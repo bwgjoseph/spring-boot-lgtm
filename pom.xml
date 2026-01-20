@@ -131,6 +131,19 @@
 					</excludes>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>com.google.cloud.tools</groupId>
+				<artifactId>jib-maven-plugin</artifactId>
+				<version>3.5.1</version>
+				<configuration>
+					<from>
+						<image>eclipse-temurin:25-jre-alpine</image>
+					</from>
+					<to>
+						<image>${project.artifactId}:demo</image>
+					</to>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 

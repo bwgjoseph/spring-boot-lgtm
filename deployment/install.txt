@@ -1,0 +1,38 @@
+# 1. Add the repositories
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+# 2. Create the namespace
+kubectl create namespace monitoring
+
+# 3. Deploy Prometheus (Metrics Warehouse)
+helm upgrade --install prometheus prometheus-community/prometheus --namespace monitoring -f values-prometheus.yaml
+
+# 4. Deploy Loki (Logs Warehouse)
+helm upgrade --install loki grafana/loki --namespace monitoring -f values-loki.yaml
+
+# 5. Deploy Tempo (Traces Warehouse)
+helm upgrade --install tempo grafana/tempo --namespace monitoring -f values-tempo.yaml
+
+# 6. Deploy Grafana (The UI)
+helm upgrade --install grafana grafana/grafana --namespace monitoring -f values-grafana.yaml
+
+# 7. Deploy Alloy (The Collector)
+# Do this last so it can verify the endpoints above are live
+helm upgrade --install alloy grafana/alloy --namespace monitoring -f values-alloy.yaml
+
+export POD_NAME=$(kubectl get pods --namespace monitoring -l "app.kubernetes.io/name=prometheus,app.kubernetes.io/instance=prometheus" -o jsonpath="{.items[0].metadata.name}")
+kubectl --namespace monitoring port-forward $POD_NAME 9090
+
+kubectl port-forward --namespace monitoring svc/loki-gateway 3100:80 &
+curl -H "Content-Type: application/json" -XPOST -s "http://127.0.0.1:3100/loki/api/v1/push" --data-raw "{\"streams\": [{\"stream\": {\"job\": \"test\"}, \"values\": [[\"$(date +%s)000000000\", \"fizzbuzz\"]]}]}"
+
+kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+admin / 2hQSCQp7rcdfoNFC6kFY6tVniUWKAfoTPA7qOwV9
+
+kubectl port-forward svc/alloy 12345:12345 -n monitoring
+kubectl port-forward svc/prometheus-server 9090:80 -n monitoring
+kubectl port-forward svc/grafana 8001:80 -n monitoring
+
+kubectl port-forward grafana-c669c8996-6m9q6 3000:3000 -n monitoring

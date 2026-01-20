@@ -147,3 +147,37 @@ otelcol.exporter.otlp "local_tempo" {
   }
 }
 ```
+
+#### Application
+
+Build the application into image using jib
+
+```bash
+./mvwn compile jib:dockerBuild
+```
+
+To deploy
+
+```bash
+kubectl apply -f .\deployment.yaml -n monitoring
+```
+
+### Verify
+
+```bash
+kubectl port-forward svc/alloy 12345:12345 -n monitoring &
+kubectl port-forward svc/prometheus-server 9090:80 -n monitoring &
+kubectl port-forward svc/grafana 3000:80 -n monitoring &
+kubectl port-forward svc/spring-boot-app-svc 8080:8080 -n monitoring &
+```
+
+### Troubleshoot
+
+```bash
+# Kill all existing background job and remove it
+Get-Job | Stop-Job
+Get-Job | Remove-Job
+
+# Get logs of the pod
+kubectl logs <pod-name> -n monitoring
+```

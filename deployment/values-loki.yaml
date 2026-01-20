@@ -1,0 +1,37 @@
+# 1. Force the deployment mode
+deploymentMode: SingleBinary
+
+# 2. Configure the Single Binary target
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 20Gi
+
+# 3. CRITICAL: Explicitly zero out the Scalable components
+# This removes the "more than zero replicas for both" error
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+# 4. Standard Loki Configuration
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: 'filesystem'
+  
+  # Required for SingleBinary + Filesystem in some 6.x versions
+  schemaConfig:
+    configs:
+      - from: "2024-01-01" # Ensure this date is in the past
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h

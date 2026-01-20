@@ -1,0 +1,21 @@
+tempo:
+  replicas: 1
+  # The 'all' target is the monolithic mode
+  extraArgs:
+    target: all
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+  
+  # Enable OTLP ingestion specifically for Alloy to talk to it
+  ingestion:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+
+persistence:
+  enabled: true
+  size: 20Gi

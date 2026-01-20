@@ -1,0 +1,95 @@
+alloy:
+  extraPorts:
+    - name: "otlp-grpc"
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+  configMap:
+    create: true
+    content: |-
+      // --- LOGS: DISCOVERY & RELABELING ---
+      // 1. Discover pods in the cluster
+      discovery.kubernetes "all_pods" {
+        role = "pod"
+      }
+
+      // 2. Extract specific labels to use as Loki labels
+      discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.all_pods.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+
+        // Map 'app' or 'app.kubernetes.io/name' to 'service_name'
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_label_app"]
+          separator     = ";"
+          regex         = "^(?:;*)([^;]+).*$"
+          replacement   = "$1"
+          target_label  = "service_name"
+        }
+
+        // Fallback: If no app label, use container name
+        rule {
+          source_labels = ["service_name", "__meta_kubernetes_pod_container_name"]
+          regex         = "^;(.+)$"
+          replacement   = "$1"
+          target_label  = "service_name"
+        }
+      }
+
+      // 3. Scrape the logs from the relabeled targets
+      loki.source.kubernetes "logs" {
+        targets    = discovery.relabel.pod_logs.output
+        forward_to = [loki.write.local.receiver]
+      }
+
+      loki.write "local" {
+        endpoint {
+          url = "http://loki.monitoring.svc:3100/loki/api/v1/push"
+        }
+      }
+
+      // --- METRICS: PROMETHEUS SCRAPING ---
+      prometheus.scrape "spring_boot" {
+        targets = discovery.relabel.pod_logs.output
+        metrics_path = "/actuator/prometheus"
+        forward_to = [prometheus.remote_write.prom.receiver]
+      }
+
+      prometheus.remote_write "prom" {
+        endpoint {
+          url = "http://prometheus-server.monitoring.svc:80/api/v1/write"
+        }
+      }
+
+      // --- TRACES: OTLP INGESTION ---
+      otelcol.receiver.otlp "default" {
+        grpc { endpoint = "0.0.0.0:4317" }
+        output {
+          traces = [otelcol.exporter.otlp.tempo.input]
+        }
+      }
+
+      otelcol.exporter.otlp "tempo" {
+        client {
+          endpoint = "tempo.monitoring.svc:4317"
+          tls { insecure = true }
+        }
+      }
+
+# Ensure the Service opens port 4317 for your Spring Boot app to push traces
+#service:
+#  enabled: true
+#  type: ClusterIP
+
+# Enable RBAC so Alloy has permission to list pods and read logs
+controller:
+  type: daemonset

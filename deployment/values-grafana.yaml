@@ -1,0 +1,37 @@
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-server.monitoring.svc
+        isDefault: true
+        jsonData:
+          httpMethod: POST
+          exemplarsFiles: # Links Metrics -> Traces
+            - datasourceUid: 'tempo'
+              internal: true
+
+      - name: Loki
+        type: loki
+        url: http://loki.monitoring.svc:3100
+        jsonData:
+          derivedFields:
+            - datasourceUid: 'tempo'
+              name: 'TraceID'
+              # This regex finds the traceId in standard Spring Boot logs
+              # Example log: [traceId=abc123...] -> extracts abc123
+              matcherRegex: 'traceId=(\w+)' 
+              url: '$${__value.raw}'
+              urlDisplayLabel: 'View Trace'
+
+      - name: Tempo
+        type: tempo
+        uid: 'tempo' # Match this with datasourceUid above
+        url: http://tempo.monitoring.svc:3200
+        jsonData:
+          # This links Traces -> Logs
+          lokiSearch:
+            datasourceUid: 'Loki'
+          serviceMap:
+            datasourceUid: 'Prometheus'
