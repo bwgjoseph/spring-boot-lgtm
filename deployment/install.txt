@@ -1,5 +1,6 @@
 # 1. Add the repositories
 helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add grafana-community https://grafana-community.github.io/helm-charts
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 
@@ -13,10 +14,10 @@ helm upgrade --install prometheus prometheus-community/prometheus --namespace mo
 helm upgrade --install loki grafana/loki --namespace monitoring -f values-loki.yaml
 
 # 5. Deploy Tempo (Traces Warehouse)
-helm upgrade --install tempo grafana/tempo --namespace monitoring -f values-tempo.yaml
+helm upgrade --install tempo grafana-community/tempo --namespace monitoring -f values-tempo.yaml
 
 # 6. Deploy Grafana (The UI)
-helm upgrade --install grafana grafana/grafana --namespace monitoring -f values-grafana.yaml
+helm upgrade --install grafana grafana-community/grafana --namespace monitoring -f values-grafana.yaml
 
 # 7. Deploy Alloy (The Collector)
 # Do this last so it can verify the endpoints above are live

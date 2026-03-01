@@ -1,0 +1,99 @@
+version: '3'
+
+vars:
+  NAMESPACE: monitoring
+  DEPLOY_DIR: deployment
+  # HELM CHART VERSIONS
+  VER_ALLOY: "0.6.1"
+  VER_GRAFANA: "8.5.12"
+  VER_LOKI: "6.16.0"
+  VER_TEMPO: "1.10.15"
+  VER_PROMETHEUS: "25.27.0"
+
+tasks:
+  # --- INFRASTRUCTURE REPOS ---
+  repos:
+    desc: Add and update Helm repositories
+    cmds:
+      - helm repo add grafana https://grafana.github.io/helm-charts
+      - helm repo add grafana-community https://grafana-community.github.io/helm-charts
+      - helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - helm repo update
+
+  namespace:
+    desc: Create the monitoring namespace if it doesn't exist
+    cmds:
+      - kubectl create namespace {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+
+  # --- INDIVIDUAL COMPONENTS ---
+  alloy:
+    desc: Install or Upgrade Grafana Alloy
+    deps: [repos, namespace]
+    cmds:
+      - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f {{.DEPLOY_DIR}}/values-alloy.yaml
+
+  grafana:
+    desc: Install or Upgrade Grafana
+    deps: [repos, namespace]
+    cmds:
+      - helm upgrade --install grafana grafana-community/grafana -n {{.NAMESPACE}} --version {{.VER_GRAFANA}} -f {{.DEPLOY_DIR}}/values-grafana.yaml
+
+  loki:
+    desc: Install or Upgrade Loki
+    deps: [repos, namespace]
+    cmds:
+      - helm upgrade --install loki grafana/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f {{.DEPLOY_DIR}}/values-loki.yaml
+
+  tempo:
+    desc: Install or Upgrade Tempo
+    deps: [repos, namespace]
+    cmds:
+      - helm upgrade --install tempo grafana-community/tempo -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f {{.DEPLOY_DIR}}/values-tempo.yaml
+
+  prometheus:
+    desc: Install or Upgrade Prometheus
+    deps: [repos, namespace]
+    cmds:
+      - helm upgrade --install prometheus prometheus-community/prometheus -n {{.NAMESPACE}} --version {{.VER_PROMETHEUS}} -f {{.DEPLOY_DIR}}/values-prometheus.yaml
+
+  # --- APPLICATION TASKS ---
+  app:build:
+    desc: Build the Spring Boot application and Docker image using Jib
+    cmds:
+      - ./mvnw clean compile jib:dockerBuild
+
+  app:deploy:
+    desc: Deploy the Spring Boot application to Kubernetes
+    deps: [namespace]
+    cmds:
+      - kubectl apply -f {{.DEPLOY_DIR}}/deployment.yaml
+      - kubectl rollout restart deployment spring-boot-app -n {{.NAMESPACE}}
+
+  # --- COMPOSITE TASKS ---
+  infra:
+    desc: Install/Upgrade all infrastructure components (LGTM + Alloy)
+    deps: [loki, tempo, prometheus, grafana, alloy]
+
+  all:
+    desc: Run a full installation/upgrade (Infra + App)
+    cmds:
+      - task: infra
+      - task: app:build
+      - task: app:deploy
+
+  # --- UTILITY TASKS ---
+  port-forward:
+    desc: Port-forward Grafana UI (localhost:3000)
+    cmds:
+      - echo "Access Grafana at http://localhost:3000"
+      - kubectl port-forward service/grafana 3000:80 -n {{.NAMESPACE}}
+
+  password:
+    desc: Get the Grafana admin password
+    cmds:
+      - kubectl get secret --namespace {{.NAMESPACE}} grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+  clean:
+    desc: Remove the monitoring namespace and all its resources
+    cmds:
+      - kubectl delete namespace {{.NAMESPACE}} --ignore-not-found
