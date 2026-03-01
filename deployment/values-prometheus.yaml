@@ -1,7 +1,10 @@
 server:
-  # CRITICAL: Allow Alloy to push metrics via remote_write
-  extraArgs:
-    enable-feature: "remote-write-receiver"
+  # Enable Alloy to push metrics via remote_write
+  remoteWriteReceiver: true
+  
+  extraFlags:
+    - web.enable-remote-write-receiver
+    - web.enable-lifecycle
   
   persistentVolume:
     enabled: true
@@ -13,4 +16,4 @@ alertmanager:
 prometheus-pushgateway:
   enabled: false
 prometheus-node-exporter:
-  enabled: true # Keep this to see node health in Grafana
+  enabled: false

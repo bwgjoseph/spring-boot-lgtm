@@ -1,6 +1,10 @@
 spring:
   application:
     name: spring-boot-observability
+  data:
+    mongodb:
+      # Disable MongoDB to stop connection errors in sandbox
+      enabled: false
 management:
   endpoints:
     web:
@@ -24,17 +28,18 @@ management:
     sampling:
       # Keep 100% at the app level; Alloy's tail sampling will handle the reduction
       probability: 1.0
-  observations:
-    key-values:
-      application: spring-boot-observability
+    # Crucial: Ensure traceId/spanId are put into MDC
+    propagation:
+      produce: [w3c]
+      consume: [w3c]
+    # In newer Spring Boot, this explicitly enables MDC correlation
+    enabled: true
   otlp:
-    tracing:
-      endpoint: http://localhost:4317
-      transport: grpc
     metrics:
       export:
         enabled: false
-
 logging:
   pattern:
+    # Check for traceId, trace_id, and their span counterparts
     correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+  include-application-name: false

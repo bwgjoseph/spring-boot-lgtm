@@ -9,7 +9,6 @@ singleBinary:
     size: 20Gi
 
 # 3. CRITICAL: Explicitly zero out the Scalable components
-# This removes the "more than zero replicas for both" error
 backend:
   replicas: 0
 read:
@@ -35,3 +34,22 @@ loki:
         index:
           prefix: index_
           period: 24h
+
+# 5. Fix Caches for local sandbox (was requesting 9.8Gi)
+chunksCache:
+  allocatedMemory: 512
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+
+resultsCache:
+  allocatedMemory: 512
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"

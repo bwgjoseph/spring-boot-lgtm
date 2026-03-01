@@ -65,7 +65,10 @@ alloy:
       otelcol.receiver.otlp "default" {
         grpc { endpoint = "0.0.0.0:4317" }
         output {
-          traces  = [otelcol.processor.tail_sampling.default.input]
+          traces  = [
+            otelcol.connector.servicegraph.default.input,
+            otelcol.processor.tail_sampling.default.input,
+          ]
           metrics = [otelcol.exporter.otlp.tempo.input]
         }
       }
@@ -84,18 +87,31 @@ alloy:
         }
         output {
           traces = [
-            otelcol.connector.service_graph.default.input,
+            otelcol.connector.servicegraph.default.input,
             otelcol.exporter.otlp.tempo.input,
           ]
         }
       }
 
       // Service Graph: Build dependency map from traces
-      otelcol.connector.service_graph "default" {
-        dimensions = ["deployment.environment"]
-        output {
-          metrics = [prometheus.remote_write.prom.receiver]
+      otelcol.connector.servicegraph "default" {
+        dimensions = ["service.name"]
+        
+        store {
+          max_items = 1000
+          ttl       = "30s"
         }
+
+        store_expiration = "10s"
+
+        output {
+          metrics = [otelcol.exporter.prometheus.default.input]
+        }
+      }
+
+      // Bridge: Convert OTel metrics from servicegraph to Prometheus format
+      otelcol.exporter.prometheus "default" {
+        forward_to = [prometheus.remote_write.prom.receiver]
       }
 
       otelcol.exporter.otlp "tempo" {

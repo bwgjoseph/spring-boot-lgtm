@@ -4,34 +4,50 @@ datasources:
     datasources:
       - name: Prometheus
         type: prometheus
+        uid: prometheus
         url: http://prometheus-server.monitoring.svc
         isDefault: true
         jsonData:
           httpMethod: POST
-          exemplarsFiles: # Links Metrics -> Traces
+          exemplarTraceIdDestinations:
             - datasourceUid: 'tempo'
-              internal: true
+              name: 'trace_id'
 
       - name: Loki
         type: loki
+        uid: loki
         url: http://loki.monitoring.svc:3100
         jsonData:
           derivedFields:
             - datasourceUid: 'tempo'
               name: 'TraceID'
-              # This regex finds the traceId in standard Spring Boot logs
-              # Example log: [traceId=abc123...] -> extracts abc123
-              matcherRegex: 'traceId=(\w+)' 
+              matcherRegex: '\[.+?,(\w+),(\w+)?\]'
               url: '$${__value.raw}'
               urlDisplayLabel: 'View Trace'
 
       - name: Tempo
         type: tempo
-        uid: 'tempo' # Match this with datasourceUid above
+        uid: tempo
         url: http://tempo.monitoring.svc:3200
         jsonData:
-          # This links Traces -> Logs
-          lokiSearch:
-            datasourceUid: 'Loki'
+          # Trace to Logs
+          tracesToLogs:
+            datasourceUid: 'loki'
+            tags: ['job', 'instance', 'pod', 'namespace']
+            mappedTags:
+              - key: 'service.name'
+                value: 'service_name'
+            filterByTraceId: true
+            filterBySpanId: false
+          
+          # Trace to Metrics (Service Map)
+          tracesToMetrics:
+            datasourceUid: 'prometheus'
+            spanAttributes:
+              - key: 'service.name'
+                value: 'service_name'
+          
           serviceMap:
-            datasourceUid: 'Prometheus'
+            datasourceUid: 'prometheus'
+          nodeGraph:
+            enabled: true

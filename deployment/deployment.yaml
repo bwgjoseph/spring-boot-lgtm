@@ -30,12 +30,11 @@ spec:
           env:
             # 1. TRACING CONFIG: Point to Alloy's OTLP gRPC port
             - name: MANAGEMENT_OTLP_TRACING_ENDPOINT
-              value: "http://alloy.monitoring.svc.cluster.local:4317"
-            # Ensure to push via gRPC
+              value: "http://alloy:4317"
             - name: MANAGEMENT_OTLP_TRACING_TRANSPORT
               value: "grpc"
-            - name: LOGGING_STRUCTURED_FORMAT_CONSOLE
-              value: "ecs"
+            - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+              value: "1.0"
 
             # 2. METRICS CONFIG: Enable OTLP push (optional if using scrape)
             # Since we chose 'Scrape', we ensure Prometheus registry is active

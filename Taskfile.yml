@@ -3,12 +3,12 @@ version: '3'
 vars:
   NAMESPACE: monitoring
   DEPLOY_DIR: deployment
-  # HELM CHART VERSIONS
-  VER_ALLOY: "0.6.1"
-  VER_GRAFANA: "8.5.12"
-  VER_LOKI: "6.16.0"
-  VER_TEMPO: "1.10.15"
-  VER_PROMETHEUS: "25.27.0"
+  # HELM CHART VERSIONS (Stable as of March 2026)
+  VER_ALLOY: "1.6.0"
+  VER_GRAFANA: "11.2.2"
+  VER_LOKI: "6.53.0"
+  VER_TEMPO: "1.26.5"
+  VER_PROMETHEUS: "28.13.0"
 
 tasks:
   # --- INFRASTRUCTURE REPOS ---
@@ -23,7 +23,10 @@ tasks:
   namespace:
     desc: Create the monitoring namespace if it doesn't exist
     cmds:
-      - kubectl create namespace {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+      # More robust way for Windows/PowerShell to handle the namespace creation
+      - kubectl create namespace {{.NAMESPACE}} --dry-run=client -o yaml > namespace.yaml
+      - kubectl apply --server-side -f namespace.yaml
+      - rm namespace.yaml
 
   # --- INDIVIDUAL COMPONENTS ---
   alloy:
@@ -60,7 +63,7 @@ tasks:
   app:build:
     desc: Build the Spring Boot application and Docker image using Jib
     cmds:
-      - ./mvnw clean compile jib:dockerBuild
+      - .\\mvnw clean compile jib:dockerBuild
 
   app:deploy:
     desc: Deploy the Spring Boot application to Kubernetes
@@ -72,7 +75,12 @@ tasks:
   # --- COMPOSITE TASKS ---
   infra:
     desc: Install/Upgrade all infrastructure components (LGTM + Alloy)
-    deps: [loki, tempo, prometheus, grafana, alloy]
+    cmds:
+      - task: prometheus
+      - task: loki
+      - task: tempo
+      - task: grafana
+      - task: alloy
 
   all:
     desc: Run a full installation/upgrade (Infra + App)
@@ -83,10 +91,19 @@ tasks:
 
   # --- UTILITY TASKS ---
   port-forward:
-    desc: Port-forward Grafana UI (localhost:3000)
+    desc: Port-forward all observability UIs (Grafana:3000, Prometheus:9090, Alloy:12345)
     cmds:
-      - echo "Access Grafana at http://localhost:3000"
-      - kubectl port-forward service/grafana 3000:80 -n {{.NAMESPACE}}
+      - kubectl port-forward service/grafana 3000:80 -n {{.NAMESPACE}} &
+      - kubectl port-forward service/prometheus-server 9090:80 -n {{.NAMESPACE}} &
+      - kubectl port-forward daemonset/alloy 12345:12345 -n {{.NAMESPACE}} &
+      - kubectl port-forward service/spring-boot-app-svc 8080:8080 -n {{.NAMESPACE}} &
+      - echo "Port-forwards started in background."
+#      - echo "Grafana: http://localhost:3000"
+#      - echo "Prometheus: http://localhost:9090"
+#      - echo "Alloy: http://localhost:12345"
+#      - echo "App: http://localhost:8080"
+      - echo "Grafana Admin Password:"
+      - task: password
 
   password:
     desc: Get the Grafana admin password
