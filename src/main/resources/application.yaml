@@ -1,6 +1,6 @@
 spring:
   application:
-    name: spring-boot-observability
+    name: spring-boot-app
   data:
     mongodb:
       # Disable MongoDB to stop connection errors in sandbox

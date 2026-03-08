@@ -31,7 +31,7 @@ One of the most powerful aspects of this stack is its ability to automatically m
 
 ### 🗺️ Service Graph (The "System" View)
 Tempo's `metricsGenerator` scans your traces and automatically draws a map of how services interact.
-*   **What it shows:** Arrows between services (e.g., `app` -> `pokeapi`), request rates, and error percentages.
+*   **What it shows:** Arrows between services (e.g., `spring-boot-app` -> `pokeapi`), request rates, and error percentages.
 *   **The Benefit:** You can instantly see if a downstream API is failing or causing a bottleneck for your entire system.
 *   **Where to find it:** In Grafana, go to **Explore -> Tempo** and select the **Service Graph** tab.
 
@@ -58,10 +58,11 @@ Tempo's `metricsGenerator` scans your traces and automatically draws a map of yo
 ### 🔗 Log-Trace Correlation
 *   **Trace-to-Log:** While looking at a Trace in Tempo, click "Logs for this span" to see every log message written *during that specific request*.
 *   **Log-to-Trace:** While looking at a Log in Loki, click the "View Trace" button next to the Trace ID to see the full execution timeline of that request.
+*   **Deeper Dive:** See [learning_trace_to_log.md](./learning_trace_to_log.md) for detailed troubleshooting of this feature.
 
 ---
 
-## 3. Kubernetes Cluster Monitoring
+## 4. Kubernetes Cluster Monitoring
 
 We've enabled full visibility into the cluster itself, not just your Java app:
 - **Cluster/Node Health:** CPU, RAM, and Disk usage for the underlying machines.

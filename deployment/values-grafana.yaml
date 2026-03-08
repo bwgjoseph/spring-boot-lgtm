@@ -21,7 +21,8 @@ datasources:
           derivedFields:
             - datasourceUid: 'tempo'
               name: 'TraceID'
-              matcherRegex: '\[.+?,(\w+),(\w+)?\]'
+              # Matches standard key-value or Spring Boot bracketed format
+              matcherRegex: '(?:traceId|trace_id|traceid|\[.+?,)([a-f0-9]{32})'
               url: '$${__value.raw}'
               urlDisplayLabel: 'View Trace'
 
@@ -30,15 +31,20 @@ datasources:
         uid: tempo
         url: http://tempo.monitoring.svc:3200
         jsonData:
-          # Trace to Logs
-          tracesToLogs:
+          # Standard Traces to Logs configuration (V2)
+          # Automatic filtering handles the traceId search
+          tracesToLogsV2:
             datasourceUid: 'loki'
-            tags: ['job', 'instance', 'pod', 'namespace']
-            mappedTags:
+            filterByTraceID: true
+            filterBySpanID: false
+            lokiSearch: true
+            tags:
+              - key: 'service.namespace'
+                value: 'namespace'
               - key: 'service.name'
                 value: 'service_name'
-            filterByTraceId: true
-            filterBySpanId: false
+            spanStartTimeShift: '5s'
+            spanEndTimeShift: '5s'
           
           # Trace to Metrics (Service Map)
           tracesToMetrics:
@@ -58,5 +64,4 @@ sidecar:
     label: grafana_dashboard
     labelValue: "1"
     searchNamespace: ALL
-    # Folder to store the dashboards in Grafana
     folder: /var/lib/grafana/dashboards/default

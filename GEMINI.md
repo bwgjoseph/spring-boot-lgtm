@@ -52,8 +52,9 @@ The project uses `Taskfile` to simplify complex operations.
 ## Development Conventions
 
 ### Instrumentation
-- **Micrometer Observation API:** Use `Observation.createNotStarted(...)` for manual instrumentation of business logic. Refer to `PokemonAPI.java` for an example.
-- **MDC Correlation:** Trace IDs and Span IDs are automatically included in logs via the pattern defined in `application.yaml`: `[${spring.application.name:},%X{traceId:-},%X{spanId:-}]`.
+- **Micrometer Observation API:** Use `@Observed` annotation or `Observation.createNotStarted(...)` for manual instrumentation.
+- **MDC Correlation:** Trace IDs and Span IDs are automatically included in logs via the pattern defined in `application.yaml`: `[${spring.application.name:},%X{trace_id:-},%X{span_id:-}]`.
+- **Trace-to-Log Learnings:** Refer to [learning_trace_to_log.md](./learning_trace_to_log.md) for details on why `trace_id` (snake_case) is used and how correlation works.
 
 ### Observability Patterns
 - **Exemplars:** Enabled via `management.prometheus.metrics.export.exemplars.enabled: true`. This allows linking Prometheus metric spikes directly to Tempo traces in Grafana.
