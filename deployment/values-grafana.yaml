@@ -51,3 +51,12 @@ datasources:
             datasourceUid: 'prometheus'
           nodeGraph:
             enabled: true
+
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: ALL
+    # Folder to store the dashboards in Grafana
+    folder: /var/lib/grafana/dashboards/default

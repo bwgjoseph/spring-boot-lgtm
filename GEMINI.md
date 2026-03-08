@@ -21,11 +21,12 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
   - **Jib:** Builds Docker images (`jib-maven-plugin`).
   - **Helm:** Kubernetes deployments (`deployment/`).
   - **Taskfile:** Orchestration for infrastructure and app deployment.
-
 ## Development Environment
 - **Operating System:** Windows
 - **Shell:** PowerShell (pwsh)
+- **Docker Desktop:** Special configurations applied for hardware limits. See [DOCKER_DESKTOP.md](./DOCKER_DESKTOP.md).
 - **Command Syntax:** Always use PowerShell syntax for shell commands. 
+...
   - Use `;` instead of `&&` for command chaining.
   - Use `$env:VAR = "val"` for environment variables.
   - Use `.\mvnw` instead of `./mvnw`.
@@ -39,6 +40,7 @@ The project uses `Taskfile` to simplify complex operations.
 | **Infra Only** | `task infra` | Deploys Prometheus, Loki, Tempo, Grafana, and Alloy. |
 | **App Build** | `task app:build` | Builds the Spring Boot app and Docker image using Jib. |
 | **App Deploy** | `task app:deploy` | Deploys the application to the `monitoring` namespace. |
+| **Dashboards** | `task dashboards` | Syncs local dashboards from `deployment/dashboards/` to K8s. |
 | **Port Forward** | `task port-forward` | Forwards Grafana (3000), Prometheus (9090), Alloy (12345), and App (8080). |
 | **Get Password** | `task password` | Retrieves the Grafana admin password. |
 

@@ -1,39 +1,25 @@
-# 1. Add the repositories
-helm repo add grafana https://grafana.github.io/helm-charts
-helm repo add grafana-community https://grafana-community.github.io/helm-charts
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
+# 🚀 Observability Stack Quick Reference (PowerShell)
 
-# 2. Create the namespace
-kubectl create namespace monitoring
+# 1. Add Repos & Update
+helm repo add grafana https://grafana.github.io/helm-charts; helm repo add grafana-community https://grafana-community.github.io/helm-charts; helm repo add prometheus-community https://prometheus-community.github.io/helm-charts; helm repo update
 
-# 3. Deploy Prometheus (Metrics Warehouse)
-helm upgrade --install prometheus prometheus-community/prometheus --namespace monitoring -f values-prometheus.yaml
+# 2. Deploy Infrastructure
+helm upgrade --install prometheus prometheus-community/prometheus -n monitoring -f values-prometheus.yaml --version 28.13.0
+helm upgrade --install loki grafana/loki -n monitoring -f values-loki.yaml --version 6.53.0
+helm upgrade --install tempo grafana-community/tempo -n monitoring --version 2.0.0
+helm upgrade --install grafana grafana-community/grafana -n monitoring -f values-grafana.yaml --version 11.3.0
+kubectl create configmap local-dashboards --from-file=dashboards -n monitoring --dry-run=client -o yaml | kubectl apply -f -; kubectl label configmap local-dashboards grafana_dashboard=1 -n monitoring --overwrite
+helm upgrade --install alloy grafana/alloy -n monitoring -f values-alloy.yaml --version 1.6.1
 
-# 4. Deploy Loki (Logs Warehouse)
-helm upgrade --install loki grafana/loki --namespace monitoring -f values-loki.yaml
+# 3. Build & Deploy App
+.\mvnw clean compile jib:dockerBuild
+kubectl apply -f deployment.yaml; kubectl rollout restart deployment spring-boot-app -n monitoring
 
-# 5. Deploy Tempo (Traces Warehouse)
-helm upgrade --install tempo grafana-community/tempo --namespace monitoring -f values-tempo.yaml
+# 4. Access UIs (Port-Forward)
+# Run these in separate shells or in the background
+kubectl port-forward svc/grafana 3000:80 -n monitoring
+kubectl port-forward svc/spring-boot-app-svc 8080:8080 -n monitoring
+kubectl port-forward daemonset/alloy 12345:12345 -n monitoring
 
-# 6. Deploy Grafana (The UI)
-helm upgrade --install grafana grafana-community/grafana --namespace monitoring -f values-grafana.yaml
-
-# 7. Deploy Alloy (The Collector)
-# Do this last so it can verify the endpoints above are live
-helm upgrade --install alloy grafana/alloy --namespace monitoring -f values-alloy.yaml
-
-export POD_NAME=$(kubectl get pods --namespace monitoring -l "app.kubernetes.io/name=prometheus,app.kubernetes.io/instance=prometheus" -o jsonpath="{.items[0].metadata.name}")
-kubectl --namespace monitoring port-forward $POD_NAME 9090
-
-kubectl port-forward --namespace monitoring svc/loki-gateway 3100:80 &
-curl -H "Content-Type: application/json" -XPOST -s "http://127.0.0.1:3100/loki/api/v1/push" --data-raw "{\"streams\": [{\"stream\": {\"job\": \"test\"}, \"values\": [[\"$(date +%s)000000000\", \"fizzbuzz\"]]}]}"
-
-kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
-admin / 2hQSCQp7rcdfoNFC6kFY6tVniUWKAfoTPA7qOwV9
-
-kubectl port-forward svc/alloy 12345:12345 -n monitoring
-kubectl port-forward svc/prometheus-server 9090:80 -n monitoring
-kubectl port-forward svc/grafana 8001:80 -n monitoring
-
-kubectl port-forward grafana-c669c8996-6m9q6 3000:3000 -n monitoring
+# 5. Credentials
+kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo ""

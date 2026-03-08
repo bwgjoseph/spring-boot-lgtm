@@ -29,6 +29,13 @@ tasks:
       - rm namespace.yaml
 
   # --- INDIVIDUAL COMPONENTS ---
+  dashboards:
+    desc: Create ConfigMap for local dashboards
+    deps: [namespace]
+    cmds:
+      - kubectl create configmap local-dashboards --from-file={{.DEPLOY_DIR}}/dashboards -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl label configmap local-dashboards grafana_dashboard=1 -n {{.NAMESPACE}} --overwrite
+
   alloy:
     desc: Install or Upgrade Grafana Alloy
     deps: [repos, namespace]
@@ -80,6 +87,7 @@ tasks:
       - task: loki
       - task: tempo
       - task: grafana
+      - task: dashboards
       - task: alloy
 
   all:

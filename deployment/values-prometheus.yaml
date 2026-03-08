@@ -10,10 +10,17 @@ server:
     enabled: true
     size: 20Gi # Local disk storage for lean setup
 
-# Disable components we don't need for a simple setup
+# Enable/Disable components for a simple setup
 alertmanager:
   enabled: false
 prometheus-pushgateway:
   enabled: false
 prometheus-node-exporter:
-  enabled: false
+  enabled: true
+  # DOCKER-DESKTOP: Disabled hostRootfs mount because Docker Desktop 
+  # does not support 'shared' mount propagation for the root path.
+  # FOR PRODUCTION: Set to 'true' to allow monitoring of host disk usage.
+  hostRootFsMount:
+    enabled: false
+kube-state-metrics:
+  enabled: true

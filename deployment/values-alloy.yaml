@@ -121,5 +121,95 @@ alloy:
         }
       }
 
+      // --- K8S CLUSTER MONITORING: DISCOVERY ---
+
+      // Discovery for Node Exporter and Kubelet
+      discovery.kubernetes "nodes" {
+        role = "node"
+      }
+
+      // Discovery for Kube-State-Metrics service
+      discovery.kubernetes "services" {
+        role = "service"
+      }
+
+      // --- K8S CLUSTER MONITORING: SCRAPING ---
+
+      // Filter to only the KSM service
+      discovery.relabel "ksm" {
+        targets = discovery.kubernetes.services.targets
+        rule {
+          source_labels = ["__meta_kubernetes_service_name"]
+          regex = "prometheus-kube-state-metrics"
+          action = "keep"
+        }
+      }
+
+      // Filter to only the Node Exporter service
+      discovery.relabel "node_exporter" {
+        targets = discovery.kubernetes.services.targets
+        rule {
+          source_labels = ["__meta_kubernetes_service_name"]
+          regex = "prometheus-node-exporter"
+          action = "keep"
+        }
+      }
+
+      // Scrape cAdvisor for per-container CPU/Memory metrics
+      prometheus.scrape "cadvisor" {
+        targets = discovery.kubernetes.nodes.targets
+        scheme = "https"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        tls_config {
+          ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+          // DOCKER-DESKTOP: Insecure skip is required because the Kubelet 
+          // certificate usually doesn't match the node IP in Docker Desktop.
+          // FOR PRODUCTION: Configure proper CA verification if possible.
+          insecure_skip_verify = true
+        }
+        metrics_path = "/metrics/cadvisor"
+        forward_to = [prometheus.remote_write.prom.receiver]
+
+        rule {
+          action = "replace"
+          source_labels = ["id"]
+          regex = "^/kubepods/(?:.+)/pod([^/]+)/.+$"
+          target_label = "pod_uid"
+        }
+        rule {
+          action = "replace"
+          source_labels = ["id"]
+          regex = "^/kubepods/(?:.+)/pod[^/]+/([^/]+)$"
+          target_label = "container"
+        }
+      }
+
+      // Scrape Kubelet for node health
+      prometheus.scrape "kubelet" {
+        targets = discovery.kubernetes.nodes.targets
+        scheme = "https"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        tls_config {
+          ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+          // DOCKER-DESKTOP: Insecure skip is required because the Kubelet 
+          // certificate usually doesn't match the node IP in Docker Desktop.
+          // FOR PRODUCTION: Configure proper CA verification if possible.
+          insecure_skip_verify = true
+        }
+        forward_to = [prometheus.remote_write.prom.receiver]
+      }
+
+      // Scrape Kube-State-Metrics (Object state like Deployment health)
+      prometheus.scrape "kube_state_metrics" {
+        targets    = discovery.relabel.ksm.output
+        forward_to = [prometheus.remote_write.prom.receiver]
+      }
+
+      // Scrape Node Exporter (Hardware metrics)
+      prometheus.scrape "node_exporter" {
+        targets    = discovery.relabel.node_exporter.output
+        forward_to = [prometheus.remote_write.prom.receiver]
+      }
+
 controller:
   type: daemonset

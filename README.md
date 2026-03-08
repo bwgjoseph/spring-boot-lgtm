@@ -50,6 +50,12 @@ task all
 task infra
 ```
 
+## 🐳 Docker Desktop Notes
+
+This project contains specialized configurations to handle hardware and mount propagation limits in Docker Desktop. 
+
+👉 **[Read the Docker Desktop Configuration Guide (DOCKER_DESKTOP.md)](./DOCKER_DESKTOP.md)**
+
 ## 🔍 Exploration
 
 1. **Generate Traces:** Call the Pokemon API to see the distributed tracing in action.
@@ -60,6 +66,9 @@ task infra
    - Search for `http_server_requests_seconds_bucket` to see **Exemplars** (clickable dots linking to traces).
    - Use the **Service Graph** tab in Tempo to see the automated architecture map.
    - Query Loki logs to see the `[service-name,traceId,spanId]` correlation pattern.
+3. **Cluster Health:**
+   - Search for the **"Kubernetes / Compute Resources / Cluster"** dashboard to see overall CPU/Memory usage.
+   - Use the **"Namespace (Pods)"** dashboard to drill down into the Spring Boot app's resource consumption.
 
 ## ⚙️ Production Tuning
 
