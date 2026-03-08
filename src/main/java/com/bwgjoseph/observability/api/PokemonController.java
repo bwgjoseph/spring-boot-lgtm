@@ -1,5 +1,6 @@
 package com.bwgjoseph.observability.api;
 
+import io.micrometer.observation.annotation.Observed;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,8 +22,10 @@ public class PokemonController {
         return "trace";
     }
 
+    @Observed(name = "pokemon.controller", contextualName = "get-pokemon")
     @GetMapping("/pokemon/{id}")
     public Pokemon get(@PathVariable String id) {
+        log.info("Controller received request for ID: {}", id);
         Pokemon ditto = this.pokemonAPI.getPokemon(id);
 
         return new Pokemon(ditto.id(), ditto.name(), ditto.baseExperience());
