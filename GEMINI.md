@@ -13,7 +13,7 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
   - **Grafana Alloy:** Collector/Gateway (`1.6.1`, configured via `values-alloy.yaml`).
 - **Storage:** 
   - **Loki:** Log Storage (`6.53.0`, scraped from stdout/stderr).
-  - **Tempo:** Trace Storage (`2.0.0`, pushed via OTLP/gRPC).
+  - **Tempo:** Trace Storage and Service Graph generation (`2.0.0`, pushed via OTLP/gRPC).
   - **Prometheus:** Metrics Storage (`28.13.0`, scraped from Alloy).
   - **MongoDB:** (Currently disabled in `application.yaml`).
 - **Build & Deployment:** 

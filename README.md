@@ -10,7 +10,7 @@ This sandbox goes beyond basic connectivity to include advanced observability pa
 
 - **Exemplars:** Direct correlation from metric spikes in Prometheus to specific traces in Tempo.
 - **Tail-based Sampling:** Intelligent trace reduction (currently 100% for testing, configurable to keep 100% errors and X% success).
-- **Service Graph:** Automated dependency mapping generated from spans via Alloy's `service_graph` connector.
+- **Service Graph:** Automated dependency mapping generated from spans via Tempo's native `metricsGenerator`.
 - **Manual Instrumentation:** Examples of using the Micrometer `Observation` API for business-specific metrics and traces.
 - **Self-Monitoring:** Integrated scraping of Alloy's own health and performance metrics.
 - **Correlation-ready Logs:** Robust log patterns configured to capture both `traceId` and `trace_id` variants, compatible with Loki.
@@ -21,7 +21,8 @@ This sandbox goes beyond basic connectivity to include advanced observability pa
 - **Logs:** Collected by Alloy from pod stdout/stderr with Kubernetes metadata enrichment (Pull model).
 - **Traces:** Pushed by the application to Alloy via OTLP/gRPC (Push model).
 - **Correlation:** Data sources use standardized UIDs (`prometheus`, `loki`, `tempo`) to enable seamless cross-linking (Metric -> Trace -> Log).
-- **Alloy:** Acts as the "Brain," processing traces (sampling, batching, service graphs) before forwarding to Tempo and Loki.
+- **Alloy:** Acts as the entry point, processing traces (sampling, batching) before forwarding to Tempo and Loki.
+- **Service Graph:** Generated natively by Tempo's internal `metricsGenerator` and pushed to Prometheus.
 
 ## 🛠️ Tech Stack & Versions
 
@@ -72,14 +73,11 @@ This project contains specialized configurations to handle hardware and mount pr
 
 ## ⚙️ Production Tuning
 
-When moving from this sandbox to a real production environment, consider the following adjustments in `values-alloy.yaml`:
+When moving from this sandbox to a real production environment, consider the following adjustments:
 
-### Service Graph
-The current settings are optimized for immediate feedback in a low-traffic sandbox:
-- **`store.max_items`**: Increase to `10000+` to handle production request rates.
-- **`store.ttl`**: Increase to `2m` to ensure spans from different services have time to be paired.
-- **`store_expiration`**: Increase to `3m` to improve the accuracy of the dependency map for long-running traces.
+### Service Graph (values-tempo.yaml)
+The current settings are optimized for immediate feedback in a low-traffic sandbox. In production, Tempo's `metricsGenerator` ring should be backed by a persistent store like Etcd or memberlist.
 
-### Tail-based Sampling
+### Tail-based Sampling (values-alloy.yaml)
 The sandbox captures 100% of traces. In production, you should dial back the `probabilistic` sampling percentage (e.g., `1%` to `10%`) for successful requests while keeping `sample-errors` at 100%.
 
