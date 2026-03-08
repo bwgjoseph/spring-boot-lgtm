@@ -4,13 +4,16 @@ This project is a production-ready template and sandbox for implementing the **G
 
 It demonstrates a "Scrape & Push" architecture using Spring Boot 3.5+, Micrometer Tracing (OTEL Bridge), and W3C Trace Context.
 
+👉 **[Detailed Feature Guide (feature.md)](./feature.md)**
+
 ## 🚀 Key Features (Day 2 Ready)
 
 This sandbox goes beyond basic connectivity to include advanced observability patterns:
 
 - **Exemplars:** Direct correlation from metric spikes in Prometheus to specific traces in Tempo.
 - **Tail-based Sampling:** Intelligent trace reduction (currently 100% for testing, configurable to keep 100% errors and X% success).
-- **Service Graph:** Automated dependency mapping generated from spans via Tempo's native `metricsGenerator`.
+- **Service Graph:** Automated system-wide dependency mapping generated natively by Tempo.
+- **Node Graph:** Visual request-level flowchart for deep-diving into complex traces.
 - **Manual Instrumentation:** Examples of using the Micrometer `Observation` API for business-specific metrics and traces.
 - **Self-Monitoring:** Integrated scraping of Alloy's own health and performance metrics.
 - **Correlation-ready Logs:** Robust log patterns configured to capture both `traceId` and `trace_id` variants, compatible with Loki.
