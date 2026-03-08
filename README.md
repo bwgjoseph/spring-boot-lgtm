@@ -28,10 +28,10 @@ This sandbox goes beyond basic connectivity to include advanced observability pa
 | Component | Role | Helm Chart | Version |
 |-----------|------|------------|---------|
 | **Spring Boot 3.5** | Application | - | - |
-| **Grafana Alloy** | Collector/Gateway | `grafana/alloy` | `1.6.0` |
-| **Grafana** | Visualization | `grafana-community/grafana` | `11.2.2` |
+| **Grafana Alloy** | Collector/Gateway | `grafana/alloy` | `1.6.1` |
+| **Grafana** | Visualization | `grafana-community/grafana` | `11.3.0` |
 | **Loki** | Log Storage | `grafana/loki` | `6.53.0` |
-| **Tempo** | Trace Storage | `grafana-community/tempo` | `1.26.5` |
+| **Tempo** | Trace Storage | `grafana-community/tempo` | `2.0.0` |
 | **Prometheus** | Metrics Storage | `prometheus-community/prometheus` | `28.13.0` |
 
 

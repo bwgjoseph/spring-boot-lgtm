@@ -38,10 +38,10 @@ helm upgrade --install prometheus prometheus-community/prometheus -n monitoring 
 helm upgrade --install loki grafana/loki -n monitoring -f deployment/values-loki.yaml --version 6.53.0
 
 # Install or Upgrade Tempo (Traces)
-helm upgrade --install tempo grafana-community/tempo -n monitoring --version 1.26.5
+helm upgrade --install tempo grafana-community/tempo -n monitoring --version 2.0.0
 
 # Install or Upgrade Grafana (Visualization)
-helm upgrade --install grafana grafana-community/grafana -n monitoring -f deployment/values-grafana.yaml --version 11.2.2
+helm upgrade --install grafana grafana-community/grafana -n monitoring -f deployment/values-grafana.yaml --version 11.3.0
 ```
 
 ---
@@ -51,7 +51,7 @@ Alloy acts as the central gateway for all observability data. It is installed **
 
 ### Fresh Install or Upgrade
 ```bash
-helm upgrade --install alloy grafana/alloy -n monitoring -f deployment/values-alloy.yaml --version 1.6.0
+helm upgrade --install alloy grafana/alloy -n monitoring -f deployment/values-alloy.yaml --version 1.6.1
 ```
 
 ---

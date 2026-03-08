@@ -102,7 +102,7 @@ alloy:
           ttl       = "30s"
         }
 
-        store_expiration = "10s"
+        store_expiration_loop = "10s"
 
         output {
           metrics = [otelcol.exporter.prometheus.default.input]
