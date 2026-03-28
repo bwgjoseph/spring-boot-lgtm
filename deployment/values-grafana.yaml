@@ -5,7 +5,7 @@ datasources:
       - name: Prometheus
         type: prometheus
         uid: prometheus
-        url: http://prometheus-server.monitoring.svc
+        url: http://prometheus-server.monitoring.svc:80
         isDefault: true
         jsonData:
           httpMethod: POST
@@ -16,12 +16,11 @@ datasources:
       - name: Loki
         type: loki
         uid: loki
-        url: http://loki.monitoring.svc:3100
+        url: http://loki-gateway.monitoring.svc
         jsonData:
           derivedFields:
             - datasourceUid: 'tempo'
               name: 'TraceID'
-              # Matches standard key-value or Spring Boot bracketed format
               matcherRegex: '(?:traceId|trace_id|traceid|\[.+?,)([a-f0-9]{32})'
               url: '$${__value.raw}'
               urlDisplayLabel: 'View Trace'

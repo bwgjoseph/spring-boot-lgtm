@@ -8,13 +8,14 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
 - **Language:** Java 25
 - **Observability:** 
   - **Micrometer Tracing (OTEL Bridge):** For traces.
-  - **Micrometer Observation API:** For manual instrumentation (e.g., `PokemonAPI.java`).
+  - **Micrometer Observation API:** For manual instrumentation.
   - **Micrometer Prometheus Registry:** For metric scraping via `/actuator/prometheus`.
-  - **Grafana Alloy:** Collector/Gateway (`1.6.1`, configured via `values-alloy.yaml`).
+  - **Grafana Alloy:** Collector/Gateway (`1.6.1`, configured via `values-alloy.yaml`). Features `loki.process` for structured metadata extraction.
 - **Storage:** 
-  - **Loki:** Log Storage (`6.53.0`, scraped from stdout/stderr).
-  - **Tempo:** Trace Storage and Service Graph generation (`2.0.0`, pushed via OTLP/gRPC).
+  - **Loki:** Log Storage (`6.53.0`, Simple Scalable mode, S3/MinIO backend).
+  - **Tempo:** Trace Storage and Service Graph generation (`2.0.0`, Single Binary with S3/MinIO backend).
   - **Prometheus:** Metrics Storage (`28.13.0`, scraped from Alloy).
+  - **MinIO:** Internal Object Storage (`5.4.0`, provides S3 API for Loki/Tempo).
   - **MongoDB:** (Currently disabled in `application.yaml`).
 - **Build & Deployment:** 
   - **Maven:** Build system.

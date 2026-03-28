@@ -1,0 +1,56 @@
+# Tempo Single Binary with Manual Config to bypass chart limitations
+tempo:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  
+  extraArgs:
+    mem-ballast-size-mbs: 16
+
+# Manually define the config to ensure correct S3 field names
+config: |
+  server:
+    http_listen_port: 3200
+  storage:
+    trace:
+      backend: s3
+      s3:
+        endpoint: minio.monitoring.svc:9000
+        bucket: tempo
+        access_key: admin
+        secret_key: password123
+        insecure: true
+        s3forcepathstyle: true
+      wal:
+        path: /var/tempo/wal
+  distributor:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "0.0.0.0:4317"
+  ingester:
+    lifecycler:
+      ring:
+        kvstore:
+          store: inmemory
+        replication_factor: 1
+  metrics_generator:
+    enabled: true
+    storage:
+      path: /var/tempo/wal
+      remote_write:
+        - url: http://prometheus-server.monitoring.svc/api/v1/write
+    traces_storage:
+      path: /var/tempo/traces
+  overrides:
+    metrics_generator_processors: [service-graphs, span-metrics]
+
+persistence:
+  enabled: true
+  size: 10Gi

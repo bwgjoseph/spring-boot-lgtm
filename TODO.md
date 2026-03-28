@@ -8,3 +8,4 @@
 - [ ] Update configuration to be production ready
     - [ ] Ensure retention period is 1 month
 - [ ] Setup grafana-mcp
+- [x] Service graph is not working (See [SERVICE_GRAPH_ISSUE](SERVICE_GRAPH_ISSUE.md))

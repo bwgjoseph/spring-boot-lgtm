@@ -2,10 +2,16 @@ server:
   # Enable Alloy to push metrics via remote_write
   remoteWriteReceiver: true
   
-  extraFlags:
-    - web.enable-remote-write-receiver
-    - web.enable-lifecycle
+  # Prometheus server command-line flags
+  # For remote write receiver to be enabled, we need to pass '--web.enable-remote-write-receiver' and '--web.enable-lifecycle'
+  extraArgs:
+    web.enable-remote-write-receiver: null
+    web.enable-lifecycle: null
   
+  # Prometheus configuration file contents
+  # This section will be injected into /etc/config/prometheus.yml
+  config: {}
+        
   persistentVolume:
     enabled: true
     size: 20Gi # Local disk storage for lean setup

@@ -1,0 +1,80 @@
+# Loki Simple Scalable Configuration
+deploymentMode: SimpleScalable
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  
+  storage:
+    type: s3
+    s3:
+      endpoint: minio.monitoring.svc:9000
+      access_key_id: admin
+      secret_access_key: password123
+      s3ForcePathStyle: true
+      insecure: true
+    bucketNames:
+      chunks: loki
+      ruler: loki
+      admin: loki
+
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+
+# Separation of Read/Write paths
+write:
+  replicas: 1
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+read:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+
+backend:
+  replicas: 1
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+
+gateway:
+  resources:
+    requests:
+      cpu: 5m
+      memory: 16Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+
+# Scaling these down for local cluster
+chunksCache:
+  allocatedMemory: 256
+resultsCache:
+  allocatedMemory: 256

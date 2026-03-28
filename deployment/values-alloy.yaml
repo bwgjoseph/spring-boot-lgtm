@@ -33,12 +33,29 @@ alloy:
 
       loki.source.kubernetes "logs" {
         targets    = discovery.relabel.pod_logs.output
-        forward_to = [loki.write.local.receiver]
+        forward_to = [loki.process.extract_metadata.receiver]
       }
 
       loki.write "local" {
         endpoint {
-          url = "http://loki.monitoring.svc:3100/loki/api/v1/push"
+          url = "http://loki-gateway.monitoring.svc:80/loki/api/v1/push"
+        }
+      }
+
+      // Metadata Extraction: Promote trace_id and span_id to structured metadata
+      loki.process "extract_metadata" {
+        forward_to = [loki.write.local.receiver]
+
+        stage.regex {
+          // Matches standard Spring Boot MDC format: [app,traceId,spanId]
+          expression = ".*\\[(?P<app>.+?),(?P<trace_id>\\w*),(?P<span_id>\\w*)\\].*"
+        }
+
+        stage.structured_metadata {
+          values = {
+            "trace_id" = "",
+            "span_id"  = "",
+          }
         }
       }
 
@@ -108,6 +125,22 @@ alloy:
 
       // --- K8S CLUSTER MONITORING: SCRAPING ---
 
+      discovery.relabel "cadvisor" {
+        targets = discovery.kubernetes.nodes.targets
+        rule {
+          action = "replace"
+          source_labels = ["id"]
+          regex = "^/kubepods/(?:.+)/pod([^/]+)/.+$"
+          target_label = "pod_uid"
+        }
+        rule {
+          action = "replace"
+          source_labels = ["id"]
+          regex = "^/kubepods/(?:.+)/pod[^/]+/([^/]+)$"
+          target_label = "container"
+        }
+      }
+
       // Filter to only the KSM service
       discovery.relabel "ksm" {
         targets = discovery.kubernetes.services.targets
@@ -130,7 +163,7 @@ alloy:
 
       // Scrape cAdvisor for per-container CPU/Memory metrics
       prometheus.scrape "cadvisor" {
-        targets = discovery.kubernetes.nodes.targets
+        targets = discovery.relabel.cadvisor.output
         scheme = "https"
         bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
         tls_config {
@@ -142,19 +175,6 @@ alloy:
         }
         metrics_path = "/metrics/cadvisor"
         forward_to = [prometheus.remote_write.prom.receiver]
-
-        rule {
-          action = "replace"
-          source_labels = ["id"]
-          regex = "^/kubepods/(?:.+)/pod([^/]+)/.+$"
-          target_label = "pod_uid"
-        }
-        rule {
-          action = "replace"
-          source_labels = ["id"]
-          regex = "^/kubepods/(?:.+)/pod[^/]+/([^/]+)$"
-          target_label = "container"
-        }
       }
 
       // Scrape Kubelet for node health

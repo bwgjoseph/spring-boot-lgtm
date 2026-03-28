@@ -5,6 +5,7 @@ This project is a production-ready template and sandbox for implementing the **G
 It demonstrates a "Scrape & Push" architecture using Spring Boot 3.5+, Micrometer Tracing (OTEL Bridge), and W3C Trace Context.
 
 👉 **[Detailed Feature Guide (feature.md)](./feature.md)**
+👉 **[Troubleshooting Guide (TROUBLESHOOT.md)](./TROUBLESHOOT.md)**
 
 ## 🚀 Key Features (Day 2 Ready)
 
@@ -24,8 +25,10 @@ This sandbox goes beyond basic connectivity to include advanced observability pa
 - **Logs:** Collected by Alloy from pod stdout/stderr with Kubernetes metadata enrichment (Pull model).
 - **Traces:** Pushed by the application to Alloy via OTLP/gRPC (Push model).
 - **Correlation:** Data sources use standardized UIDs (`prometheus`, `loki`, `tempo`) to enable seamless cross-linking (Metric -> Trace -> Log).
-- **Alloy:** Acts as the entry point, processing traces (sampling, batching) before forwarding to Tempo and Loki.
+- **Alloy:** Acts as the entry point, processing traces (sampling, batching) and extracting structured metadata before forwarding to Tempo and Loki.
 - **Service Graph:** Generated natively by Tempo's internal `metricsGenerator` and pushed to Prometheus.
+- **Scalability:** Loki and Tempo run in **Simple Scalable Mode** (separating read/write paths).
+- **Storage:** A local **MinIO** instance provides S3-compatible shared storage for the scalable components.
 
 ## 🛠️ Tech Stack & Versions
 
@@ -37,6 +40,7 @@ This sandbox goes beyond basic connectivity to include advanced observability pa
 | **Loki** | Log Storage | `grafana/loki` | `6.53.0` |
 | **Tempo** | Trace Storage | `grafana-community/tempo` | `2.0.0` |
 | **Prometheus** | Metrics Storage | `prometheus-community/prometheus` | `28.13.0` |
+| **MinIO** | Object Storage | `minio/minio` | `5.4.0` |
 
 
 ## 🏁 Getting Started

@@ -26,14 +26,17 @@ kubectl create namespace monitoring
 # Add Helm repos
 helm repo add grafana https://grafana.github.io/helm-charts; helm repo add grafana-community https://grafana-community.github.io/helm-charts; helm repo add prometheus-community https://prometheus-community.github.io/helm-charts; helm repo update
 
+# Install or Upgrade MinIO (Internal Object Storage)
+helm upgrade --install minio minio/minio -n monitoring -f deployment/values-minio.yaml --version 5.4.0
+
 # Install or Upgrade Prometheus (Metrics, Node Exporter, KSM)
 helm upgrade --install prometheus prometheus-community/prometheus -n monitoring -f deployment/values-prometheus.yaml --version 28.13.0
 
 # Install or Upgrade Loki (Logs)
-helm upgrade --install loki grafana/loki -n monitoring -f deployment/values-loki.yaml --version 6.53.0
+helm upgrade --install loki grafana/loki -n monitoring -f deployment/values-loki-scalable.yaml --version 6.53.0
 
 # Install or Upgrade Tempo (Traces)
-helm upgrade --install tempo grafana-community/tempo -n monitoring --version 2.0.0
+helm upgrade --install tempo grafana-community/tempo -n monitoring -f deployment/values-tempo-scalable.yaml --version 2.0.0
 
 # Install or Upgrade Grafana (Visualization)
 helm upgrade --install grafana grafana-community/grafana -n monitoring -f deployment/values-grafana.yaml --version 11.3.0
@@ -116,3 +119,6 @@ While the steps above are manual, you can perform all these actions (including r
 *   `task infra`: Just the LGTM stack + Alloy + Dashboards.
 *   `task port-forward`: Quick access to Grafana and the App.
 *   `task password`: Retrieve admin credentials.
+
+## 🆘 Need Help?
+If you encounter any issues (such as `ImagePullBackOff` on KinD/Docker Desktop), refer to the **[Troubleshooting Guide (../TROUBLESHOOT.md)](../TROUBLESHOOT.md)**.

@@ -1,6 +1,5 @@
 tempo:
   replicas: 1
-  # The 'all' target is the monolithic mode
   extraArgs:
     target: all
   storage:
@@ -8,28 +7,41 @@ tempo:
       backend: local
       local:
         path: /var/tempo/traces
-  
-  # Enable OTLP ingestion specifically for Alloy to talk to it
   ingestion:
     otlp:
       protocols:
         grpc:
           endpoint: "0.0.0.0:4317"
-
-  # Fix "empty ring" error by enabling metrics generator in monolithic mode
+        http:
+          endpoint: "0.0.0.0:4318"
+  
+  # Metrics Generator Configuration
   metricsGenerator:
     enabled: true
-    remoteWriteUrl: "http://prometheus-server.monitoring.svc/api/v1/write"
-    # Configuration for the generator ring
+    # Use the flat structure as per the chart's values.yaml
+    remoteWriteUrl: "http://prometheus-server.monitoring.svc:80/api/v1/write"
+    processor:
+      service_graphs:
+        wait: 10s
+        max_items: 10000
+      span_metrics:
+        enable_target_info: true
+    storage:
+      path: "/tmp/tempo"
+      remote_write:
+        - url: "http://prometheus-server.monitoring.svc:80/api/v1/write"
     ring:
       kvstore:
         store: inmemory
 
-# Ensure the overrides allow metrics generation
-tempoConfig:
+  # Explicitly enable processors via overrides
   overrides:
-    metrics_generator_processors: [service-graphs, span-metrics]
-
-persistence:
-  enabled: true
-  size: 20Gi
+    defaults:
+      metrics_generator:
+        processors:
+          - service-graphs
+          - span-metrics
+  
+  persistence:
+    enabled: true
+    size: 20Gi
