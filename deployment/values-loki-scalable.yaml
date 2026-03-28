@@ -65,6 +65,9 @@ backend:
       memory: 512Mi
 
 gateway:
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.29-alpine
   resources:
     requests:
       cpu: 5m
@@ -72,9 +75,20 @@ gateway:
     limits:
       cpu: 50m
       memory: 64Mi
+  # Anti-affinity rule to ensure gateway pods are spread across nodes
+  # This is a common setting to ensure HA for critical components.
+  # For single-node clusters (like Docker Desktop KinD), this may cause pods to be Pending.
+  podAntiAffinity:
+    enabled: false # Temporarily disabled to allow scheduling on single node.
 
-# Scaling these down for local cluster
+# For the memcached cache components, explicitly set images and versions
 chunksCache:
+  image:
+    repository: memcached
+    tag: 1.6.41-alpine # Explicitly setting the version
   allocatedMemory: 256
 resultsCache:
+  image:
+    repository: memcached
+    tag: 1.6.41-alpine # Explicitly setting the version
   allocatedMemory: 256

@@ -6,7 +6,7 @@ vars:
   # HELM CHART VERSIONS (Stable as of March 2026)
   VER_ALLOY: "1.6.1"
   VER_GRAFANA: "11.3.0"
-  VER_LOKI: "6.53.0"
+  VER_LOKI: "9.3.4"
   VER_TEMPO: "2.0.0"
   VER_PROMETHEUS: "28.13.0"
   VER_MINIO: "5.4.0"
@@ -59,7 +59,7 @@ tasks:
     desc: Install or Upgrade Loki
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install loki grafana/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f {{.DEPLOY_DIR}}/values-loki-scalable.yaml
+      - helm upgrade --install loki grafana-community/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f {{.DEPLOY_DIR}}/values-loki-scalable.yaml
 
   tempo:
     desc: Install or Upgrade Tempo

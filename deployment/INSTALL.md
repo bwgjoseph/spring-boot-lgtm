@@ -33,7 +33,7 @@ helm upgrade --install minio minio/minio -n monitoring -f deployment/values-mini
 helm upgrade --install prometheus prometheus-community/prometheus -n monitoring -f deployment/values-prometheus.yaml --version 28.13.0
 
 # Install or Upgrade Loki (Logs)
-helm upgrade --install loki grafana/loki -n monitoring -f deployment/values-loki-scalable.yaml --version 6.53.0
+helm upgrade --install loki grafana-community/loki -n monitoring -f deployment/values-loki-scalable.yaml --version 9.3.4
 
 # Install or Upgrade Tempo (Traces)
 helm upgrade --install tempo grafana-community/tempo -n monitoring -f deployment/values-tempo-scalable.yaml --version 2.0.0

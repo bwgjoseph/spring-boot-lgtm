@@ -37,7 +37,7 @@ This sandbox goes beyond basic connectivity to include advanced observability pa
 | **Spring Boot 3.5** | Application | - | - |
 | **Grafana Alloy** | Collector/Gateway | `grafana/alloy` | `1.6.1` |
 | **Grafana** | Visualization | `grafana-community/grafana` | `11.3.0` |
-| **Loki** | Log Storage | `grafana/loki` | `6.53.0` |
+| **Loki** | Log Storage | `grafana-community/loki` | `9.3.4` |
 | **Tempo** | Trace Storage | `grafana-community/tempo` | `2.0.0` |
 | **Prometheus** | Metrics Storage | `prometheus-community/prometheus` | `28.13.0` |
 | **MinIO** | Object Storage | `minio/minio` | `5.4.0` |
