@@ -87,6 +87,15 @@ If you cannot login to Grafana:
 2.  Ensure `gateway.podAntiAffinity.enabled` is set to `false` in `values-loki-scalable.yaml`.
 3.  Ensure the `gateway`, `read`, `write`, and `backend` blocks are correctly nested under the `loki:` key in `values-loki-scalable.yaml`.
 
+### Grafana cannot reach Tempo (Connection Refused)
+**Symptom:** Grafana shows `dial tcp ...:3200: connect: connection refused` when querying traces.
+**Cause:** 
+1.  Tempo pod is in `CrashLoopBackOff` due to OOM (Exit Code 137) or liveness probe failures.
+2.  Default memory limits (256Mi) may be too low during WAL replay on startup.
+**Resolution:**
+1.  Increase memory limits in `values-tempo.yaml` to at least `1Gi`.
+2.  Increase `livenessProbe` and `readinessProbe` `initialDelaySeconds` and `timeoutSeconds` to account for slow startups in local environments.
+
 ### Service Graph is Empty
 **Symptom:** The Service Graph tab in Tempo is empty.
 **Resolution:**
