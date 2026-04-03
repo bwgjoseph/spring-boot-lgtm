@@ -95,8 +95,15 @@ If you cannot login to Grafana:
 **Resolution:**
 1.  Increase memory limits in `values-tempo.yaml` to at least `1Gi`.
 2.  Increase `livenessProbe` and `readinessProbe` `initialDelaySeconds` and `timeoutSeconds` to account for slow startups in local environments.
+### Trace-to-Log: No results found (Zero-width time range)
+**Symptom:** In Tempo, clicking "Logs for this span" results in "No results found" even though the query is correct.
+**Cause:** The logs search time range exactly matches the span start/end times. If logs were ingested with a slight delay or clock drift exists, they may fall outside this exact window.
+**Resolution:**
+1.  In `values-grafana.yaml`, ensure `spanStartTimeShift` is set to a negative value (e.g., `-5s`) and `spanEndTimeShift` is set to a positive value (e.g., `5s`).
+2.  This expands the search window around the span, increasing the chance of finding correlated logs.
 
 ### TraceQL metrics not configured / local-blocks processor not found
+...
 **Symptom:** Grafana Traces Drilldown page shows "TraceQL metrics not configured" or "localblocks processor not found".
 **Cause:** The `local-blocks` processor is not enabled in the Tempo `metrics_generator` configuration. This processor is required for the Traces Drilldown feature.
 **Resolution:**

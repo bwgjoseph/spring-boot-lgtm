@@ -38,11 +38,9 @@ datasources:
             filterBySpanID: false
             lokiSearch: true
             tags:
-              - key: 'service.namespace'
-                value: 'namespace'
               - key: 'service.name'
                 value: 'service_name'
-            spanStartTimeShift: '5s'
+            spanStartTimeShift: '-5s'
             spanEndTimeShift: '5s'
           
           # Trace to Metrics (Service Map)
