@@ -77,6 +77,16 @@ If you cannot login to Grafana:
 **Cause:** Default memory limits (128Mi) are too low for query processing.
 **Resolution:** Increase memory limits in `deployment/values-loki-scalable.yaml`. Recommended: `512Mi` for `read`/`backend` and `256Mi` for `write`.
 
+### Grafana cannot reach Loki (Connection Refused)
+**Symptom:** Grafana logs show `dial tcp ...:80: connect: connection refused` when querying Loki.
+**Cause:** 
+1.  The `loki-gateway` pod is stuck in `Pending` due to pod anti-affinity rules on a single-node cluster.
+2.  The `loki-gateway` service is targeting the wrong port or the Nginx configuration is not listening on the expected port.
+**Resolution:**
+1.  Verify the `loki-gateway` pod is `Running`. If `Pending`, manually delete old gateway pods to break anti-affinity deadlocks.
+2.  Ensure `gateway.podAntiAffinity.enabled` is set to `false` in `values-loki-scalable.yaml`.
+3.  Ensure the `gateway`, `read`, `write`, and `backend` blocks are correctly nested under the `loki:` key in `values-loki-scalable.yaml`.
+
 ### Service Graph is Empty
 **Symptom:** The Service Graph tab in Tempo is empty.
 **Resolution:**

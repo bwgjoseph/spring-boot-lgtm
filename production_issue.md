@@ -41,3 +41,13 @@ This document summarizes the challenges and learnings from the attempt to migrat
 *   **Specific Error:** `failed parsing config: failed to parse configFile /conf/tempo.yaml: yaml: unmarshal errors: line 12: field s3forcepathstyle not found in type s3.Config`. 
 *   **The Resolution:** Reverted `values-tempo.yaml` to use `backend: local` with a persistent volume claim.
 *   **Learning:** Even within the same version of Tempo, the Helm chart's manual `config` block must be extremely precise, as the Go types for S3 configuration vary between chart versions and Tempo binary versions. For a sandbox, local storage is significantly more stable.
+
+## 5. Loki Gateway Scheduling & Connectivity (April 2026)
+*   **The Issue:** The `loki-gateway` pod stayed `Pending` even after resource limits were lowered.
+*   **Anti-Affinity Deadlock:** The Helm chart defaults to `hard` anti-affinity, which prevents scheduling a new gateway pod on the same node where an old one (from a previous ReplicaSet) is still running. On a single-node cluster, this creates a deadlock.
+*   **YAML Nesting Mismatch:** In the `grafana-community/loki` chart (v9.x.x), the `write`, `read`, `backend`, and `gateway` sections **must be nested** under the `loki:` key. If they are at the top level, they are ignored by the chart templates.
+*   **The Resolution:** 
+    *   Moved component blocks under the `loki:` section in `values-loki-scalable.yaml`.
+    *   Explicitly disabled `podAntiAffinity` (set `enabled: false` and `type: soft`) for the gateway.
+    *   Updated `memberlist.join_members` to use the `loki-memberlist` service DNS instead of hardcoded pod names.
+*   **Learning:** Always verify the exact YAML structure expected by the specific chart version. Service-to-service communication should always use Kubernetes Service DNS names to remain resilient to pod restarts.
