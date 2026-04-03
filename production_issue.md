@@ -34,4 +34,10 @@ This document summarizes the challenges and learnings from the attempt to migrat
 ## 🚀 Recommended Path Forward
 1.  **Start Clean:** Completely uninstall the old release before trying a new architecture.
 2.  **Explicit Config:** Use the `config` string block in Helm values to avoid "hidden" logic in the chart templates.
-3.  **Local vs. Prod:** Accept that "Simple Scalable" is for multi-node clusters. For local dev, **Single Binary with S3 storage** is the best "Hybrid" mode—it uses the production storage pattern but keeps the pod footprint small.
+3.  **Local vs. Prod:** Accept that "Simple Scalable" is for multi-node clusters. For local dev, **Single Binary with local PVC storage** is currently used for Tempo due to S3 configuration complexities in the `grafana-community/tempo` chart (v2.0.0). Loki remains in Simple Scalable mode with S3/MinIO.
+
+## 4. Specific Tempo Revert (April 2026)
+*   **The Issue:** Attempting to use S3 storage for Tempo via the `grafana-community/tempo` chart led to frequent `CrashLoopBackOff` errors.
+*   **Specific Error:** `failed parsing config: failed to parse configFile /conf/tempo.yaml: yaml: unmarshal errors: line 12: field s3forcepathstyle not found in type s3.Config`. 
+*   **The Resolution:** Reverted `values-tempo.yaml` to use `backend: local` with a persistent volume claim.
+*   **Learning:** Even within the same version of Tempo, the Helm chart's manual `config` block must be extremely precise, as the Go types for S3 configuration vary between chart versions and Tempo binary versions. For a sandbox, local storage is significantly more stable.

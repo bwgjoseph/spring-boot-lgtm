@@ -1,47 +1,50 @@
 tempo:
   replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
   extraArgs:
-    target: all
+    mem-ballast-size-mbs: 16
+
+# Manually define the config to ensure correct S3 field names
+config: |
+  server:
+    http_listen_port: 3200
   storage:
     trace:
       backend: local
       local:
         path: /var/tempo/traces
-  ingestion:
-    otlp:
-      protocols:
-        grpc:
-          endpoint: "0.0.0.0:4317"
-        http:
-          endpoint: "0.0.0.0:4318"
-  
-  # Metrics Generator Configuration
-  metricsGenerator:
-    enabled: true
-    # Use the flat structure as per the chart's values.yaml
-    remoteWriteUrl: "http://prometheus-server.monitoring.svc:80/api/v1/write"
-    processor:
-      service_graphs:
-        wait: 10s
-        max_items: 10000
-      span_metrics:
-        enable_target_info: true
+      wal:
+        path: /var/tempo/wal
+  distributor:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "0.0.0.0:4317"
+  ingester:
+    lifecycler:
+      ring:
+        kvstore:
+          store: inmemory
+        replication_factor: 1
+  metrics_generator:
     storage:
-      path: "/tmp/tempo"
+      path: /var/tempo/wal
       remote_write:
-        - url: "http://prometheus-server.monitoring.svc:80/api/v1/write"
-    ring:
-      kvstore:
-        store: inmemory
-
-  # Explicitly enable processors via overrides
+        - url: http://prometheus-server.monitoring.svc/api/v1/write
+    traces_storage:
+      path: /var/tempo/traces
   overrides:
-    defaults:
-      metrics_generator:
-        processors:
-          - service-graphs
-          - span-metrics
-  
-  persistence:
-    enabled: true
-    size: 20Gi
+    metrics_generator_processors: [service-graphs, span-metrics]
+
+persistence:
+  enabled: true
+  size: 10Gi
+

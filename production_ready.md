@@ -12,6 +12,7 @@ While PVCs are easier to start with, Loki and Tempo are designed as **cloud-nati
     *   **High Availability:** Sharing a single PVC across multiple "Read" and "Write" pods requires a ReadWriteMany (RWM) volume (like NFS), which is significantly slower and prone to file-locking issues.
     *   **Cost/Performance:** Object storage allows Loki to store "chunks" of data very cheaply while keeping a tiny index. Disk-based storage for logs becomes very expensive as you move from 7 days to 30+ days of retention.
 *   **Recommendation:** Use **MinIO** for the long-term data store and small, fast SSD-backed PVCs for "Write Ahead Logs" (WAL) and local caching.
+*   **Sandbox Note:** In this repository, **Tempo** was reverted to local PVC storage due to configuration schema complexities between the `grafana-community/tempo` chart and S3 settings. **Loki** continues to use MinIO.
 
 ## 2. Grafana HA with PostgreSQL
 *   **The Problem:** By default, Grafana uses a local SQLite file to store users, dashboard definitions, and alert states. You cannot run 2+ replicas of Grafana using the same SQLite file.

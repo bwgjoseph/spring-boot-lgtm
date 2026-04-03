@@ -29,6 +29,15 @@ loki:
           prefix: index_
           period: 24h
 
+
+  # Explicitly set memberlist configuration to use Kubernetes service discovery
+  memberlist:
+    join_members:
+      - loki-gateway-7d79b54759-rb6ph.loki-gateway.monitoring.svc.cluster.local:7946 # Explicitly join the running gateway pod
+    discovery:
+      k8s:
+        enabled: false # Disable K8s discovery
+
 # Separation of Read/Write paths
 write:
   replicas: 1
@@ -79,7 +88,7 @@ gateway:
   # This is a common setting to ensure HA for critical components.
   # For single-node clusters (like Docker Desktop KinD), this may cause pods to be Pending.
   podAntiAffinity:
-    enabled: false # Temporarily disabled to allow scheduling on single node.
+    enabled: false
 
 # For the memcached cache components, explicitly set images and versions
 chunksCache:

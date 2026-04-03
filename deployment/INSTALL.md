@@ -36,7 +36,8 @@ helm upgrade --install prometheus prometheus-community/prometheus -n monitoring 
 helm upgrade --install loki grafana-community/loki -n monitoring -f deployment/values-loki-scalable.yaml --version 9.3.4
 
 # Install or Upgrade Tempo (Traces)
-helm upgrade --install tempo grafana-community/tempo -n monitoring -f deployment/values-tempo-scalable.yaml --version 2.0.0
+# Note: Tempo is configured for local PVC storage for stability in this sandbox.
+helm upgrade --install tempo grafana-community/tempo -n monitoring -f deployment/values-tempo.yaml --version 2.0.0
 
 # Install or Upgrade Grafana (Visualization)
 helm upgrade --install grafana grafana-community/grafana -n monitoring -f deployment/values-grafana.yaml --version 11.3.0

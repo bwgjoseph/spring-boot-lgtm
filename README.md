@@ -27,8 +27,8 @@ This sandbox goes beyond basic connectivity to include advanced observability pa
 - **Correlation:** Data sources use standardized UIDs (`prometheus`, `loki`, `tempo`) to enable seamless cross-linking (Metric -> Trace -> Log).
 - **Alloy:** Acts as the entry point, processing traces (sampling, batching) and extracting structured metadata before forwarding to Tempo and Loki.
 - **Service Graph:** Generated natively by Tempo's internal `metricsGenerator` and pushed to Prometheus.
-- **Scalability:** Loki and Tempo run in **Simple Scalable Mode** (separating read/write paths).
-- **Storage:** A local **MinIO** instance provides S3-compatible shared storage for the scalable components.
+- **Scalability:** Loki runs in **Simple Scalable Mode** (separating read/write paths). Tempo runs as a Single Binary for simplicity.
+- **Storage:** A local **MinIO** instance provides S3-compatible shared storage for **Loki**, while **Tempo** uses local Persistent Volumes (PVC) for simplicity and stability in this sandbox environment.
 
 ## 🛠️ Tech Stack & Versions
 
