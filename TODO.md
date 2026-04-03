@@ -10,3 +10,4 @@
 - [ ] Setup grafana-mcp
 - [x] Service graph is not working (See [SERVICE_GRAPH_ISSUE](SERVICE_GRAPH_ISSUE.md))
 - [ ] How to integrate and scape JMX metrics (See https://blog.frankel.ch/tip-opentelemetry-projects/)
+- [ ] Integrate with Pyroscope

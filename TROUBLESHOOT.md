@@ -96,6 +96,13 @@ If you cannot login to Grafana:
 1.  Increase memory limits in `values-tempo.yaml` to at least `1Gi`.
 2.  Increase `livenessProbe` and `readinessProbe` `initialDelaySeconds` and `timeoutSeconds` to account for slow startups in local environments.
 
+### TraceQL metrics not configured / local-blocks processor not found
+**Symptom:** Grafana Traces Drilldown page shows "TraceQL metrics not configured" or "localblocks processor not found".
+**Cause:** The `local-blocks` processor is not enabled in the Tempo `metrics_generator` configuration. This processor is required for the Traces Drilldown feature.
+**Resolution:**
+1.  Add `local-blocks` to the `metrics_generator_processors` list in `values-tempo.yaml`.
+2.  Redeploy Tempo and restart the pod.
+
 ### Service Graph is Empty
 **Symptom:** The Service Graph tab in Tempo is empty.
 **Resolution:**
