@@ -52,6 +52,14 @@ config: |
   overrides:
     metrics_generator_processors: [service-graphs, span-metrics, local-blocks]
 
-persistence:
+    storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+      compaction:
+        block_retention: 72h # 3 days
   enabled: true
   size: 10Gi

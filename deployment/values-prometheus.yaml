@@ -2,6 +2,9 @@ server:
   # Enable Alloy to push metrics via remote_write
   remoteWriteReceiver: true
   
+  # Set retention period
+  retention: "14d"
+  
   # Prometheus server command-line flags
   # For remote write receiver to be enabled, we need to pass '--web.enable-remote-write-receiver' and '--web.enable-lifecycle'
   extraArgs:

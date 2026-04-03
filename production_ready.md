@@ -14,9 +14,19 @@ While PVCs are easier to start with, Loki and Tempo are designed as **cloud-nati
 *   **Recommendation:** Use **MinIO** for the long-term data store and small, fast SSD-backed PVCs for "Write Ahead Logs" (WAL) and local caching.
 *   **Sandbox Note:** In this repository, **Tempo** was reverted to local PVC storage due to configuration schema complexities between the `grafana-community/tempo` chart and S3 settings. **Loki** continues to use MinIO.
 
+## 1.1. Recommended Production Retention Policies (Self-Hosted MinIO)
+
+For a production environment utilizing MinIO for scalable object storage, consider the following retention periods:
+
+*   **Prometheus (Metrics):** **30-90 days**. Metrics are relatively compact, and longer retention aids in historical analysis, trend identification, and anomaly detection over longer periods. MinIO can handle this volume cost-effectively.
+*   **Loki (Logs):** **30-90 days**. Logs are typically the largest data volume. Retaining logs for 1-3 months allows for sufficient historical debugging and compliance needs. MinIO is well-suited for this.
+*   **Tempo (Traces):** **7-14 days**. Traces are high-cardinality and can consume significant storage. Shorter retention is common for traces as the primary goal is usually debugging recent issues or understanding current performance. Longer retention might be necessary for specific compliance or deep forensic analysis, but for general use, 7-14 days is a good balance between utility and cost.
+
+**Sandbox Note:** In this repository, retention periods are set to **14 days for Prometheus, 7 days for Loki, and 3 days for Tempo** to keep storage requirements minimal in a local development environment.
+
 ## 2. Grafana HA with PostgreSQL
 *   **The Problem:** By default, Grafana uses a local SQLite file to store users, dashboard definitions, and alert states. You cannot run 2+ replicas of Grafana using the same SQLite file.
-*   **The PostgreSQL Solution:** By pointing Grafana to your PostgreSQL instance, you enable **Horizontal Scaling**. You can run 3 Grafana pods behind your NGINX Ingress. If one pod dies, the others continue serving, and no data (dashboards/users) is lost.
+*   **The PostgreSQL Solution:** By pointing Grafana to your PostgreSQL instance, you enable **Horizontal Scaling**. You can run 3 Grafana pods behind your NGINX Ingress. If one pod dies, the others continue serving, and no data (dashboards/users) is lost
 
 ## 3. Scaling Modes: Simple Scalable vs. Microservices
 For a cluster of your size (~50 pods), the choice is clear:

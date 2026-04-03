@@ -102,6 +102,21 @@ If you cannot login to Grafana:
 1.  In `deployment/datasources.yaml`, ensure `spanStartTimeShift` is set to a negative value (e.g., `-5s`) and `spanEndTimeShift` is set to a positive value (e.g., `5s`).
 2.  This expands the search window around the span, increasing the chance of finding correlated logs.
 
+### Tempo Retention Period Configuration
+**Symptom:** Traces are not being pruned after the expected period, leading to excessive storage usage.
+**Cause:** The `compaction.block_retention` setting in Tempo's configuration was either missing or incorrectly structured, preventing retention policies from being applied.
+**Resolution:**
+1.  Correctly structure the `compaction` block as a sibling to `storage.trace` and `storage.wal` within the `storage` section of `values-tempo.yaml`.
+2.  Set `block_retention` to the desired duration (e.g., `72h` for 3 days).
+3.  Redeploy Tempo using `task tempo`.
+
+### Trace-to-Log: No results found (Zero-width time range)
+**Symptom:** In Tempo, clicking "Logs for this span" results in "No results found" even though the query is correct.
+**Cause:** The logs search time range exactly matches the span start/end times. If logs were ingested with a slight delay or clock drift exists, they may fall outside this exact window.
+**Resolution:**
+1.  In `deployment/datasources.yaml`, ensure `spanStartTimeShift` is set to a negative value (e.g., `-5s`) and `spanEndTimeShift` is set to a positive value (e.g., `5s`).
+2.  This expands the search window around the span, increasing the chance of finding correlated logs.
+
 ### TraceQL metrics not configured / local-blocks processor not found
 ...
 **Symptom:** Grafana Traces Drilldown page shows "TraceQL metrics not configured" or "localblocks processor not found".

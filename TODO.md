@@ -12,3 +12,7 @@
 - [ ] How to integrate and scape JMX metrics (See https://blog.frankel.ch/tip-opentelemetry-projects/)
 - [ ] Integrate with Pyroscope
 - [ ] Figure out how to publish data from alloy to different sources
+- [ ] Figure out production configuration and best practices
+  - [ ] Retention period
+  - [ ] Disk space required
+    - PVC vs S3
