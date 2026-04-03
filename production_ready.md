@@ -1,79 +1,110 @@
-# 🏗️ Roadmap to Production: LGTM Observability Stack (On-Prem)
+# Production Readiness: LGTM Observability Stack (On-Prem)
 
-This document details the transition from sandbox to production for an on-prem environment running ~10 Spring Boot services (~50 total replicas).
+This document outlines production considerations for the LGTM observability stack (Loki, Grafana, Tempo, Mimir/Prometheus) when deployed on-premises, with Grafana Alloy as the central collector. It details configurations for high availability, scalability, storage, retention, and security.
 
 ---
 
-## 1. Storage: PVC vs. Object Storage (MinIO)
-While PVCs are easier to start with, Loki and Tempo are designed as **cloud-native** databases that prefer object storage.
+## II. Core Components & Production Configuration
 
-*   **Downsides of PVC-only storage:**
-    *   **Scalability:** PVCs are bound to a specific size. Expanding them often requires downtime or complex storage-class operations. MinIO is "infinitely" scalable.
-    *   **High Availability:** Sharing a single PVC across multiple "Read" and "Write" pods requires a ReadWriteMany (RWM) volume (like NFS), which is significantly slower and prone to file-locking issues.
-    *   **Cost/Performance:** Object storage allows Loki to store "chunks" of data very cheaply while keeping a tiny index. Disk-based storage for logs becomes very expensive as you move from 7 days to 30+ days of retention.
-*   **Recommendation:** Use **MinIO** for the long-term data store and small, fast SSD-backed PVCs for "Write Ahead Logs" (WAL) and local caching.
-*   **Sandbox Note:** In this repository, **Tempo** was reverted to local PVC storage due to configuration schema complexities between the `grafana-community/tempo` chart and S3 settings. **Loki** continues to use MinIO.
+### Grafana Alloy
 
-## 1.1. Recommended Production Retention Policies (Self-Hosted MinIO)
+Grafana Alloy acts as the central observability gateway, collecting, processing, and exporting telemetry data. In production, focus on:
 
-For a production environment utilizing MinIO for scalable object storage, consider the following retention periods:
+*   **High Availability (HA):** Deploying multiple replicas of Alloy behind a load balancer to ensure no single point of failure.
+*   **Configuration Management:** Managing `values-alloy.yaml` through a robust CI/CD pipeline.
+*   **Remote Write Targets:** Ensuring reliable connections to Prometheus (for metrics), Loki (for logs), and Tempo (for traces).
+*   **Processor Tuning:** Optimizing `loki.process` or other processors for efficient log structuring and metadata extraction.
 
-*   **Prometheus (Metrics):** **30-90 days**. Metrics are relatively compact, and longer retention aids in historical analysis, trend identification, and anomaly detection over longer periods. MinIO can handle this volume cost-effectively.
-*   **Loki (Logs):** **30-90 days**. Logs are typically the largest data volume. Retaining logs for 1-3 months allows for sufficient historical debugging and compliance needs. MinIO is well-suited for this.
-*   **Tempo (Traces):** **7-14 days**. Traces are high-cardinality and can consume significant storage. Shorter retention is common for traces as the primary goal is usually debugging recent issues or understanding current performance. Longer retention might be necessary for specific compliance or deep forensic analysis, but for general use, 7-14 days is a good balance between utility and cost.
+### Tempo
 
-**Sandbox Note:** In this repository, retention periods are set to **14 days for Prometheus, 7 days for Loki, and 3 days for Tempo** to keep storage requirements minimal in a local development environment.
+Tempo is responsible for storing and querying traces. Production considerations include:
 
-## 2. Grafana HA with PostgreSQL
-*   **The Problem:** By default, Grafana uses a local SQLite file to store users, dashboard definitions, and alert states. You cannot run 2+ replicas of Grafana using the same SQLite file.
-*   **The PostgreSQL Solution:** By pointing Grafana to your PostgreSQL instance, you enable **Horizontal Scaling**. You can run 3 Grafana pods behind your NGINX Ingress. If one pod dies, the others continue serving, and no data (dashboards/users) is lost
+*   **High Availability (HA):** Deploying Tempo with sufficient replicas. For robust HA, consider Kubernetes deployment strategies and appropriate resource allocation. While the sandbox uses local PVCs due to chart complexities, production should leverage MinIO.
+*   **Storage Strategy:**
+    *   **MinIO Recommendation:** For long-term trace storage, MinIO is highly recommended. It provides S3-compatible object storage, offering better scalability, cost-effectiveness, and durability than local PVCs for large trace volumes.
+*   **Retention Policies:**
+    *   **Production Recommendation:** **7-14 days**. Traces are high-cardinality and can consume significant storage. Shorter retention balances utility for debugging recent issues with storage costs. Longer retention can be considered for specific compliance needs.
+*   **Scaling Mode:**
+    *   **Simple Scalable Mode:** Recommended for most on-prem deployments. It simplifies management with fewer distinct services while still enabling scaling of read/write paths.
 
-## 3. Scaling Modes: Simple Scalable vs. Microservices
-For a cluster of your size (~50 pods), the choice is clear:
+### Loki
 
-| Feature | **Simple Scalable** (Recommended) | **Full Microservices** |
-| :--- | :--- | :--- |
-| **Complexity** | Low (3 main components) | High (10+ components) |
-| **Scaling** | Scales "Read" and "Write" paths | Scales every sub-component (Ingester, Querier, etc.) |
-| **Management** | Managed via standard Helm chart | Requires heavy orchestration/Jsonnet/Tanka |
-| **Suitability** | Perfect for 10-100 services | Designed for thousands of services (Uber/Netflix scale) |
+Loki is designed for log aggregation. Production configurations should focus on:
 
-*   **Recommendation:** Use **Simple Scalable Mode**. It provides the HA you need without the massive operational overhead of full microservices.
+*   **High Availability (HA):** Employing Kubernetes deployment strategies (e.g., multiple replicas, anti-affinity rules) for `loki-read`, `loki-write`, and `loki-backend` components.
+*   **Storage Strategy:**
+    *   **MinIO Recommendation:** MinIO is the preferred backend for long-term log storage due to its scalability and cost-effectiveness for large data volumes.
+*   **Retention Policies:**
+    *   **Production Recommendation:** **30-90 days**. Logs are typically the largest data volume. Retaining logs for 1-3 months allows for sufficient historical debugging and compliance needs. MinIO is well-suited for this scale.
+*   **Scaling Mode:**
+    *   **Simple Scalable Mode:** Recommended for its balance of performance and manageability, separating read/write paths.
+*   **Logging Strategy:**
+    *   **Labels:** Use indexed labels (e.g., `service_name`, `namespace`) for fast filtering of large log volumes.
+    *   **Structured Metadata:** Leverage structured fields (e.g., `trace_id`, `span_id`) for efficient correlation without high indexing costs. Alloy can be configured to extract these.
+    *   **Log Line:** The raw text for human readability.
 
-## 4. Logging Strategy: Labels vs. Text vs. Structured Metadata
-Loki 3.0+ introduced a new way to store data that solves the "Trace ID Problem."
+### MinIO
 
-### The Three Tiers of Log Data
+MinIO serves as the S3-compatible object storage backend, crucial for scalable and cost-effective retention of logs and metrics.
 
-| Tier | Storage Type | Example | Best For... |
-| :--- | :--- | :--- | :--- |
-| **Labels** | Indexed (Highly searchable) | `service_name`, `env` | Filtering large volumes of logs quickly. |
-| **Structured Metadata** | Non-indexed Fields | `trace_id`, `span_id` | Fast correlation without crashing Loki's memory. |
-| **Log Line** | Raw Text | The actual message | Human reading and regex grep. |
+*   **Production Setup:**
+    *   **High Availability (HA):** Deploy MinIO in a distributed mode (e.g., erasure coding) across multiple nodes for resilience.
+    *   **Security:** Secure MinIO access with strong credentials, TLS, and network policies. Restrict access to only necessary components.
+    *   **Storage Class:** Use high-performance SSD/NVMe storage classes for MinIO's backing PVCs to ensure optimal performance.
+*   **Retention Policies:**
+    *   **General Principle:** Object storage is ideal for cost-effective long-term storage.
+    *   **Prometheus (Metrics):** **30-90 days**. MinIO can efficiently store this volume, allowing for robust historical analysis.
+    *   **Loki (Logs):** **30-90 days**. MinIO's scalability makes it suitable for retaining large log volumes for compliance and debugging.
+    *   **Tempo (Traces):** **7-14 days**. While MinIO can store traces long-term, shorter retention is generally preferred due to their high cardinality and cost. Longer retention might be considered for specific compliance needs, but for general use, 7-14 days is a good balance between utility and cost.
 
-### Why Structured Metadata?
-In your sandbox, the `trace_id` is just text. To find it, Loki must "grep" every line. 
-With **Structured Metadata**, Alloy extracts the `trace_id` and attaches it as a field. 
-*   **Advantage:** You get the speed of a label search without the memory cost of indexing unique IDs (High Cardinality).
-*   **UI Benefit:** Grafana can automatically find these fields, making the "Trace to Log" button work without custom regex.
+### Prometheus
 
-## 5. Storage Strategy: MinIO-backed PVCs (Recommended)
-Since the cluster primarily supports **ReadWriteOnce (RWO)** PVCs, we will use **MinIO** as a middle layer.
-*   **Architecture:** `Loki/Tempo (S3 API) -> MinIO (Pod) -> PVC (Disk)`.
-*   **Benefit:** This provides the "Shared Storage" needed for Simple Scalable mode without requiring a cluster-wide RWX filesystem.
-*   **Performance:** MinIO should be backed by a high-performance StorageClass (SSD/NVMe).
+Prometheus is responsible for collecting and storing metrics. Production considerations include:
 
-## 6. Coordination: Memberlist (Gossip)
-Simple Scalable mode uses the **Memberlist** protocol for internal coordination.
-*   **How it works:** Pods "gossip" with each other to maintain a shared "Hash Ring." This ring tracks which pod is responsible for which logs or traces.
-*   **On-Prem Note:** This requires open gossip ports (usually 7946) between all observability pods. It eliminates the need for an external coordinator like Etcd.
+*   **High Availability (HA):** Deploying multiple Prometheus instances (federated or clustered) to avoid single points of failure.
+*   **Retention Policies:**
+    *   **Recommended Production:** **30-90 days**. Metrics are relatively compact. Longer retention aids in historical analysis, trend identification, and anomaly detection over longer periods. MinIO can handle this volume cost-effectively.
+    *   **Configuration:** Managed via `server.retention` in Helm values.
+*   **Scaling:** Ensure sufficient resources (`requests` and `limits`) for Prometheus server pods, especially with a large number of targets and long retention periods.
 
-## 7. The Scalable Storage Constraint (RWO vs. RWX)
-Moving to Simple Scalable mode while staying on PVCs requires a specific storage capability:
-*   **ReadWriteOnce (RWO):** Standard disks. Cannot be shared. This will **NOT** work for Simple Scalable mode because "Read" pods cannot see the data written by "Write" pods.
-*   **ReadWriteMany (RWX):** Shared filesystems (NFS, Ceph). Required if you insist on avoiding MinIO.
-*   **The "Cloud-Native" Recommendation:** Even on-prem, use **MinIO**. It turns your RWO PVCs into an S3-compatible API that Loki and Tempo can share perfectly.
+### Alertmanager
 
-## 8. Ingress & Security
-*   **Current Path:** NGINX Ingress + Cert-Manager is the correct production pattern.
-*   **Next Step:** Configure the Ingress to point to the Grafana service and ensure the `Simple Scalable` Loki/Tempo components are only accessible internally via the cluster network.
+Alertmanager is configured to handle alerts generated by Prometheus. It provides crucial functionality for alert management, including deduplication, grouping, silencing, and routing to notification channels.
+
+*   **Alerting Rules:** Note that the actual alert rules (conditions for firing alerts, e.g., CPU > 90%) are typically defined separately in Prometheus's configuration (e.g., via additional ConfigMaps or Prometheus Operator CRDs).
+*   **Grouping Strategy:** Alerts are grouped by `['alertname', 'cluster', 'service', 'namespace']` to consolidate related issues into single notifications.
+*   **Notification Buffering:** `group_wait` is set to `30s` and `group_interval` to `5m` for efficient notification delivery.
+*   **Receiver Configuration:** Alerts are routed to a single Mattermost webhook receiver (`mattermost-receiver`). A placeholder URL is configured; this must be replaced with your actual Mattermost incoming webhook URL. `send_resolved: true` is enabled to notify when alerts are resolved.
+*   **Security:** As per general production considerations, ensure Kubernetes Network Policies restrict access to the Alertmanager service.
+
+### Grafana
+
+Grafana provides the visualization layer. Production configurations focus on:
+
+*   **High Availability (HA):** Running Grafana in multiple replicas is essential. This requires an external database like PostgreSQL to store users, dashboard definitions, and alert states, as SQLite is not suitable for clustered deployments.
+*   **Ingress Configuration:** Expose Grafana via an NGINX Ingress controller, configured for TLS termination and potentially rate limiting.
+*   **Security:** Secure Grafana access with strong admin passwords, consider OAuth integration, and restrict network access to Grafana pods.
+
+---
+
+## III. General Production Considerations
+
+### Scaling Modes: Simple Scalable vs. Microservices
+
+*   **Simple Scalable Mode:** Recommended for most on-prem deployments (e.g., up to ~100 services). It simplifies management with fewer distinct services (e.g., read/write paths are scaled independently but within a single conceptual deployment) and is well-suited for typical enterprise observability needs.
+*   **Full Microservices:** Designed for massive scale (thousands of services, e.g., Netflix/Uber). It involves managing many individual components (Ingester, Querier, Distributor, etc.) and requires significant orchestration expertise (e.g., Jsonnet, Tanka).
+
+### Storage Strategy
+
+*   **MinIO Recommendation:** For production environments with long-term data retention requirements for logs, metrics, and traces, **MinIO** is the recommended object storage solution.
+    *   **Benefits:** Offers excellent scalability, cost-effectiveness for bulk data, and durability. It presents an S3-compatible API, which Loki and Tempo are designed to use.
+    *   **Architecture:** Observability components (Loki, Tempo, Prometheus remote-write) push data to MinIO. MinIO itself can be backed by persistent volumes (PVCs) for its data, allowing for high-performance object storage on top of standard Kubernetes storage.
+*   **PVC Considerations:** While easier for initial setup, relying solely on RWO PVCs for Loki and Tempo in a distributed (Simple Scalable) mode is not recommended due to limitations in sharing data across pods. RWX volumes (NFS, Ceph) are an alternative but often come with performance and complexity trade-offs compared to MinIO.
+
+### Ingress & Security
+
+*   **Ingress Controller:** Use an NGINX Ingress controller (or similar) to manage external access to Grafana, Prometheus, and potentially other UIs.
+*   **TLS Termination:** Configure TLS termination at the Ingress level.
+*   **Cert-Manager:** Integrate Cert-Manager for automated certificate management to secure your endpoints.
+*   **Network Policies:** Implement Kubernetes Network Policies to restrict network access between observability components and from external sources. Only necessary ports and services should be exposed.
+*   **Secrets Management:** Use Kubernetes Secrets for sensitive information like database passwords (for Grafana), MinIO credentials, etc.

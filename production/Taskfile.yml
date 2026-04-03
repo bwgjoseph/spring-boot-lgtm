@@ -1,0 +1,123 @@
+# Taskfile for deploying the LGTM Observability Stack in Production
+
+# Define production variables and paths
+production_dir := "./production" # Assuming production values are in a 'production' subdir
+
+# Production values files (relative paths from the Taskfile.yml location)
+alloy_prod_values := fmt.join(" ", production_dir, "values-alloy-production.yaml")
+tempo_prod_values := fmt.join(" ", production_dir, "values-tempo-production.yaml")
+loki_prod_values := fmt.join(" ", production_dir, "values-loki-production.yaml")
+prometheus_prod_values := fmt.join(" ", production_dir, "values-prometheus-production.yaml")
+grafana_prod_values := fmt.join(" ", production_dir, "values-grafana-production.yaml")
+minio_prod_values := fmt.join(" ", production_dir, "values-minio-production.yaml") # Assumes MinIO values file
+
+# Production deployment tasks
+tasks:
+  # Task to deploy the entire LGTM stack in production
+  all:
+    desc: "Deploys the complete LGTM stack in production with HA and MinIO."
+    deps:
+      - infra:prod
+      # - app:prod # Uncomment/add if the application needs separate production deployment
+
+  # Task to deploy only the infrastructure components in production
+  infra:prod:
+    desc: "Deploys production LGTM infrastructure (MinIO, Loki, Tempo, Prometheus, Grafana, Alloy)."
+    cmds:
+      - |
+        echo "Starting production LGTM stack deployment..."
+        # Ensure Kubernetes namespace exists
+        echo "Creating namespace 'monitoring' if it doesn't exist..."
+        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+        
+        # --- DEPLOY MINIO FIRST ---
+        echo "Deploying MinIO..."
+        # This assumes a MinIO Helm chart is available locally in ./charts/minio
+        # Ensure ./production/values-minio-production.yaml is created and configured.
+        helm upgrade --install minio ./charts/minio -n monitoring -f {{.minio_prod_values}} --create-namespace
+        
+        # Wait for MinIO to be ready (optional, but recommended for subsequent steps)
+        echo "Waiting for MinIO to be ready... (This step might require manual intervention or a more sophisticated wait command)"
+        # Example: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=minio -n monitoring --timeout=300s
+        sleep 60 # Simple sleep as a placeholder
+
+        # --- DEPLOY LGTM COMPONENTS ---
+        # The following commands assume secrets for MinIO credentials and Grafana DB are already created.
+        # For MinIO secrets, example assumes a secret named 'minio-credentials' with keys 'MINIO_ACCESS_KEY' and 'MINIO_SECRET_KEY'.
+        # For Grafana DB secrets, example assumes 'grafana-db-secrets' with key 'password'.
+        # These secrets MUST be created before running these commands.
+
+        # Deploy Loki with production values and MinIO credentials
+        echo "Deploying Loki..."
+        helm upgrade --install loki ./charts/loki -n monitoring 
+          -f {{.loki_prod_values}} 
+          --set storage.s3.access_key_id=$(kubectl get secret minio-credentials -n monitoring -o jsonpath='{.data.MINIO_ACCESS_KEY}' | base64 --decode) 
+          --set storage.s3.secret_access_key=$(kubectl get secret minio-credentials -n monitoring -o jsonpath='{.data.MINIO_SECRET_KEY}' | base64 --decode) 
+          --create-namespace
+        
+        # Deploy Tempo with production values and MinIO credentials
+        echo "Deploying Tempo..."
+        helm upgrade --install tempo ./charts/tempo -n monitoring 
+          -f {{.tempo_prod_values}} 
+          --set storage.s3.access_key_id=$(kubectl get secret minio-credentials -n monitoring -o jsonpath='{.data.MINIO_ACCESS_KEY}' | base64 --decode) 
+          --set storage.s3.secret_access_key=$(kubectl get secret minio-credentials -n monitoring -o jsonpath='{.data.MINIO_SECRET_KEY}' | base64 --decode) 
+          --create-namespace
+        
+        # Deploy Prometheus with production values
+        echo "Deploying Prometheus..."
+        helm upgrade --install prometheus ./charts/prometheus -n monitoring 
+          -f {{.prometheus_prod_values}} 
+          --create-namespace
+        
+        # Deploy Grafana with production values and PostgreSQL secret reference
+        echo "Deploying Grafana..."
+        helm upgrade --install grafana ./charts/grafana -n monitoring 
+          -f {{.grafana_prod_values}} 
+          --set externalDatabase.password=$(kubectl get secret grafana-db-secrets -n monitoring -o jsonpath='{.data.password}' | base64 --decode) 
+          --create-namespace
+        
+        # Deploy Alloy (DaemonSet) using its production values
+        echo "Deploying Alloy..."
+        helm upgrade --install alloy ./charts/alloy -n monitoring 
+          -f {{.alloy_prod_values}} 
+          --create-namespace
+        
+        echo "Production LGTM infrastructure deployment complete."
+
+  # Task to deploy only the application in production (if applicable)
+  # app:prod:
+  #   desc: "Deploys the Spring Boot application to the monitoring namespace in production."
+  #   cmds:
+  #     - echo "Deploying Spring Boot application (production mode)..."
+  #     # Replace with your actual app deployment command (e.g., using Helm or kubectl apply)
+  #     # Example: helm upgrade --install my-app ./charts/my-app -n monitoring -f deployment/production/values-app-production.yaml --create-namespace
+
+  # Task to get Grafana password (if managed by chart)
+  password:
+    desc: "Retrieves the Grafana admin password (if managed by Helm/Secrets)."
+    cmds:
+      - echo "Fetching Grafana admin password..."
+      # This command depends on how the Grafana Helm chart exposes the password secret.
+      # Example: kubectl get secret grafana -n monitoring -o jsonpath='{.data.admin-password}' | base64 --decode
+      - echo "Please manually retrieve the Grafana admin password from your Kubernetes secrets."
+
+  # Task to port-forward production services (use with caution for debugging)
+  port-forward:prod:
+    desc: "Forwards Grafana, Prometheus, Loki, Tempo, and MinIO for debugging (use with caution)."
+    cmds:
+      - echo "Port forwarding for production services. Use with caution."
+      # Example commands - adjust ports and selectors as needed
+      # - kubectl port-forward svc/grafana 3000:80 -n monitoring
+      # - kubectl port-forward svc/prometheus-server 9090:80 -n monitoring
+      # - kubectl port-forward svc/loki-gateway 3100:80 -n monitoring # Assuming loki-gateway service name
+      # - kubectl port-forward svc/tempo 3200:3200 -n monitoring # Assuming tempo service name
+      # - kubectl port-forward svc/minio 9000:9000 -n monitoring # Assuming minio service name
+
+# Notes:
+# - Ensure Helm charts for MinIO, Loki, Tempo, Prometheus, Grafana, and Alloy are available
+#   in a './charts/' subdirectory or a Helm repository accessible by Taskfile.
+# - Kubernetes secrets for MinIO credentials and Grafana DB password must be created beforehand
+#   and contain the necessary keys (e.g., MINIO_ACCESS_KEY, MINIO_SECRET_KEY, password).
+# - The use of 'kubectl get secret ... | base64 --decode' assumes secrets are stored base64 encoded.
+# - Adjust service names, ports, and secret references based on your actual Kubernetes environment.
+# - For HA setups, ensure Ingress controllers, TLS certificates, and network policies are properly configured.

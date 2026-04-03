@@ -1,0 +1,111 @@
+# Production configuration for Prometheus
+# Assumes MinIO is deployed for long-term metrics storage.
+# Assumes Alertmanager will be deployed or configured.
+
+server:
+  # Increase retention period for long-term analysis
+  retention: "90d" # 90 days retention
+  
+  # Prometheus server command-line flags
+  # Enable remote write receiver if Alloy is pushing metrics to this Prometheus instance.
+  # If Prometheus is solely writing to MinIO via remote_write, this might be adjusted.
+  extraArgs:
+    web.enable-remote-write-receiver: null # Enable if Alloy pushes to this Prometheus
+    web.enable-lifecycle: null
+    # For HA, Prometheus might need configurations related to its own discovery or federation.
+    # If using Thanos or Cortex for long-term storage, additional flags would be needed.
+    # This example focuses on enabling essential production features for a single instance's configuration.
+
+  # Remote Write Configuration: Pointing to MinIO for long-term storage.
+  # NOTE: This assumes MinIO is configured to accept Prometheus remote_write API.
+  # The endpoint has been updated to a Kubernetes-friendly format.
+  # Remember to replace 'http://minio.monitoring.svc.cluster.local:9000/prometheus/write'
+  # with your actual MinIO endpoint and credentials once MinIO is deployed.
+  remoteWrite:
+    - url: "http://minio.monitoring.svc.cluster.local:9000/prometheus/write" # Updated to K8s internal service URL
+      # Optional: Add SigV4 authentication if MinIO requires it
+      # sigv4:
+      #   region: "us-east-1" # Adjust region as per MinIO configuration
+      #   access_key_id: "YOUR_MINIO_ACCESS_KEY"
+      #   secret_access_key: "YOUR_MINIO_SECRET_KEY"
+      
+  # Persistent Volume for Prometheus TSDB data (for operational data and short-term storage)
+  persistentVolume:
+    enabled: true
+    size: 50Gi # Increased size for operational data and potential local caches
+
+  # Adjust resources for production load
+  resources:
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+
+# Enable and configure Alertmanager for production alerting.
+# Alertmanager handles deduplication, grouping, silencing, and routing of alerts from Prometheus.
+alertmanager:
+  enabled: true
+  # Alertmanager configuration details. This block defines how alerts are grouped, routed,
+  # and where they are sent.
+  config: |
+    # Global configuration options for Alertmanager.
+    global:
+      # How long to wait before sending a notification about a resolved alert.
+      resolve_timeout: 5m
+
+    # The root of the routing tree. Alerts with no specific route match will end up here.
+    route:
+      # Labels by which alerts should be grouped. Alerts with identical values for these labels
+      # will be batched into a single notification.
+      # Recommended for comprehensive grouping: ['alertname', 'cluster', 'service', 'namespace'].
+      group_by: ['alertname', 'cluster', 'service', 'namespace'] 
+      
+      # Duration to wait to buffer alerts of the same group before sending an initial notification.
+      # Allows bundling multiple related alerts into one message.
+      group_wait: 30s 
+      
+      # Duration to wait before sending a notification for new alerts added to an existing group
+      # that has already been notified. Prevents alert storms for ongoing incidents.
+      group_interval: 5m 
+      
+      # How often to re-send a notification if an alert is still firing.
+      repeat_interval: 4h 
+      
+      # The default receiver for alerts that do not match any specific routes.
+      # This is set to 'mattermost-receiver' to send all alerts to Mattermost.
+      receiver: 'mattermost-receiver' 
+
+    # List of receivers for alerts.
+    receivers:
+      - name: 'mattermost-receiver'
+        # Configuration for sending alerts via webhook, suitable for Mattermost.
+        webhook_configs:
+          # This URL is a placeholder. Replace it with your actual Mattermost incoming webhook URL.
+          # Ensure Mattermost is accessible from your Kubernetes cluster, or configure external access.
+          - url: 'http://mattermost.example.com/hooks/generic-mattermost-webhook-placeholder' 
+            # Send a notification when an alert transitions from firing to resolved.
+            send_resolved: true 
+
+# Note: Alerting rules (the conditions that trigger alerts, e.g., CPU > 90%) are typically
+# defined separately in Prometheus's configuration, often via additional ConfigMaps or
+# Prometheus Operator CRDs, not directly in this Helm chart values.yaml.
+
+# Enable Node Exporter with hostRootFsMount for production disk monitoring
+prometheus-node-exporter:
+  enabled: true
+  hostRootFsMount:
+    enabled: true # Enable for production to monitor host disk usage
+
+# Enable Kube-State-Metrics
+kube-state-metrics:
+  enabled: true
+
+# Note on HA for Prometheus:
+# The above configuration sets up a single Prometheus instance with remote write to MinIO.
+# For true HA, consider:
+# 1. Deploying multiple Prometheus instances with identical scrape configurations and remote write targets.
+# 2. Using a Prometheus Operator with a highly available setup.
+# 3. Integrating with a federated setup or a remote storage solution like Thanos/Cortex if extreme scale is needed.
+# This configuration focuses on essential production features like retention, remote storage, and Alertmanager for a single instance, assuming backend services (like MinIO for storage) contribute to overall system HA.

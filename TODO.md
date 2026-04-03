@@ -16,3 +16,5 @@
   - [ ] Retention period
   - [ ] Disk space required
     - PVC vs S3
+- [ ] How to setup span attributes
+- [ ] Integrate Grafana with Keycloak

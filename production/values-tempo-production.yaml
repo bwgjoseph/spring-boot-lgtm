@@ -1,0 +1,122 @@
+# Production configuration for Tempo
+# This assumes MinIO is deployed and accessible within the Kubernetes cluster.
+# Production Tempo requires HA, robust storage (MinIO), and appropriate retention.
+
+tempo:
+  # Increase replicas for High Availability
+  replicas: 3 # Recommended for HA
+
+  # Adjust resources based on expected trace volume and retention
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+
+  # Configure probes for production HA
+  livenessProbe:
+    initialDelaySeconds: 90 # Increased delay for potential startup
+    timeoutSeconds: 15
+  readinessProbe:
+    initialDelaySeconds: 45
+    timeoutSeconds: 15
+
+  # Use production-grade settings
+  extraArgs:
+    mem-ballast-size-mbs: "1024" # Larger ballast for production
+
+  # Production Storage Configuration: Use MinIO (S3-compatible)
+  config: |
+    server:
+      http_listen_port: 3200
+      # For production, ensure TLS is enabled for the server port if exposed externally
+      # tls:
+      #   cert_file: /path/to/cert.pem
+      #   key_file: /path/to/key.pem
+
+    storage:
+      trace:
+        backend: "s3" # Use S3-compatible object storage
+        # Configure your MinIO (S3) bucket details here
+        s3:
+          endpoint: "http://minio.monitoring.svc.cluster.local:9000" # Updated to Kubernetes-friendly format
+          bucket: "tempo-traces"                    # Replace with your S3 bucket name
+          access_key_id: "YOUR_MINIO_ACCESS_KEY"    # Replace with your MinIO Access Key
+          secret_access_key: "YOUR_MINIO_SECRET_KEY"  # Replace with your MinIO Secret Key
+          # For production, use dualstack if needed, and configure secure: true if using HTTPS
+          # dualstack: "false"
+          # secure: true # Set to true if MinIO is configured with TLS
+
+      wal:
+        # WAL path should ideally be on persistent, fast storage or managed by S3 if possible
+        # For simplicity here, we assume a PVC for WAL, but consider your specific needs.
+        backend: "filesystem"
+        # If using S3 for WAL, configure s3 section here as well.
+        # For HA, the WAL needs to be accessible or replicated.
+        # Using filesystem with persistence for WAL as a starting point.
+        filesystem:
+          path: /var/tempo/wal
+
+    compaction:
+      # Production retention for traces: 7-14 days recommended
+      block_retention: "14d" # 14 days retention
+
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: "0.0.0.0:4317" # Listen on all interfaces
+            http: # Optional: Enable HTTP for OTLP
+              endpoint: "0.0.0.0:4318"
+      # For HA, set replication factor
+      replication_factor: 3 # Should match the ingester ring replication factor
+
+    ingester:
+      # For HA, use a distributed KV store like etcd or Consul, or rely on Kubernetes service discovery.
+      # The 'simple scalable' mode might abstract this, but for robust HA, a proper ring is needed.
+      # For this chart, 'memberlist' is often used for Kubernetes-native discovery.
+      lifecycler:
+        ring:
+          kvstore:
+            store: "memberlist" # Use memberlist for distributed discovery in HA setups
+            # For memberlist, additional configuration might be needed depending on chart support
+            # Example for memberlist (if supported by the chart):
+            # consul:
+            #   endpoint: "consul.example.com:8500"
+            #   scheme: "http"
+          replication_factor: 3 # Match distributor replication factor
+
+    metrics_generator:
+      # Production Prometheus endpoint for metrics
+      remote_write:
+        - url: "https://prometheus.example.com/api/v1/write" # Replace with your production Prometheus URL
+      # Ensure storage for metrics generator is also robust
+      storage:
+        path: /var/tempo/metrics_wal # Use a persistent path for metrics generator WAL
+      traces_storage:
+        # Tempo's trace storage path is configured above in the main 'storage.trace' section.
+        backend: "s3" # Ensure this aligns with the chosen storage backend (S3)
+        s3:
+          endpoint: "http://minio.example.com:9000"
+          bucket: "tempo-traces"
+          access_key_id: "YOUR_MINIO_ACCESS_KEY"
+          secret_access_key: "YOUR_MINIO_SECRET_KEY"
+
+# Enable persistence for WAL and potentially other local data if not using S3 for everything
+persistence:
+  enabled: true
+  # If using S3 for trace storage, this PVC might primarily be for WAL or local caches.
+  # Adjust size based on WAL and cache needs.
+  size: 20Gi
+
+# Enable TLS for Tempo API endpoints for production
+# Note: The exact method of enabling TLS might depend on the Helm chart's specific parameters.
+# This is a conceptual representation.
+# tls:
+#   enabled: true
+#   certFile: "/path/to/tempo.crt"
+#   keyFile: "/path/to/tempo.key"
+#   caFile: "/path/to/ca.crt"

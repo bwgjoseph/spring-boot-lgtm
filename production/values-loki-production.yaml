@@ -1,0 +1,89 @@
+# Production configuration for Loki
+# This assumes MinIO is deployed and accessible within the Kubernetes cluster.
+# Production Loki requires HA, robust storage (MinIO), and appropriate retention.
+
+# Switch from SingleBinary to a scalable mode
+deploymentMode: "scalable" # Use 'scalable' or similar for distributed mode
+
+# Configure replicas for scalable components
+backend:
+  replicas: 3 # Recommended for HA
+
+read:
+  replicas: 3 # Recommended for HA
+
+write:
+  replicas: 3 # Recommended for HA
+
+# Standard Loki Configuration for Production
+loki:
+  auth_enabled: false # Assuming auth handled by ingress/network policies for simplicity, adjust if needed.
+  commonConfig:
+    replication_factor: 3 # For HA, should match number of write/read/backend instances if possible
+  
+  # --- PRODUCTION STORAGE CONFIGURATION: MINIO (S3-COMPATIBLE) ---
+  storage:
+    type: 's3' # Use S3-compatible object storage
+    s3:
+      endpoint: "http://minio.example.com:9000" # Replace with your MinIO endpoint
+      bucket: "loki-logs"                       # Replace with your S3 bucket name
+      access_key_id: "YOUR_MINIO_ACCESS_KEY"     # Replace with your MinIO Access Key
+      secret_access_key: "YOUR_MINIO_SECRET_KEY"   # Replace with your MinIO Secret Key
+      # For production, use dualstack if needed, and configure secure: true if using HTTPS
+      # dualstack: "false"
+      # secure: true # Set to true if MinIO is configured with TLS
+
+  # Production schema configuration compatible with S3 and appropriate schema version.
+  # v13 is generally suitable for recent Loki versions.
+  schemaConfig:
+    configs:
+      - from: "2024-01-01" # Ensure this date is in the past for existing data compatibility
+        store: tsdb
+        object_store: s3 # Explicitly state s3 for object store
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h # Index period, usually fine at 24h
+
+# Production Cache Configuration: Significantly increase memory for production load
+chunksCache:
+  # Use GiB for better clarity on production scale
+  allocatedMemory: "4Gi" 
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "500m"
+    limits:
+      memory: "8Gi"
+      cpu: "2"
+
+resultsCache:
+  # Use GiB for better clarity on production scale
+  allocatedMemory: "2Gi" 
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "250m"
+    limits:
+      memory: "4Gi"
+      cpu: "1"
+
+# Note on Retention:
+# Loki itself doesn't enforce hard retention by default for S3.
+# Retention is typically managed via S3 bucket lifecycle policies (e.g., delete objects older than 30-90 days).
+# This configuration assumes such policies will be applied to the 'loki-logs' bucket.
+# If the Helm chart supports explicit retention settings for S3, they should be configured here
+# to align with the recommended 30-90 days.
+
+# Adjust resources for Loki components (read, write, backend) based on expected load.
+# The chart might have specific resource settings for each component.
+# Example:
+# read:
+#   resources:
+#     requests:
+#       cpu: "1"
+#       memory: "4Gi"
+#     limits:
+#       cpu: "4"
+#       memory: "8Gi"
+# ... similar for write and backend.
