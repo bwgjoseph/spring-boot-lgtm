@@ -99,7 +99,7 @@ If you cannot login to Grafana:
 **Symptom:** In Tempo, clicking "Logs for this span" results in "No results found" even though the query is correct.
 **Cause:** The logs search time range exactly matches the span start/end times. If logs were ingested with a slight delay or clock drift exists, they may fall outside this exact window.
 **Resolution:**
-1.  In `values-grafana.yaml`, ensure `spanStartTimeShift` is set to a negative value (e.g., `-5s`) and `spanEndTimeShift` is set to a positive value (e.g., `5s`).
+1.  In `deployment/datasources.yaml`, ensure `spanStartTimeShift` is set to a negative value (e.g., `-5s`) and `spanEndTimeShift` is set to a positive value (e.g., `5s`).
 2.  This expands the search window around the span, increasing the chance of finding correlated logs.
 
 ### TraceQL metrics not configured / local-blocks processor not found

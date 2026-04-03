@@ -43,6 +43,13 @@ tasks:
       - kubectl create configmap local-dashboards --from-file={{.DEPLOY_DIR}}/dashboards -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
       - kubectl label configmap local-dashboards grafana_dashboard=1 -n {{.NAMESPACE}} --overwrite
 
+  datasources:
+    desc: Create ConfigMap for local datasources
+    deps: [namespace]
+    cmds:
+      - kubectl create configmap local-datasources --from-file={{.DEPLOY_DIR}}/datasources.yaml -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl label configmap local-datasources grafana_datasource=1 -n {{.NAMESPACE}} --overwrite
+
   alloy:
     desc: Install or Upgrade Grafana Alloy
     deps: [repos, namespace]
@@ -96,6 +103,7 @@ tasks:
       - task: tempo
       - task: grafana
       - task: dashboards
+      - task: datasources
       - task: alloy
 
   all:

@@ -42,6 +42,9 @@ helm upgrade --install tempo grafana-community/tempo -n monitoring -f deployment
 # Install or Upgrade Grafana (Visualization)
 helm upgrade --install grafana grafana-community/grafana -n monitoring -f deployment/values-grafana.yaml --version 11.3.0
 
+# Deploy Local Datasources (Required for the LGTM linkings)
+kubectl create configmap local-datasources --from-file=deployment/datasources.yaml -n monitoring --dry-run=client -o yaml | kubectl apply -f -; kubectl label configmap local-datasources grafana_datasource=1 -n monitoring --overwrite
+
 # Deploy Local Dashboards (Required for K8s Monitoring views)
 kubectl create configmap local-dashboards --from-file=deployment/dashboards -n monitoring --dry-run=client -o yaml | kubectl apply -f -; kubectl label configmap local-dashboards grafana_dashboard=1 -n monitoring --overwrite
 ```
