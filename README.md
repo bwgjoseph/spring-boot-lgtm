@@ -21,6 +21,67 @@ This sandbox goes beyond basic connectivity to include advanced observability pa
 
 ## 🏗️ Architecture
 
+The following diagram illustrates the data flow and communication ports across the LGTM stack:
+
+```mermaid
+graph TD
+    subgraph "Application Layer"
+        APP["Spring Boot App<br/>(Port: 8080)"]
+    end
+
+    subgraph "Collection & Processing (The Brain)"
+        ALLOY["Grafana Alloy<br/>(Port: 12345)"]
+    end
+
+    subgraph "Storage & Analysis Layer (LGTM)"
+        PROM["Prometheus<br/>(Port: 9090)"]
+        LOKI["Loki<br/>(Port: 3100)"]
+        TEMPO["Tempo<br/>(Port: 3200)"]
+        AM["Alertmanager<br/>(Port: 9093)"]
+    end
+
+    subgraph "Infrastructure Layer"
+        MINIO["MinIO<br/>(Port: 9000)"]
+        POSTGRES["PostgreSQL<br/>(Port: 5432)"]
+    end
+
+    subgraph "Visualization & Alerting"
+        GRAFANA["Grafana<br/>(Port: 3000)"]
+        NOTIFY["Notification Channels<br/>(Mattermost/UI)"]
+    end
+
+    %% Data Flow: Application to Alloy
+    APP -- "OTLP Traces (4317)" --> ALLOY
+    APP -- "Log Scrape" --> ALLOY
+    ALLOY -- "Metrics Scrape (/actuator/prometheus)" --> APP
+
+    %% Data Flow: Alloy to Backends
+    ALLOY -- "Remote Write" --> PROM
+    ALLOY -- "Loki Push API" --> LOKI
+    ALLOY -- "OTLP (4317)" --> TEMPO
+
+    %% Storage Relationships
+    PROM -- "Remote Write" --> MINIO
+    LOKI -- "S3 API" --> MINIO
+    TEMPO -- "S3 API" --> MINIO
+    
+    %% Internal Correlation & Alerting
+    TEMPO -- "Remote Write (Service Graph)" --> PROM
+    PROM -- "Firing Alerts" --> AM
+    AM -- "Notifications" --> NOTIFY
+
+    %% Visualization & Config
+    GRAFANA -- "Queries" --> PROM
+    GRAFANA -- "Queries" --> LOKI
+    GRAFANA -- "Queries" --> TEMPO
+    GRAFANA -- "Persistence" --> POSTGRES
+
+    %% Styling
+    style ALLOY fill:#f96,stroke:#333,stroke-width:2px
+    style GRAFANA fill:#f9f,stroke:#333,stroke-width:2px
+    style APP fill:#bbf,stroke:#333,stroke-width:2px
+```
+
 - **Metrics:** Scraped by Alloy from `/actuator/prometheus` (Pull model).
 - **Logs:** Collected by Alloy from pod stdout/stderr with Kubernetes metadata enrichment (Pull model).
 - **Traces:** Pushed by the application to Alloy via OTLP/gRPC (Push model).
@@ -77,6 +138,8 @@ This project contains specialized configurations to handle hardware and mount pr
 3. **Cluster Health:**
    - Search for the **"Kubernetes / Compute Resources / Cluster"** dashboard to see overall CPU/Memory usage.
    - Use the **"Namespace (Pods)"** dashboard to drill down into the Spring Boot app's resource consumption.
+4. **Alerting:**
+   - Visit the **Alertmanager UI** at `http://localhost:9093` to see active alerts, silences, and routing status.
 
 ## ⚙️ Production Tuning
 

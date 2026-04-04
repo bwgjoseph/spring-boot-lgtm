@@ -20,6 +20,7 @@ kubectl apply -f deployment.yaml; kubectl rollout restart deployment spring-boot
 # Run these in separate shells or in the background
 kubectl port-forward svc/grafana 3000:80 -n monitoring
 kubectl port-forward svc/spring-boot-app-svc 8080:8080 -n monitoring
+kubectl port-forward svc/prometheus-alertmanager 9093:9093 -n monitoring
 kubectl port-forward daemonset/alloy 12345:12345 -n monitoring
 
 # 5. Credentials

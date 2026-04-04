@@ -43,22 +43,24 @@ While Service Graphs show the *whole system*, the Node Graph focuses on a **sing
 
 ---
 
-## 3. "Advanced" Features (The Pro Stuff)
+## 3. "Advanced" Features (Day 2 Ready)
 
-Once you have the pillars, this sandbox enables "Day 2" features that make debugging much faster:
+This sandbox goes beyond basic connectivity to include advanced observability patterns:
 
 ### 🎯 Exemplars (The "Magic" Link)
 In the Prometheus metrics graphs, you'll see small dots. These are **Exemplars**.
 *   **The Benefit:** If you see a spike in latency, you can click a dot to jump **directly** to the specific Trace that caused that spike. No more searching for "what happened at 2 PM."
 
-### 🗺️ Automated Service Graph
-Tempo's `metricsGenerator` scans your traces and automatically draws a map of your architecture.
-*   **The Benefit:** You don't have to manually draw diagrams. If `Service A` starts calling `Service B`, it just appears on the map automatically, showing error rates and latency between them.
-
 ### 🔗 Log-Trace Correlation
 *   **Trace-to-Log:** While looking at a Trace in Tempo, click "Logs for this span" to see every log message written *during that specific request*.
 *   **Log-to-Trace:** While looking at a Log in Loki, click the "View Trace" button next to the Trace ID to see the full execution timeline of that request.
 *   **Deeper Dive:** See [learning_trace_to_log.md](./learning_trace_to_log.md) for detailed troubleshooting of this feature.
+
+### 🔔 Integrated Alerting (Alertmanager)
+The sandbox includes a pre-configured **Alertmanager** to handle system and application health alerts.
+*   **Local-first:** In sandbox mode, alerts are visible directly in the **Alertmanager Web UI** (port 9093).
+*   **Production-ready:** Configured with advanced **Grouping** (`alertname`, `cluster`, `service`, `namespace`) to prevent alert fatigue.
+*   **The Benefit:** Real-time notification of issues like high CPU, memory leaks, or service downtime.
 
 ---
 

@@ -60,9 +60,51 @@ alloy:
       }
 
       // --- METRICS: PROMETHEUS SCRAPING ---
+      
+      // Filter pods to only those with 'prometheus.io/scrape: "true"' annotation
+      discovery.relabel "spring_boot_pods" {
+        targets = discovery.kubernetes.all_pods.targets
+        
+        rule {
+          source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_scrape"]
+          action = "keep"
+          regex = "true"
+        }
+        
+        rule {
+          source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_path"]
+          action = "replace"
+          target_label = "__metrics_path__"
+          regex = "(.+)"
+        }
+        
+        rule {
+          source_labels = ["__address__", "__meta_kubernetes_pod_annotation_prometheus_io_port"]
+          action = "replace"
+          regex = "([^:]+)(?::\\d+)?;(\\d+)"
+          replacement = "$1:$2"
+          target_label = "__address__"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_label_app"]
+          separator     = ";"
+          regex         = "^(?:;*)([^;]+).*$"
+          replacement   = "$1"
+          target_label  = "service_name"
+        }
+      }
+
       prometheus.scrape "spring_boot" {
-        targets = discovery.relabel.pod_logs.output
-        metrics_path = "/actuator/prometheus"
+        targets = discovery.relabel.spring_boot_pods.output
         forward_to = [prometheus.remote_write.prom.receiver]
       }
 

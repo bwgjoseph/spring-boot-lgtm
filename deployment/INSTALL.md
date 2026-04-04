@@ -89,6 +89,12 @@ kubectl port-forward service/grafana 3000:80 -n monitoring
 ```
 *Note: Default credentials are `admin` / (use `task password` to retrieve).*
 
+### Alertmanager (Alerting UI)
+**URL:** `http://localhost:9093`
+```powershell
+kubectl port-forward service/prometheus-alertmanager 9093:9093 -n monitoring
+```
+
 ### Spring Boot Application (Swagger/Health)
 **URL:** `http://localhost:8080/actuator/health`
 ```powershell

@@ -7,9 +7,10 @@ This document summarizes the investigation and troubleshooting of the **Trace-to
 2.  **Data Presence:** We verified via the Loki API that logs are searchable using the query: `{service_name="spring-boot-app"} |= "<trace_id>"`.
 3.  **App Alignment:** The `spring.application.name` in the Java app is now aligned with the `service_name` label applied by Grafana Alloy (`spring-boot-app`).
 4.  **MDC Population:** The `trace_id` and `span_id` are correctly appearing in the application logs after adding the `TracingObservationHandler` and `spring-boot-starter-aop`.
+5.  **Metadata Extraction:** Grafana Alloy is now configured with a `loki.process` stage to extract `trace_id` and `span_id` from the log line and promote them to **Structured Metadata**.
 
 ## ❌ What is NOT Working
-1.  **Tempo UI Button:** The "Logs for this span" button in the Tempo UI (managed by `tracesToLogsV2`) fails to return results, even when the generated query looks correct.
+1.  **Tempo UI Button:** The "Logs for this span" button in the Tempo UI (managed by `tracesToLogsV2`) fails to return results, even when the generated query looks correct. This may be because it expects a **Label** rather than **Structured Metadata**.
 2.  **UI DataLinks:** Manual `dataLinks` configured in the Tempo datasource did not appear in the span details panel as expected.
 
 ## 🔍 Root Cause Analysis

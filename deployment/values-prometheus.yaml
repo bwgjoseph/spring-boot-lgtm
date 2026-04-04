@@ -1,34 +1,92 @@
 server:
-  # Enable Alloy to push metrics via remote_write
+  # Setting to true might help the chart correctly manage the flags
   remoteWriteReceiver: true
   
   # Set retention period
   retention: "14d"
   
   # Prometheus server command-line flags
-  # For remote write receiver to be enabled, we need to pass '--web.enable-remote-write-receiver' and '--web.enable-lifecycle'
-  extraArgs:
-    web.enable-remote-write-receiver: null
-    web.enable-lifecycle: null
+  # Leave empty to let the chart manage mandatory flags and avoid duplicates
+  extraArgs: {}
   
   # Prometheus configuration file contents
-  # This section will be injected into /etc/config/prometheus.yml
-  config: {}
+  config:
+    rule_files:
+      - /etc/config/alerting_rules.yml
+    alerting:
+      alertmanagers:
+        - kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_namespace]
+              action: keep
+              regex: monitoring
+            - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+              action: keep
+              regex: alertmanager
+            - source_labels: [__meta_kubernetes_pod_container_port_number]
+              action: keep
+              regex: "9093"
         
   persistentVolume:
     enabled: true
-    size: 20Gi # Local disk storage for lean setup
+    size: 20Gi
 
-# Enable/Disable components for a simple setup
+# Define Alerting Rules
+serverFiles:
+  alerting_rules.yml:
+    groups:
+      - name: sandbox_alerts
+        rules:
+          # 1. Service Down Alert (Detects absence of metrics - used when replicas = 0)
+          - alert: InstanceAbsent
+            expr: absent(up{service_name="spring-boot-app"})
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Instance spring-boot-app is ABSENT"
+              description: "Prometheus is not receiving any metrics for spring-boot-app. The deployment might be scaled to 0 or Alloy cannot reach it."
+
+          # 2. Service Unhealthy Alert (Detects up == 0 - used when pod is running but scrape fails)
+          - alert: InstanceDown
+            expr: up{service_name="spring-boot-app"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Instance {{ $labels.instance }} is DOWN"
+              description: "The pod {{ $labels.pod }} is running but the metrics endpoint is returning an error."
+
+          # 3. High CPU Usage (> 80%)
+          - alert: HighCpuUsage
+            expr: sum(rate(container_cpu_usage_seconds_total{service_name="spring-boot-app"}[5m])) by (pod, namespace) > 0.8
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage on pod {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is using more than 80% CPU."
+
+# Enable/Disable components
 alertmanager:
-  enabled: false
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'cluster', 'service', 'namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      receiver: 'null-receiver'
+    receivers:
+      - name: 'null-receiver'
+
 prometheus-pushgateway:
   enabled: false
 prometheus-node-exporter:
   enabled: true
-  # DOCKER-DESKTOP: Disabled hostRootfs mount because Docker Desktop 
-  # does not support 'shared' mount propagation for the root path.
-  # FOR PRODUCTION: Set to 'true' to allow monitoring of host disk usage.
   hostRootFsMount:
     enabled: false
 kube-state-metrics:

@@ -3,18 +3,15 @@
 # Assumes Alertmanager will be deployed or configured.
 
 server:
-  # Increase retention period for long-term analysis
+  # Enable Alloy to push metrics via remote_write
+  remoteWriteReceiver: true
+  
+  # Set retention period
   retention: "90d" # 90 days retention
   
   # Prometheus server command-line flags
-  # Enable remote write receiver if Alloy is pushing metrics to this Prometheus instance.
-  # If Prometheus is solely writing to MinIO via remote_write, this might be adjusted.
-  extraArgs:
-    web.enable-remote-write-receiver: null # Enable if Alloy pushes to this Prometheus
-    web.enable-lifecycle: null
-    # For HA, Prometheus might need configurations related to its own discovery or federation.
-    # If using Thanos or Cortex for long-term storage, additional flags would be needed.
-    # This example focuses on enabling essential production features for a single instance's configuration.
+  # Leave empty to let the chart manage mandatory flags and avoid duplicates
+  extraArgs: {}
 
   # Remote Write Configuration: Pointing to MinIO for long-term storage.
   # NOTE: This assumes MinIO is configured to accept Prometheus remote_write API.
@@ -43,13 +40,70 @@ server:
       cpu: "4"
       memory: "8Gi"
 
+  # Prometheus configuration file contents
+  config:
+    rule_files:
+      - /etc/config/alerting_rules.yml
+    # Explicitly point Prometheus to the Alertmanager service
+    alerting:
+      alertmanagers:
+        - kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_namespace]
+              action: keep
+              regex: monitoring
+            - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+              action: keep
+              regex: alertmanager
+            - source_labels: [__meta_kubernetes_pod_container_port_number]
+              action: keep
+              regex: "9093"
+
+# Define Alerting Rules
+serverFiles:
+  alerting_rules.yml:
+    groups:
+      - name: production_alerts
+        rules:
+          # 1. Service Down Alert (Detects absence of metrics - used when replicas = 0)
+          - alert: InstanceAbsent
+            expr: absent(up{service_name="spring-boot-app"})
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Instance spring-boot-app is ABSENT"
+              description: "Prometheus is not receiving any metrics for spring-boot-app. The deployment might be scaled to 0 or Alloy cannot reach it."
+
+          # 2. Service Unhealthy Alert (Detects up == 0 - used when pod is running but scrape fails)
+          - alert: InstanceDown
+            expr: up{service_name="spring-boot-app"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Instance {{ $labels.instance }} is DOWN"
+              description: "The pod {{ $labels.pod }} is running but the metrics endpoint is returning an error."
+
+          # 3. High CPU Usage (> 80%)
+          - alert: HighCpuUsage
+            expr: sum(rate(container_cpu_usage_seconds_total{service_name="spring-boot-app"}[5m])) by (pod, namespace) > 0.8
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage on pod {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is using more than 80% CPU."
+
 # Enable and configure Alertmanager for production alerting.
 # Alertmanager handles deduplication, grouping, silencing, and routing of alerts from Prometheus.
 alertmanager:
   enabled: true
   # Alertmanager configuration details. This block defines how alerts are grouped, routed,
   # and where they are sent.
-  config: |
+  # Fixed: Converted from multi-line string to a YAML object to meet chart schema requirements.
+  config:
     # Global configuration options for Alertmanager.
     global:
       # How long to wait before sending a notification about a resolved alert.

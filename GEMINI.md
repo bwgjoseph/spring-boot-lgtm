@@ -38,11 +38,11 @@ The project uses `Taskfile` to simplify complex operations.
 | Task | Command | Description |
 |------|---------|-------------|
 | **Full Setup** | `task all` | Builds the app and deploys the entire LGTM stack + App to K8s. |
-| **Infra Only** | `task infra` | Deploys Prometheus, Loki, Tempo, Grafana, and Alloy. |
+| **Infra Only** | `task infra` | Deploys Prometheus, Loki, Tempo, Grafana, Alertmanager, and Alloy. |
 | **App Build** | `task app:build` | Builds the Spring Boot app and Docker image using Jib. |
 | **App Deploy** | `task app:deploy` | Deploys the application to the `monitoring` namespace. |
 | **Dashboards** | `task dashboards` | Syncs local dashboards from `deployment/dashboards/` to K8s. |
-| **Port Forward** | `task port-forward` | Forwards Grafana (3000), Prometheus (9090), Alloy (12345), and App (8080). |
+| **Port Forward** | `task port-forward` | Forwards Grafana (3000), Prometheus (9090), Alertmanager (9093), Alloy (12345), and App (8080). |
 | **Get Password** | `task password` | Retrieves the Grafana admin password. |
 
 ### Manual Maven Commands
