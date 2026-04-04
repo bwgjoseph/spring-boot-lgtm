@@ -59,9 +59,10 @@ tempo:
         filesystem:
           path: /var/tempo/wal
 
-    compaction:
-      # Production retention for traces: 7-14 days recommended
-      block_retention: "14d" # 14 days retention
+    compactor:
+      compaction:
+        # Production retention for traces: 7-14 days recommended
+        block_retention: "14d" # 14 days retention
 
     distributor:
       receivers:
@@ -92,7 +93,7 @@ tempo:
     metrics_generator:
       # Production Prometheus endpoint for metrics
       remote_write:
-        - url: "https://prometheus.example.com/api/v1/write" # Replace with your production Prometheus URL
+        - url: "http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write" # Updated to Kubernetes-friendly format
       # Ensure storage for metrics generator is also robust
       storage:
         path: /var/tempo/metrics_wal # Use a persistent path for metrics generator WAL

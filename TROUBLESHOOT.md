@@ -103,11 +103,16 @@ If you cannot login to Grafana:
 2.  This expands the search window around the span, increasing the chance of finding correlated logs.
 
 ### Tempo Retention Period Configuration
-**Symptom:** Traces are not being pruned after the expected period, leading to excessive storage usage.
-**Cause:** The `compaction.block_retention` setting in Tempo's configuration was either missing or incorrectly structured, preventing retention policies from being applied.
+**Symptom:** Tempo pod fails to start with `field compaction not found in type storage.Config` or `field compaction not found in type app.Config`. Or, traces are not being pruned after the expected period.
+**Cause:** The `compaction` block was incorrectly placed under `storage` or at the top level. In Tempo 2.x, `compaction` settings must be nested within a top-level `compactor` block.
 **Resolution:**
-1.  Correctly structure the `compaction` block as a sibling to `storage.trace` and `storage.wal` within the `storage` section of `values-tempo.yaml`.
-2.  Set `block_retention` to the desired duration (e.g., `72h` for 3 days).
+1.  In `values-tempo.yaml`, ensure the `compactor` block is defined at the top level of the `config` string.
+2.  Nest the `compaction` block inside `compactor`.
+    ```yaml
+    compactor:
+      compaction:
+        block_retention: 72h # 3 days
+    ```
 3.  Redeploy Tempo using `task tempo`.
 
 ### Trace-to-Log: No results found (Zero-width time range)

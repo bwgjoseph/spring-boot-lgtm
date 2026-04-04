@@ -18,7 +18,7 @@ tempo:
   extraArgs:
     mem-ballast-size-mbs: 16
 
-# Manually define the config to ensure correct S3 field names
+# Manually define the config to ensure correct field names and structure
 config: |
   server:
     http_listen_port: 3200
@@ -29,6 +29,7 @@ config: |
         path: /var/tempo/traces
       wal:
         path: /var/tempo/wal
+  compactor:
     compaction:
       block_retention: 72h # 3 days
   distributor:
@@ -56,4 +57,3 @@ config: |
 persistence:
   enabled: true
   size: 10Gi
-
