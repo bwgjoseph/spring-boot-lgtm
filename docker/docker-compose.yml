@@ -1,0 +1,96 @@
+services:
+
+  # mongodb replicaset primary
+  mongo-1:
+    image: mongo:7.0.14
+    container_name: mongo-1
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo_db:/data/db
+      - mongo_configdb:/data/configdb
+      - ./scripts/mongo-replica.key:/data/mongo-replica.key
+    depends_on:
+      - mongo-2
+      - mongo-3
+    entrypoint:
+      - bash
+      - -c
+      - |
+          chmod 400 /data/mongo-replica.key
+          chown 999:999 /data/mongo-replica.key
+          exec docker-entrypoint.sh $$@
+    command: "mongod --bind_ip_all --replSet mgrs --keyFile /data/mongo-replica.key"
+
+  # mongodb replicaset secondary
+  mongo-2:
+    image: mongo:7.0.14
+    container_name: mongo-2
+    restart: always
+    expose:
+      - 27017
+    volumes:
+      - mongo_db_2:/data/db
+      - mongo_configdb_2:/data/configdb
+      - ./scripts/mongo-replica.key:/data/mongo-replica.key
+    entrypoint:
+      - bash
+      - -c
+      - |
+          chmod 400 /data/mongo-replica.key
+          chown 999:999 /data/mongo-replica.key
+          exec docker-entrypoint.sh $$@
+    command: "mongod --bind_ip_all --replSet mgrs --keyFile /data/mongo-replica.key"
+
+  # mongodb replicaset arbiter
+  mongo-3:
+    image: mongo:7.0.14
+    container_name: mongo-3
+    restart: always
+    expose:
+      - 27017
+    volumes:
+      - mongo_db_3:/data/db
+      - mongo_configdb_3:/data/configdb
+      - ./scripts/mongo-replica.key:/data/mongo-replica.key
+    entrypoint:
+      - bash
+      - -c
+      - |
+          chmod 400 /data/mongo-replica.key
+          chown 999:999 /data/mongo-replica.key
+          exec docker-entrypoint.sh $$@
+    command: "mongod --bind_ip_all --replSet mgrs --keyFile /data/mongo-replica.key"
+
+  mongo-setup:
+    image: mongo:7.0.14
+    container_name: mongo-setup
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    depends_on:
+      - mongo-1
+      - mongo-2
+      - mongo-3
+    volumes:
+      - ./scripts/setup.sh:/scripts/setup.sh
+    restart: on-failure
+    entrypoint: ["/bin/bash", "/scripts/setup.sh"]
+
+volumes:
+    mongo_db:
+        # external: true // Specify if you wish to create yourself
+    mongo_configdb:
+        # external: true // Specify if you wish to create yourself
+    mongo_db_2:
+        # external: true // Specify if you wish to create yourself
+    mongo_configdb_2:
+        # external: true // Specify if you wish to create yourself
+    mongo_db_3:
+        # external: true // Specify if you wish to create yourself
+    mongo_configdb_3:
+        # external: true // Specify if you wish to create yourself

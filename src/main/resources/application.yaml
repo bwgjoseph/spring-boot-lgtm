@@ -3,13 +3,25 @@ spring:
     name: spring-boot-app
   data:
     mongodb:
-      # Disable MongoDB to stop connection errors in sandbox
-      enabled: false
+      enabled: true
+      uri: mongodb://root:password@localhost:27017/kx?authSource=admin
+debezium:
+  properties:
+    connector.class: io.debezium.connector.mongodb.MongoDbConnector
+    mongodb.connection.string: mongodb://admin:password@localhost:27017/source?authSource=admin&replicaSet=mgrs
+    topic.prefix: kx-connector
+    offset.storage: org.apache.kafka.connect.storage.FileOffsetBackingStore
+    offset.storage.file.filename: /tmp/offsets.dat
+    # For MongoDB, capturing everything in the kx database
+    database.include.list: kx
+    # Allow the engine to start even if it cannot connect immediately (useful for sandbox)
+    errors.retry.delay.initial.ms: 1000
+    errors.retry.delay.max.ms: 5000
 management:
   endpoints:
     web:
       exposure:
-        include: "health,prometheus"
+        include: "*"
   prometheus:
     metrics:
       export:

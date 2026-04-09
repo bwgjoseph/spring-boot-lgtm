@@ -56,6 +56,10 @@ In the Prometheus metrics graphs, you'll see small dots. These are **Exemplars**
 *   **Log-to-Trace:** While looking at a Log in Loki, click the "View Trace" button next to the Trace ID to see the full execution timeline of that request.
 *   **Deeper Dive:** See [learning_trace_to_log.md](./learning_trace_to_log.md) for detailed troubleshooting of this feature.
 
+### 📊 Dynamic Debezium Monitoring
+The sandbox includes a **Dynamic JMX-to-Micrometer Bridge** for Debezium Embedded.
+*   **The Benefit:** It automatically discovers all Debezium MBeans and exposes them as Prometheus metrics with rich contextual tags (connector name, task ID, etc.). No manual configuration is needed when adding new connectors.
+
 ### 🔔 Integrated Alerting (Alertmanager)
 The sandbox includes a pre-configured **Alertmanager** to handle system and application health alerts.
 *   **Local-first:** In sandbox mode, alerts are visible directly in the **Alertmanager Web UI** (port 9093).
