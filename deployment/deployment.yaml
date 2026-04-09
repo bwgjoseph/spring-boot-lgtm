@@ -31,14 +31,14 @@ spec:
           value: "http://alloy.monitoring.svc:4317"
         - name: MANAGEMENT_OTLP_TRACING_TRANSPORT
           value: "grpc"
-        - name: SPRING_DATA_MONGODB_URI
-          value: "mongodb://mongodb.monitoring.svc:27017/pokemon"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "deployment.environment=staging,service.version=1.0.0"
         # Ensure application name matches the service_name label for correlation
         - name: SPRING_APPLICATION_NAME
           value: "spring-boot-app"
         resources:
           requests:
-            memory: "512Mi"
+            memory: "1Gi"
             cpu: "100m"
           limits:
             memory: "1Gi"
@@ -47,14 +47,14 @@ spec:
           httpGet:
             path: /actuator/health/liveness
             port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 60
+          periodSeconds: 15
         readinessProbe:
           httpGet:
             path: /actuator/health/readiness
             port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 60
+          periodSeconds: 15
 ---
 apiVersion: v1
 kind: Service

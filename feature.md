@@ -78,8 +78,9 @@ We've enabled full visibility into the cluster itself, not just your Java app:
 ### Instrumenting your Code
 You don't need to learn complex OpenTelemetry APIs. We use the **Micrometer Observation API**:
 1.  **Annotation:** Just add `@Observed` to a method.
-2.  **MDC:** Your logs automatically include `[trace_id, span_id]`.
-3.  **Manual:** Use `Observation.createNotStarted(...)` for complex business logic.
+2.  **MDC:** Your logs automatically include `[traceId, spanId, userId]` (idiomatic Java camelCase).
+3.  **Snake_case in Grafana:** These are automatically mapped to `trace_id`, `span_id`, and `user_id` in Loki and Tempo for standard observability compliance.
+4.  **Manual:** Use `Observation.createNotStarted(...)` for complex business logic.
 
 ### Exploration Workflow
 1.  Open **Grafana** (localhost:3000).

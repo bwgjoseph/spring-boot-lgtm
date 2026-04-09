@@ -12,12 +12,13 @@ It demonstrates a "Scrape & Push" architecture using Spring Boot 3.5+, Micromete
 This sandbox goes beyond basic connectivity to include advanced observability patterns:
 
 - **Exemplars:** Direct correlation from metric spikes in Prometheus to specific traces in Tempo.
+- **Baggage & Correlation:** Cross-service propagation of custom attributes (like `userId`) using W3C Baggage, synced automatically to logs (MDC) and traces (Span Attributes).
+- **Kubernetes Enrichment:** Grafana Alloy automatically enriches every trace with Pod, Node, and Namespace metadata based on the source IP.
+- **Embedded Debezium Monitoring:** Native Micrometer integration for Debezium Embedded, bridging JMX MBeans to Prometheus metrics without a Java Agent.
 - **Tail-based Sampling:** Intelligent trace reduction (currently 100% for testing, configurable to keep 100% errors and X% success).
 - **Service Graph:** Automated system-wide dependency mapping generated natively by Tempo.
-- **Node Graph:** Visual request-level flowchart for deep-diving into complex traces.
 - **Manual Instrumentation:** Examples of using the Micrometer `Observation` API for business-specific metrics and traces.
 - **Self-Monitoring:** Integrated scraping of Alloy's own health and performance metrics.
-- **Correlation-ready Logs:** Robust log patterns configured to capture both `traceId` and `trace_id` variants, compatible with Loki.
 
 ## 🏗️ Architecture
 
@@ -42,7 +43,7 @@ graph TD
 
     subgraph "Infrastructure Layer"
         MINIO["MinIO<br/>(Port: 9000)"]
-        POSTGRES["PostgreSQL<br/>(Port: 5432)"]
+        MONGO["MongoDB<br/>(Port: 27017)"]
     end
 
     subgraph "Visualization & Alerting"
@@ -74,7 +75,7 @@ graph TD
     GRAFANA -- "Queries" --> PROM
     GRAFANA -- "Queries" --> LOKI
     GRAFANA -- "Queries" --> TEMPO
-    GRAFANA -- "Persistence" --> POSTGRES
+    GRAFANA -- "Persistence" --> MINIO
 
     %% Styling
     style ALLOY fill:#f96,stroke:#333,stroke-width:2px
@@ -93,15 +94,16 @@ graph TD
 
 ## 🛠️ Tech Stack & Versions
 
-| Component | Role | Helm Chart | Version |
-|-----------|------|------------|---------|
-| **Spring Boot 3.5** | Application | - | - |
-| **Grafana Alloy** | Collector/Gateway | `grafana/alloy` | `1.6.1` |
-| **Grafana** | Visualization | `grafana-community/grafana` | `11.3.0` |
-| **Loki** | Log Storage | `grafana-community/loki` | `9.3.4` |
-| **Tempo** | Trace Storage | `grafana-community/tempo` | `2.0.0` |
-| **Prometheus** | Metrics Storage | `prometheus-community/prometheus` | `28.13.0` |
-| **MinIO** | Object Storage | `minio/minio` | `5.4.0` |
+| Component           | Role              | Helm Chart                        | Version   |
+|---------------------|-------------------|-----------------------------------|-----------|
+| **Spring Boot 3.5** | Application       | -                                 | -         |
+| **Grafana Alloy**   | Collector/Gateway | `grafana/alloy`                   | `1.6.1`   |
+| **Grafana**         | Visualization     | `grafana-community/grafana`       | `11.3.0`  |
+| **Loki**            | Log Storage       | `grafana-community/loki`          | `9.3.4`   |
+| **Tempo**           | Trace Storage     | `grafana-community/tempo`         | `2.0.0`   |
+| **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `28.13.0` |
+| **MinIO**           | Object Storage    | `minio/minio`                     | `5.4.0`   |
+| **MongoDB**         | DB / CDC Source   | -                                 | `5.6.2` (Driver) |
 
 
 ## 🏁 Getting Started
@@ -127,19 +129,19 @@ This project contains specialized configurations to handle hardware and mount pr
 
 ## 🔍 Exploration
 
-1. **Generate Traces:** Call the Pokemon API to see the distributed tracing in action.
+1. **Generate Traces & Logs:** Call the Pokemon API with credentials to see correlation.
    ```bash
-   curl http://localhost:8080/pokemon/1
+   curl -u user:password http://localhost:8080/pokemon/1
    ```
 2. **Grafana Explore:** 
    - Search for `http_server_requests_seconds_bucket` to see **Exemplars** (clickable dots linking to traces).
    - Use the **Service Graph** tab in Tempo to see the automated architecture map.
-   - Query Loki logs to see the `[service-name,traceId,spanId]` correlation pattern.
-3. **Cluster Health:**
-   - Search for the **"Kubernetes / Compute Resources / Cluster"** dashboard to see overall CPU/Memory usage.
-   - Use the **"Namespace (Pods)"** dashboard to drill down into the Spring Boot app's resource consumption.
-4. **Alerting:**
-   - Visit the **Alertmanager UI** at `http://localhost:9093` to see active alerts, silences, and routing status.
+   - Query Loki logs to see the `[service-name,traceId,spanId,userId]` correlation pattern.
+3. **Custom Attributes:** 
+   - Check Tempo span attributes for `user_id`, `deployment.environment`, and `k8s.pod.name`.
+   - Check Loki Structured Metadata for `user_id`.
+4. **Debezium Metrics:**
+   - Search for `debezium_streaming_total_number_of_events_seen` in Prometheus to track CDC health.
 
 ## ⚙️ Production Tuning
 
@@ -151,3 +153,5 @@ The current settings are optimized for immediate feedback in a low-traffic sandb
 ### Tail-based Sampling (values-alloy.yaml)
 The sandbox captures 100% of traces. In production, you should dial back the `probabilistic` sampling percentage (e.g., `1%` to `10%`) for successful requests while keeping `sample-errors` at 100%.
 
+### Resource Attributes (deployment.yaml)
+Custom attributes are set via `OTEL_RESOURCE_ATTRIBUTES`. In production, these should be dynamically populated via Helm values or CI/CD pipelines.

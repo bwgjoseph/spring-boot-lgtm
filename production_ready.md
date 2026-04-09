@@ -14,6 +14,9 @@ Grafana Alloy acts as the central observability gateway, collecting, processing,
 *   **Configuration Management:** Managing `values-alloy.yaml` through a robust CI/CD pipeline.
 *   **Remote Write Targets:** Ensuring reliable connections to Prometheus (for metrics), Loki (for logs), and Tempo (for traces).
 *   **Processor Tuning:** Optimizing `loki.process` or other processors for efficient log structuring and metadata extraction.
+*   **Kubernetes Enrichment (RBAC):** When using `otelcol.processor.k8sattributes`, Alloy requires specific permissions to query the Kubernetes API to map source IPs to Pod metadata.
+    *   **Required Permissions:** `get`, `watch`, and `list` for `pods`, `namespaces`, `nodes`, and `apps/replicasets`.
+    *   **Verification:** Use `kubectl auth can-i list pods --as=system:serviceaccount:monitoring:alloy -n monitoring`. If it returns `yes`, enrichment will work. If `no`, update the ClusterRole associated with the Alloy ServiceAccount.
 
 ### Tempo
 
@@ -61,11 +64,20 @@ MinIO serves as the S3-compatible object storage backend, crucial for scalable a
 
 Prometheus is responsible for collecting and storing metrics. Production considerations include:
 
-*   **High Availability (HA):** Deploying multiple Prometheus instances (federated or clustered) to avoid single points of failure.
+*   **High Availability (HA):** Deploy multiple Prometheus instances (federated or clustered) to avoid single points of failure.
 *   **Retention Policies:**
-    *   **Recommended Production:** **30-90 days**. Metrics are relatively compact. Longer retention aids in historical analysis, trend identification, and anomaly detection over longer periods. MinIO can handle this volume cost-effectively.
+    *   **Recommended Production:** **30-90 days**. Metrics are relatively compact. Longer retention aids in historical analysis, trend identification, and anomaly detection over periods. MinIO can handle this volume cost-effectively.
     *   **Configuration:** Managed via `server.retention` in Helm values.
 *   **Scaling:** Ensure sufficient resources (`requests` and `limits`) for Prometheus server pods, especially with a large number of targets and long retention periods.
+
+### Debezium Embedded (CDC)
+
+Debezium Embedded provides Change Data Capture (CDC) capabilities within the Spring Boot application. Production considerations include:
+
+*   **Offset Storage Persistence:** Use a persistent, distributed store for Debezium offsets (e.g., Redis, or a PVC-backed file store) to ensure the connector can resume from the last processed position after a restart. The sandbox uses a local file `/tmp/offsets.dat`, which is not suitable for multi-node production deployments.
+*   **Monitoring (Micrometer):** The custom `DebeziumMetricsBinder` bridges JMX MBeans to Micrometer Gauges. Ensure critical metrics like `milli_seconds_behind_source` and `total_number_of_events_seen` are monitored for connector health and throughput.
+*   **MongoDB Security:** Use production-grade MongoDB credentials with the least-privilege principle. Secure the connection with TLS and appropriate network policies.
+*   **Error Handling:** Configure robust error-handling and retry policies (`errors.retry.delay.initial.ms`, `errors.retry.delay.max.ms`) to handle transient database connectivity issues.
 
 ### Alertmanager
 

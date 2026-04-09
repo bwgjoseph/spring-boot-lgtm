@@ -47,15 +47,21 @@ alloy:
         forward_to = [loki.write.local.receiver]
 
         stage.regex {
-          // Matches standard Spring Boot MDC format: [app,traceId,spanId]
-          expression = ".*\\[(?P<app>.+?),(?P<trace_id>\\w*),(?P<span_id>\\w*)\\].*"
+          // Matches standard Spring Boot MDC format: [app,traceId,spanId,userId]
+          expression = ".*\\[(?P<app>.+?),(?P<traceId>\\w*),(?P<spanId>\\w*),(?P<userId>\\w*)\\].*"
         }
 
         stage.structured_metadata {
           values = {
-            "trace_id" = "",
-            "span_id"  = "",
+            "trace_id" = "traceId",
+            "span_id"  = "spanId",
+            "user_id"  = "userId",
           }
+        }
+
+        // Drop the internal camelCase capture groups so only snake_case remains in Loki
+        stage.label_drop {
+          values = ["app", "traceId", "spanId", "userId"]
         }
       }
 
@@ -124,8 +130,28 @@ alloy:
       otelcol.receiver.otlp "default" {
         grpc { endpoint = "0.0.0.0:4317" }
         output {
-          traces  = [otelcol.processor.tail_sampling.default.input]
+          traces  = [otelcol.processor.k8sattributes.default.input]
           metrics = [otelcol.exporter.otlp.tempo.input]
+        }
+      }
+
+      // Enrich spans with K8s metadata based on the source IP
+      otelcol.processor.k8sattributes "default" {
+        extract {
+          metadata = [
+            "k8s.namespace.name",
+            "k8s.pod.name",
+            "k8s.pod.uid",
+            "k8s.node.name",
+            "k8s.deployment.name",
+            "k8s.statefulset.name",
+            "k8s.daemonset.name",
+            "k8s.cronjob.name",
+            "k8s.job.name",
+          ]
+        }
+        output {
+          traces = [otelcol.processor.tail_sampling.default.input]
         }
       }
 
@@ -141,6 +167,12 @@ alloy:
           type = "probabilistic"
           probabilistic { sampling_percentage = 100.0 } // configure to any % for sampling
         }
+        output {
+          traces = [otelcol.processor.batch.default.input]
+        }
+      }
+
+      otelcol.processor.batch "default" {
         output {
           traces = [otelcol.exporter.otlp.tempo.input]
         }
@@ -248,3 +280,7 @@ alloy:
 
 controller:
   type: daemonset
+
+service:
+  enabled: true
+  type: ClusterIP

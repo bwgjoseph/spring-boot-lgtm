@@ -18,4 +18,6 @@
   - [x] Disk space required (Estimated 15Ti for MinIO)
     - [x] PVC vs S3 (Recommended S3/MinIO for scalability)
 - [ ] How to setup span attributes
+  - To write docs on how the while configuring correlation fields work, that also automatically synced to MDC
 - [ ] Integrate Grafana with Keycloak
+- [ ] To generate the alloy pipeline configuration as a diagram

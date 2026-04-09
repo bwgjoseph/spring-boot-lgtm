@@ -34,12 +34,20 @@ management:
       consume: [w3c]
     # In newer Spring Boot, this explicitly enables MDC correlation
     enabled: true
+    baggage:
+      # These travel across service boundaries
+      remote-fields:
+        - userId
+      # These are synced to the SLF4J MDC
+      correlation:
+        fields:
+          - userId
   otlp:
     metrics:
       export:
         enabled: false
 logging:
   pattern:
-    # Check for traceId, trace_id, and their span counterparts
-    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+    # Using camelCase for traceId and spanId as indicated by user and common for Micrometer Tracing Bridge
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{userId:-}]"
   include-application-name: false
