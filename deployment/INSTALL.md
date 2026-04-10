@@ -70,7 +70,25 @@ We use Jib to build the container image directly to your local Docker daemon.
 .\mvnw clean compile jib:dockerBuild
 ```
 
-### Step B: Deploy or Upgrade
+### Step B: Sideload the Image (for Local K8s)
+If you are using **Docker Desktop** or **KinD**, you must manually load the image into the cluster's internal registry so Kubernetes can find it.
+
+```powershell
+# Export image from Docker
+docker save spring-boot-app:demo -o spring-boot-app.tar
+
+# Copy to control plane node
+docker cp spring-boot-app.tar desktop-control-plane:/spring-boot-app.tar
+
+# Import into cluster registry (containerd)
+docker exec desktop-control-plane ctr -n k8s.io images import /spring-boot-app.tar
+
+# Cleanup
+docker exec desktop-control-plane rm /spring-boot-app.tar
+pwsh -Command "if (Test-Path spring-boot-app.tar) { Remove-Item spring-boot-app.tar }"
+```
+
+### Step C: Deploy or Upgrade
 Apply the Kubernetes manifests. If the deployment already exists, Kubernetes will perform a rolling update.
 
 ```powershell

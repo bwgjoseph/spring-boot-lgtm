@@ -40,6 +40,7 @@ The project uses `Taskfile` to simplify complex operations.
 | **Full Setup** | `task all` | Builds the app and deploys the entire LGTM stack + App to K8s. |
 | **Infra Only** | `task infra` | Deploys Prometheus, Loki, Tempo, Grafana, Alertmanager, and Alloy. |
 | **App Build** | `task app:build` | Builds the Spring Boot app and Docker image using Jib. |
+| **App Load** | `task app:load` | Builds and sideloads the image into local K8s (Kind/Docker Desktop). |
 | **App Deploy** | `task app:deploy` | Deploys the application to the `monitoring` namespace. |
 | **Dashboards** | `task dashboards` | Syncs local dashboards from `deployment/dashboards/` to K8s. |
 | **Port Forward** | `task port-forward` | Forwards Grafana (3000), Prometheus (9090), Alloy (12345), and App (8080). |

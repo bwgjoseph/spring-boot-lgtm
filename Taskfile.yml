@@ -86,6 +86,16 @@ tasks:
     cmds:
       - .\\mvnw clean compile jib:dockerBuild
 
+  app:load:
+    desc: Build and sideload the image into local Kubernetes (Docker Desktop/Kind)
+    deps: [app:build]
+    cmds:
+      - docker save spring-boot-app:demo -o spring-boot-app.tar
+      - docker cp spring-boot-app.tar desktop-control-plane:/spring-boot-app.tar
+      - docker exec desktop-control-plane ctr -n k8s.io images import /spring-boot-app.tar
+      - docker exec desktop-control-plane rm /spring-boot-app.tar
+      - pwsh -Command "if (Test-Path spring-boot-app.tar) { Remove-Item spring-boot-app.tar }"
+
   app:deploy:
     desc: Deploy the Spring Boot application to Kubernetes
     deps: [namespace]
@@ -110,7 +120,7 @@ tasks:
     desc: Run a full installation/upgrade (Infra + App)
     cmds:
       - task: infra
-      - task: app:build
+      - task: app:load
       - task: app:deploy
 
   # --- UTILITY TASKS ---
