@@ -12,6 +12,11 @@ public class DebeziumConnectorConfig {
 
     @Bean
     public Configuration mongodbConnector() {
+        String connectionString = System.getenv("DEBEZIUM_MONGODB_CONNECTION_STRING");
+        if (connectionString == null || connectionString.isEmpty()) {
+            connectionString = "mongodb://admin:password@localhost:27017/source?authSource=admin&replicaSet=mgrs";
+        }
+
         return Configuration.create()
                 // engine properties
                 .with(EmbeddedEngineConfig.ENGINE_NAME, "sbd-mongodb-cdc")
@@ -26,7 +31,7 @@ public class DebeziumConnectorConfig {
                 .with(CommonConnectorConfig.SCHEMA_NAME_ADJUSTMENT_MODE, "none") // has default
                 .with(CommonConnectorConfig.EVENT_PROCESSING_FAILURE_HANDLING_MODE, CommonConnectorConfig.EventProcessingFailureHandlingMode.FAIL)
                 // mongo connector specific properties
-                .with(MongoDbConnectorConfig.CONNECTION_STRING, "mongodb://admin:password@localhost:27017/source?authSource=admin&replicaSet=mgrs")
+                .with(MongoDbConnectorConfig.CONNECTION_STRING, connectionString)
                 .with(MongoDbConnectorConfig.SSL_ENABLED, "false") // default false
                 // .with(MongoDbConnectorConfig.SSL_ALLOW_INVALID_HOSTNAMES, "false") // has default
                 .with(MongoDbConnectorConfig.DATABASE_INCLUDE_LIST, "kx") // default empty

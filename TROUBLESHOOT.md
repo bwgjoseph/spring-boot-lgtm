@@ -138,3 +138,32 @@ If you cannot login to Grafana:
 3.  Ensure `remoteWriteReceiver: true` is enabled in Prometheus `values-prometheus.yaml`.
 4.  See [SERVICE_GRAPH_ISSUE.md](SERVICE_GRAPH_ISSUE.md) for a detailed post-mortem.
 
+## 🍃 MongoDB & Debezium Issues
+
+### MongoDB Pods Stuck in "Pending" (Insufficient memory)
+**Symptom:** `kubectl get pods` shows `mongodb-arbiter-0` or `mongodb-0` as `Pending`. `kubectl describe pod` shows `Insufficient memory`.
+**Cause:** The Bitnami chart's default resource requests are too high for a local Docker Desktop/KinD node.
+**Resolution:** 
+1.  Lower the `requests` and `limits` in `deployment/values-mongodb.yaml`.
+2.  Example: Set `memory` requests to `128Mi` or `256Mi`.
+3.  Ensure the `global.resourcesPreset` is set to `"none"`.
+
+### MongoDB Pods "OOMKilled"
+**Symptom:** Pod status is `CrashLoopBackOff`, and `describe pod` shows `Reason: OOMKilled`.
+**Cause:** MongoDB 8.x requires at least 256MB-512MB of RAM to start the engine and JVM-based helpers.
+**Resolution:** 
+1.  Increase the `limits.memory` in `values-mongodb.yaml` to at least `512Mi`.
+2.  If the node is full, lower the memory requests of other pods (like the `spring-boot-app`) to make room.
+
+### Debezium Metrics Show -1.0
+**Symptom:** `debezium_milli_seconds_behind_source` or `debezium_total_number_of_events_seen` shows `-1.0`.
+**Cause:** Debezium initializes these metrics with `-1.0` until the first event is processed in that specific context (`snapshot` vs `streaming`).
+**Resolution:** Generate some activity in the database (e.g., `db.collection.insertOne(...)`). The metrics will update on the next scrape.
+
+### Verifying ReplicaSet Status
+If the app cannot connect to MongoDB, verify the cluster health manually:
+```powershell
+kubectl exec -it mongodb-0 -n monitoring -- mongosh admin -u admin -p password --eval "rs.status()"
+```
+Look for `stateStr: 'PRIMARY'` and ensure at least one other member is `SECONDARY`.
+

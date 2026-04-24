@@ -57,8 +57,10 @@ In the Prometheus metrics graphs, you'll see small dots. These are **Exemplars**
 *   **Deeper Dive:** See [learning_trace_to_log.md](./learning_trace_to_log.md) for detailed troubleshooting of this feature.
 
 ### 📊 Dynamic Debezium Monitoring
-The sandbox includes a **Dynamic JMX-to-Micrometer Bridge** for Debezium Embedded.
-*   **The Benefit:** It automatically discovers all Debezium MBeans and exposes them as Prometheus metrics with rich contextual tags (connector name, task ID, etc.). No manual configuration is needed when adding new connectors.
+The sandbox includes an advanced **Dynamic JMX-to-Micrometer Bridge** for Debezium Embedded.
+*   **The Benefit:** It automatically discovers all Debezium MBeans and exposes them as Prometheus metrics with rich contextual tags.
+*   **Full Spectrum:** Unlike basic bridges, this implementation captures **Numeric** gauges (Lag, Throughput), **Boolean** flags (Connected, Snapshot Status), and **String/Array** metadata (Captured Collections, Last Event Position) as "Info" metrics.
+*   **Zero Configuration:** New connectors or collections are detected and monitored automatically without code changes.
 
 ### 🔔 Integrated Alerting (Alertmanager)
 The sandbox includes a pre-configured **Alertmanager** to handle system and application health alerts.

@@ -42,7 +42,7 @@ public class DebeziumMetricsBinder implements MeterBinder {
     /**
      * Periodically scan for new Debezium MBeans (e.g., when a connector starts)
      */
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 30000)
     public void scanAndRegister() {
         if (this.registry == null) return;
 
@@ -53,7 +53,7 @@ public class DebeziumMetricsBinder implements MeterBinder {
             Set<ObjectName> mBeans = mBeanServer.queryNames(pattern, null);
 
             if (mBeans.isEmpty()) {
-                log.error("No Debezium MBeans found. Available domains: {}", (Object) mBeanServer.getDomains());
+                log.warn("No Debezium MBeans found. Available domains: {}", (Object) mBeanServer.getDomains());
             }
 
             for (ObjectName mBeanName : mBeans) {
@@ -73,26 +73,28 @@ public class DebeziumMetricsBinder implements MeterBinder {
             List<Tag> tags = new ArrayList<>();
             name.getKeyPropertyList().forEach((k, v) -> tags.add(Tag.of(k, v)));
 
+            // Extract database type from domain (e.g., debezium.mongodb -> mongodb)
+            String domain = name.getDomain();
+            if (domain.contains(".")) {
+                tags.add(Tag.of("db_type", domain.substring(domain.lastIndexOf(".") + 1)));
+            }
+
             for (MBeanAttributeInfo attr : attributes) {
                 String metricName = "debezium." + attr.getName().replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
                 String meterKey = name.getCanonicalName() + ":" + attr.getName();
 
-                // Only register numeric attributes and avoid duplicates
+                // Avoid duplicates
                 if (attr.isReadable() && !registeredMeters.contains(meterKey)) {
-                    
-                    // Pre-check if value is numeric (Optional, but helps keep registry clean)
                     Object value = tryGetAttribute(name, attr.getName());
-                    if (value instanceof Number) {
-                        log.info("Registering dynamic Debezium metric: {} with tags {}", metricName, tags);
-                        
-                        Gauge.builder(metricName, mBeanServer, s -> {
-                            Object val = tryGetAttribute(name, attr.getName());
-                            return (val instanceof Number n) ? n.doubleValue() : 0.0;
-                        })
-                        .tags(tags)
-                        .description(attr.getDescription())
-                        .register(registry);
 
+                    if (value instanceof Number) {
+                        registerNumericGauge(metricName, name, attr, tags);
+                        registeredMeters.add(meterKey);
+                    } else if (value instanceof Boolean) {
+                        registerBooleanGauge(metricName, name, attr, tags);
+                        registeredMeters.add(meterKey);
+                    } else if (value instanceof String || value instanceof String[]) {
+                        registerStringInfo(metricName, name, attr, tags);
                         registeredMeters.add(meterKey);
                     }
                 }
@@ -100,6 +102,50 @@ public class DebeziumMetricsBinder implements MeterBinder {
         } catch (Exception e) {
             log.debug("Could not register MBean {}: {}", name, e.getMessage());
         }
+    }
+
+    private void registerNumericGauge(String metricName, ObjectName name, MBeanAttributeInfo attr, List<Tag> tags) {
+        log.info("Registering Debezium numeric metric: {} with tags {}", metricName, tags);
+        Gauge.builder(metricName, mBeanServer, s -> {
+            Object val = tryGetAttribute(name, attr.getName());
+            return (val instanceof Number n) ? n.doubleValue() : 0.0;
+        })
+        .tags(tags)
+        .description(attr.getDescription())
+        .register(registry);
+    }
+
+    private void registerBooleanGauge(String metricName, ObjectName name, MBeanAttributeInfo attr, List<Tag> tags) {
+        log.info("Registering Debezium boolean metric: {} with tags {}", metricName, tags);
+        Gauge.builder(metricName, mBeanServer, s -> {
+            Object val = tryGetAttribute(name, attr.getName());
+            if (val instanceof Boolean b) return b ? 1.0 : 0.0;
+            return 0.0;
+        })
+        .tags(tags)
+        .description(attr.getDescription())
+        .register(registry);
+    }
+
+    private void registerStringInfo(String metricName, ObjectName name, MBeanAttributeInfo attr, List<Tag> tags) {
+        log.info("Registering Debezium info metric: {} with tags {}", metricName, tags);
+        // We use a Gauge with value 1.0 and put the string value in a tag
+        // Since tags are immutable in Micrometer Gauges, we have to use a multi-gauge 
+        // or a custom approach if the value changes. 
+        // For simplicity in this binder, we'll register it once.
+        
+        Gauge.builder(metricName + "_info", mBeanServer, s -> 1.0)
+        .tags(tags)
+        .tags("value", formatValue(tryGetAttribute(name, attr.getName())))
+        .description(attr.getDescription())
+        .register(registry);
+    }
+
+    private String formatValue(Object value) {
+        if (value instanceof String[] array) {
+            return String.join(",", array);
+        }
+        return String.valueOf(value);
     }
 
     private Object tryGetAttribute(ObjectName name, String attribute) {

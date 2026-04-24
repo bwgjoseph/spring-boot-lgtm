@@ -21,3 +21,14 @@
   - To write docs on how the while configuring correlation fields work, that also automatically synced to MDC
 - [ ] Integrate Grafana with Keycloak
 - [ ] To generate the alloy pipeline configuration as a diagram
+- [x] Left over from 10/4
+  - [x] Need to deploy MongoDB then can test metrics from debezium
+  - [x] In DebeziumMetricsBinder, should be can revert back to not have `new ObjectName("kafka.connect*:*")`
+  - [x] Need to double check the entire run to verify everything is working (all metrics/traces/logs/userId/jmx/etc)
+  - [ ] Build debezium dashboard (https://github.com/debezium/debezium-examples/blob/main/monitoring/README.md) look around for some dashboard to copy
+- [ ] Create task to perform e2e verification
+  - [ ] deployments are all up-and-running properly
+  - [ ] Perform some calls to spring app to generate traffic so to
+    - [ ] verify metrics for debezium
+    - [ ] ensure trace and span are created
+  - [ ] Ensure loki and tempo gets the dataset 

@@ -10,6 +10,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
+import java.util.Objects;
+
 @Component
 public class SecurityObservationHandler implements TracingObservationHandler<Observation.Context> {
 
@@ -24,9 +26,14 @@ public class SecurityObservationHandler implements TracingObservationHandler<Obs
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {
             String username = authentication.getName();
-            // Add user_id as a high-cardinality tag to the observation.
-            // This ensures Tempo spans use the standard snake_case key.
+            // 1. Add user_id tag to observation (Span Attribute for Tempo)
             context.addHighCardinalityKeyValue(KeyValue.of("user_id", username));
+
+            // 2. Set userId as Baggage (Synchronized to MDC for logs)
+            // Note: We use 'userId' here to match the application.yaml correlation field
+            if (this.tracer != null) {
+                Objects.requireNonNull(this.tracer.getBaggage("userId")).makeCurrent(username);
+            }
         }
     }
 

@@ -76,7 +76,9 @@ Debezium Embedded provides Change Data Capture (CDC) capabilities within the Spr
 
 *   **Offset Storage Persistence:** Use a persistent, distributed store for Debezium offsets (e.g., Redis, or a PVC-backed file store) to ensure the connector can resume from the last processed position after a restart. The sandbox uses a local file `/tmp/offsets.dat`, which is not suitable for multi-node production deployments.
 *   **Monitoring (Micrometer):** The custom `DebeziumMetricsBinder` bridges JMX MBeans to Micrometer Gauges. Ensure critical metrics like `milli_seconds_behind_source` and `total_number_of_events_seen` are monitored for connector health and throughput.
+*   **MongoDB Architecture:** Deploy MongoDB as a **ReplicaSet** (minimum 3 nodes: Primary, Secondary, Arbiter) to ensure high availability and enable the Change Stream API required by Debezium.
 *   **MongoDB Security:** Use production-grade MongoDB credentials with the least-privilege principle. Secure the connection with TLS and appropriate network policies.
+*   **Persistence:** Ensure `persistence.enabled: true` is set in the MongoDB Helm chart to prevent data loss on pod restarts.
 *   **Error Handling:** Configure robust error-handling and retry policies (`errors.retry.delay.initial.ms`, `errors.retry.delay.max.ms`) to handle transient database connectivity issues.
 
 ### Alertmanager

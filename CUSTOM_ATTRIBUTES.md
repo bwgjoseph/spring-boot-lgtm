@@ -41,6 +41,25 @@ We follow a "Best of Both Worlds" approach: **camelCase in Java/Logs** and **sna
 
 ---
 
+## 🛠️ Debezium Embedded Attributes
+Debezium metrics are bridged from JMX MBeans. JMX ObjectName properties are automatically promoted to Micrometer tags.
+
+| JMX Property | Micrometer Tag | Description |
+|--------------|----------------|-------------|
+| `context` | `context` | Phase of operation (`streaming` or `snapshot`). |
+| `server` | `server` | The logical name of the connector (e.g., `kx-connector`). |
+| `task` | `task` | The internal task ID (usually `0`). |
+| `type` | `type` | The metric category (e.g., `connector-metrics`). |
+| `db_type` | `db_type` | The database technology (e.g., `mongodb`). Extracted from the domain. |
+
+### 🔄 Data Flow: JMX -> Prometheus
+1. **Debezium:** Registers MBeans (e.g., `debezium.mongodb:type=connector-metrics,context=streaming,server=kx-connector`).
+2. **Binder:** `DebeziumMetricsBinder` scans the MBean server every 30s.
+3. **Normalization:** PascalCase attributes are converted to snake_case (e.g., `MilliSecondsBehindSource` -> `debezium_milli_seconds_behind_source`).
+4. **Promotion:** JMX properties are added as tags, allowing you to filter by context or server in Grafana.
+
+---
+
 ## 🔍 How to Filter/Search
 
 ### In Loki (Grafana Logs)
