@@ -15,6 +15,7 @@ loki:
     retention_enabled: true
     retention_delete_delay: 2h
     retention_delete_worker_count: 150
+    delete_request_store: s3
 
   storage:
     type: s3
@@ -68,7 +69,7 @@ loki:
         memory: 128Mi
       limits:
         cpu: 200m
-        memory: 512Mi
+        memory: 256Mi
 
   backend:
     replicas: 1
@@ -80,7 +81,7 @@ loki:
         memory: 128Mi
       limits:
         cpu: 200m
-        memory: 512Mi
+        memory: 256Mi
 
   gateway:
     image:
