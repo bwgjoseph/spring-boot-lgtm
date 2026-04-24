@@ -33,12 +33,16 @@ spec:
           value: "grpc"
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: "deployment.environment=staging,service.version=1.0.0"
+        - name: DEBEZIUM_MONGODB_CONNECTION_STRING
+          value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
+        - name: SPRING_DATA_MONGODB_URI
+          value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
         # Ensure application name matches the service_name label for correlation
         - name: SPRING_APPLICATION_NAME
           value: "spring-boot-app"
         resources:
           requests:
-            memory: "1Gi"
+            memory: "512Mi"
             cpu: "100m"
           limits:
             memory: "1Gi"

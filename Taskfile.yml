@@ -80,6 +80,12 @@ tasks:
     cmds:
       - helm upgrade --install prometheus prometheus-community/prometheus -n {{.NAMESPACE}} --version {{.VER_PROMETHEUS}} -f {{.DEPLOY_DIR}}/values-prometheus.yaml
 
+  mongodb:
+    desc: Install or Upgrade MongoDB ReplicaSet (Bitnami OCI)
+    deps: [namespace]
+    cmds:
+      - helm upgrade --install mongodb oci://registry-1.docker.io/bitnamicharts/mongodb -n {{.NAMESPACE}} -f {{.DEPLOY_DIR}}/values-mongodb.yaml
+
   # --- APPLICATION TASKS ---
   app:build:
     desc: Build the Spring Boot application and Docker image using Jib
@@ -105,9 +111,10 @@ tasks:
 
   # --- COMPOSITE TASKS ---
   infra:
-    desc: Install/Upgrade all infrastructure components (LGTM + Alloy + Storage)
+    desc: Install/Upgrade all infrastructure components (LGTM + Alloy + Storage + DB)
     cmds:
       - task: minio
+      - task: mongodb
       - task: prometheus
       - task: loki
       - task: tempo

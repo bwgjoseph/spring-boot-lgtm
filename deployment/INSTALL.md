@@ -29,6 +29,9 @@ helm repo add grafana https://grafana.github.io/helm-charts; helm repo add grafa
 # Install or Upgrade MinIO (Internal Object Storage)
 helm upgrade --install minio minio/minio -n monitoring -f deployment/values-minio.yaml --version 5.4.0
 
+# Install or Upgrade MongoDB (ReplicaSet for CDC)
+helm upgrade --install mongodb oci://registry-1.docker.io/bitnamicharts/mongodb -n monitoring -f deployment/values-mongodb.yaml
+
 # Install or Upgrade Prometheus (Metrics, Node Exporter, KSM)
 helm upgrade --install prometheus prometheus-community/prometheus -n monitoring -f deployment/values-prometheus.yaml --version 28.13.0
 

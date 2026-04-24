@@ -16,7 +16,7 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
   - **Tempo:** Trace Storage and Service Graph generation (`2.0.0`).
   - **Prometheus:** Metrics Storage (`28.13.0`, scraped from Alloy).
   - **MinIO:** Internal Object Storage (`5.4.0`).
-  - **MongoDB:** Enabled and instrumented for Change Data Capture (CDC) via Debezium.
+  - **MongoDB:** 3-node ReplicaSet (Primary, Secondary, Arbiter) deployed via Bitnami Helm chart (`8.2.7`). Instrumented for CDC via Debezium.
 - **Build & Deployment:** 
   - **Maven:** Build system with BOM management for OTEL and Debezium.
   - **Jib:** Builds Docker images (`jib-maven-plugin`).

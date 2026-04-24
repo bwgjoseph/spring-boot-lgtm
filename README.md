@@ -90,7 +90,7 @@ graph TD
 - **Alloy:** Acts as the entry point, processing traces (sampling, batching) and extracting structured metadata before forwarding to Tempo and Loki.
 - **Service Graph:** Generated natively by Tempo's internal `metricsGenerator` and pushed to Prometheus.
 - **Scalability:** Loki runs in **Simple Scalable Mode** (separating read/write paths). Tempo runs as a Single Binary for simplicity.
-- **Storage:** A local **MinIO** instance provides S3-compatible shared storage for **Loki**, while **Tempo** uses local Persistent Volumes (PVC) for simplicity and stability in this sandbox environment.
+- **Storage:** A local **MinIO** instance provides S3-compatible shared storage for **Loki**, while **Tempo** uses local Persistent Volumes (PVC) for simplicity and stability. **MongoDB** is deployed as a 3-node ReplicaSet (Primary, Secondary, Arbiter) with CDC enabled.
 
 ## 🛠️ Tech Stack & Versions
 
@@ -103,7 +103,7 @@ graph TD
 | **Tempo**           | Trace Storage     | `grafana-community/tempo`         | `2.0.0`   |
 | **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `28.13.0` |
 | **MinIO**           | Object Storage    | `minio/minio`                     | `5.4.0`   |
-| **MongoDB**         | DB / CDC Source   | -                                 | `5.6.2` (Driver) |
+| **MongoDB**         | DB / CDC Source   | `bitnami/mongodb` (OCI)           | `8.2.7`   |
 
 
 ## 🏁 Getting Started
