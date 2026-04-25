@@ -94,8 +94,9 @@ public class DebeziumMetricsBinder implements MeterBinder {
                         registerBooleanGauge(metricName, name, attr, tags);
                         registeredMeters.add(meterKey);
                     } else if (value instanceof String || value instanceof String[]) {
-                        registerStringInfo(metricName, name, attr, tags);
-                        registeredMeters.add(meterKey);
+                        if (registerStringInfo(metricName, name, attr, tags)) {
+                            registeredMeters.add(meterKey);
+                        }
                     }
                 }
             }
@@ -127,18 +128,29 @@ public class DebeziumMetricsBinder implements MeterBinder {
         .register(registry);
     }
 
-    private void registerStringInfo(String metricName, ObjectName name, MBeanAttributeInfo attr, List<Tag> tags) {
-        log.info("Registering Debezium info metric: {} with tags {}", metricName, tags);
-        // We use a Gauge with value 1.0 and put the string value in a tag
-        // Since tags are immutable in Micrometer Gauges, we have to use a multi-gauge 
-        // or a custom approach if the value changes. 
-        // For simplicity in this binder, we'll register it once.
+    /**
+     * Registers a string info metric. 
+     * returns true if registration was successful (value was not empty), false otherwise.
+     */
+    private boolean registerStringInfo(String metricName, ObjectName name, MBeanAttributeInfo attr, List<Tag> tags) {
+        String formattedValue = formatValue(tryGetAttribute(name, attr.getName()));
+
+        // If the value is empty or null, we skip registration for this scan.
+        // This allows a future scan to register it once the data is actually available.
+        if (formattedValue == null || formattedValue.trim().isEmpty() || formattedValue.equals("[]")) {
+            log.debug("Skipping registration for {} because value is currently empty", metricName);
+            return false;
+        }
+
+        log.info("Registering Debezium info metric: {} with value: {}", metricName, formattedValue);
         
-        Gauge.builder(metricName + "_info", mBeanServer, s -> 1.0)
+        Gauge.builder(metricName, mBeanServer, s -> 1.0)
         .tags(tags)
-        .tags("value", formatValue(tryGetAttribute(name, attr.getName())))
+        .tags("value", formattedValue)
         .description(attr.getDescription())
         .register(registry);
+
+        return true;
     }
 
     private String formatValue(Object value) {
