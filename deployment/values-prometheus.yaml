@@ -12,7 +12,7 @@ server:
   # Prometheus configuration file contents
   config:
     rule_files:
-      - /etc/config/alerting_rules.yml
+      - /etc/config/rules/*.yaml
     alerting:
       alertmanagers:
         - kubernetes_sd_configs:
@@ -32,41 +32,11 @@ server:
     enabled: true
     size: 20Gi
 
-# Define Alerting Rules
-serverFiles:
-  alerting_rules.yml:
-    groups:
-      - name: sandbox_alerts
-        rules:
-          # 1. Service Down Alert (Detects absence of metrics - used when replicas = 0)
-          - alert: InstanceAbsent
-            expr: absent(up{service_name="spring-boot-app"})
-            for: 1m
-            labels:
-              severity: critical
-            annotations:
-              summary: "Instance spring-boot-app is ABSENT"
-              description: "Prometheus is not receiving any metrics for spring-boot-app. The deployment might be scaled to 0 or Alloy cannot reach it."
-
-          # 2. Service Unhealthy Alert (Detects up == 0 - used when pod is running but scrape fails)
-          - alert: InstanceDown
-            expr: up{service_name="spring-boot-app"} == 0
-            for: 1m
-            labels:
-              severity: critical
-            annotations:
-              summary: "Instance {{ $labels.instance }} is DOWN"
-              description: "The pod {{ $labels.pod }} is running but the metrics endpoint is returning an error."
-
-          # 3. High CPU Usage (> 80%)
-          - alert: HighCpuUsage
-            expr: sum(rate(container_cpu_usage_seconds_total{service_name="spring-boot-app"}[5m])) by (pod, namespace) > 0.8
-            for: 2m
-            labels:
-              severity: warning
-            annotations:
-              summary: "High CPU usage on pod {{ $labels.pod }}"
-              description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is using more than 80% CPU."
+extraConfigmapMounts:
+  - name: prometheus-rules
+    mountPath: /etc/config/rules
+    configMap: prometheus-rules
+    readOnly: true
 
 # Enable/Disable components
 alertmanager:

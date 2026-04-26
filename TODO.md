@@ -37,3 +37,4 @@
 - [ ] Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
 - [ ] Gitlab CI dashboard integration
 - [ ] Prepare production grade loki/tempo in scable-mode by scaling down unncessary stuff to verify
+- [ ] Make all the dashboard support filter by namespace
