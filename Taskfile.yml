@@ -165,3 +165,32 @@ tasks:
     desc: Run end-to-end observability verification
     cmds:
       - pwsh -File ./verification/run-all.ps1
+
+  scale-down:
+    desc: Scale down all deployments and statefulsets to 0 replicas to save resources
+    ignore_error: true
+    cmds:
+      - kubectl scale deployment spring-boot-app -n {{.NAMESPACE}} --replicas=0
+      - kubectl scale deployment grafana -n {{.NAMESPACE}} --replicas=0
+      - kubectl scale deployment minio -n {{.NAMESPACE}} --replicas=0
+      - kubectl scale deployment prometheus-kube-state-metrics -n {{.NAMESPACE}} --replicas=0
+      - kubectl scale statefulset prometheus-alertmanager -n {{.NAMESPACE}} --replicas=0
+      - kubectl scale deployment prometheus-server -n {{.NAMESPACE}} --replicas=0
+      - kubectl scale statefulset loki -n {{.NAMESPACE}} --replicas=0
+      - kubectl scale statefulset tempo -n {{.NAMESPACE}} --replicas=0
+      - kubectl scale statefulset mongodb -n {{.NAMESPACE}} --replicas=0
+      - kubectl scale statefulset mongodb-arbiter -n {{.NAMESPACE}} --replicas=0
+
+  scale-up:
+    desc: Scale up all deployments and statefulsets to original replica counts
+    cmds:
+      - kubectl scale deployment spring-boot-app -n {{.NAMESPACE}} --replicas=1
+      - kubectl scale deployment grafana -n {{.NAMESPACE}} --replicas=1
+      - kubectl scale deployment minio -n {{.NAMESPACE}} --replicas=1
+      - kubectl scale deployment prometheus-kube-state-metrics -n {{.NAMESPACE}} --replicas=1
+      - kubectl scale statefulset prometheus-alertmanager -n {{.NAMESPACE}} --replicas=1
+      - kubectl scale deployment prometheus-server -n {{.NAMESPACE}} --replicas=1
+      - kubectl scale statefulset loki -n {{.NAMESPACE}} --replicas=1
+      - kubectl scale statefulset tempo -n {{.NAMESPACE}} --replicas=1
+      - kubectl scale statefulset mongodb -n {{.NAMESPACE}} --replicas=2
+      - kubectl scale statefulset mongodb-arbiter -n {{.NAMESPACE}} --replicas=1
