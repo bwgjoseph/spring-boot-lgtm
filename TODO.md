@@ -33,3 +33,6 @@
     - [x] ensure trace and span are created
   - [x] Ensure loki and tempo gets the dataset 
 - [x] add Jolokia
+- [ ] Figure out if possible to forward logs to syslog directly
+- [ ] Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
+- [ ] Gitlab CI dashboard integration

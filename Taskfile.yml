@@ -10,6 +10,7 @@ vars:
   VER_TEMPO: "2.0.0"
   VER_PROMETHEUS: "28.13.0"
   VER_MINIO: "5.4.0"
+  VER_MONGODB: "18.6.31"
 
 tasks:
   # --- INFRASTRUCTURE REPOS ---
@@ -84,7 +85,7 @@ tasks:
     desc: Install or Upgrade MongoDB ReplicaSet (Bitnami OCI)
     deps: [namespace]
     cmds:
-      - helm upgrade --install mongodb oci://registry-1.docker.io/bitnamicharts/mongodb -n {{.NAMESPACE}} -f {{.DEPLOY_DIR}}/values-mongodb.yaml
+      - helm upgrade --install mongodb oci://registry-1.docker.io/bitnamicharts/mongodb -n {{.NAMESPACE}} --version {{.VER_MONGODB}} -f {{.DEPLOY_DIR}}/values-mongodb.yaml
 
   # --- APPLICATION TASKS ---
   app:build:
