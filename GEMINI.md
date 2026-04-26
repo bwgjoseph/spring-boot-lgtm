@@ -10,9 +10,10 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
   - **Micrometer Tracing (OTEL Bridge):** For traces (OpenTelemetry SDK version 1.59.0).
   - **Micrometer Observation API:** For manual instrumentation and context propagation.
   - **Micrometer Prometheus Registry:** For metric scraping via `/actuator/prometheus`.
+  - **Jolokia support-spring:** For raw JMX access via `/actuator/jolokia`.
   - **Grafana Alloy:** Collector/Gateway (`1.6.1`). Features `loki.process` for structured metadata extraction and `otelcol.processor.k8sattributes` for span enrichment.
 - **Storage:** 
-  - **Loki:** Log Storage (`6.53.0`, Simple Scalable mode).
+  - **Loki:** Log Storage (`9.3.4`, Single Binary mode).
   - **Tempo:** Trace Storage and Service Graph generation (`2.0.0`).
   - **Prometheus:** Metrics Storage (`28.13.0`, scraped from Alloy).
   - **MinIO:** Internal Object Storage (`5.4.0`).
@@ -70,6 +71,7 @@ The project uses `Taskfile` to simplify complex operations.
 - `Taskfile.yml`: Central task runner for all operations.
 - `pom.xml`: Maven configuration with version alignment for OTEL (1.59.0) and MongoDB (5.6.2).
 - `src/main/resources/application.yaml`: Spring Boot application configuration.
+- `RESOURCES.md`: Detailed CPU and Memory allocation for all deployments.
 - `deployment/values-alloy.yaml`: Configuration for Grafana Alloy enrichment and log processing.
 - `JMX_METRICS.md`: Documentation for Debezium monitoring.
 - `CUSTOM_ATTRIBUTES.md`: Documentation for cross-stack attribute mapping.

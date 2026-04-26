@@ -26,6 +26,7 @@ ObjectName debeziumPattern = new ObjectName("debezium.*:*");
 We added the following to `pom.xml`:
 - `io.debezium:debezium-bom:3.5.0.Final`
 - `io.debezium:debezium-connector-mongodb`
+- `org.jolokia:jolokia-support-spring:2.1.2` (JMX-to-HTTP bridge)
 - `lombok` (For logging and concurrent collection helpers)
 
 ---
@@ -37,24 +38,32 @@ We added the following to `pom.xml`:
 2.  **Rich Context:** By mapping JMX properties to tags, you can easily filter metrics in Grafana by connector name, task ID, or context (e.g., `{context="streaming"}`).
 3.  **Unified Scraping:** All metrics are served from the standard `/actuator/prometheus` endpoint.
 
-### The "Race Condition" & K8s Connection
-Debezium Embedded starts in a background thread and takes time to connect to MongoDB. 
-1.  **MBeans Delay:** It does **not** register JMX MBeans until the connection is established. A **Scheduled Scan** ensures the bridge eventually "sees" them.
-2.  **Connection String:** In Kubernetes, `localhost` refers to the Pod. Use the `DEBEZIUM_MONGODB_CONNECTION_STRING` environment variable to point to `host.docker.internal:27017` (for local host DB) or a Kubernetes Service.
+### The "Lazy Registration" Pattern
+Debezium Embedded starts in a background thread. String-based metrics (like `CapturedTables`) may be empty `[]` during the first few seconds of startup. 
+*   **The Issue:** Micrometer Tags are **immutable**. If we register a metric with an empty `value` tag, it will stay empty forever.
+*   **The Solution:** The `DebeziumMetricsBinder` implements a **Lazy Registration** check. It skips registration for string metrics if the value is currently empty, allowing a future 30-second scan to catch and register the populated value.
 
-## 🔍 Verification
+---
 
-### 1. Check the Prometheus Endpoint
-Visit `http://localhost:8080/actuator/prometheus` while the app is running.
+## 🔍 Verification & Debugging
 
-### 2. Search for Debezium Metrics
-```powershell
-# Local shell
-curl -s http://localhost:8080/actuator/prometheus | Select-String "debezium"
+### 1. Prometheus Metrics (Production Monitoring)
+Used for Grafana dashboards and historical alerting.
+*   **Endpoint:** `http://localhost:8080/actuator/prometheus`
+*   **Usage:** Search for `debezium_` to see time-series data.
 
-# Inside K8s pod
-kubectl exec <pod-name> -n monitoring -- sh -c "wget -qO- http://localhost:8080/actuator/prometheus | grep debezium"
-```
+### 2. Jolokia REST API (Ad-hoc Debugging)
+Used as a "Developer Tool" to inspect the **Ground Truth** of all MBeans without needing JConsole or a debugger.
+*   **Endpoint:** `http://localhost:8080/actuator/jolokia`
+*   **Authentication:** Requires Basic Auth (`user:password`).
+
+**Useful Debugging Queries:**
+*   **List all MBeans:**
+    `GET /actuator/jolokia/list/debezium.mongodb`
+*   **Read Captured Tables (Streaming):**
+    `GET /actuator/jolokia/read/debezium.mongodb:context=streaming,server=kx-connector,task=0,type=connector-metrics/CapturedTables`
+*   **Inspect Last Event Position:**
+    `GET /actuator/jolokia/read/debezium.mongodb:context=streaming,server=kx-connector,task=0,type=connector-metrics/LastEvent`
 
 ---
 

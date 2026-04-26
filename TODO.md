@@ -25,10 +25,11 @@
   - [x] Need to deploy MongoDB then can test metrics from debezium
   - [x] In DebeziumMetricsBinder, should be can revert back to not have `new ObjectName("kafka.connect*:*")`
   - [x] Need to double check the entire run to verify everything is working (all metrics/traces/logs/userId/jmx/etc)
-  - [ ] Build debezium dashboard (https://github.com/debezium/debezium-examples/blob/main/monitoring/README.md) look around for some dashboard to copy
-- [ ] Create task to perform e2e verification
-  - [ ] deployments are all up-and-running properly
-  - [ ] Perform some calls to spring app to generate traffic so to
-    - [ ] verify metrics for debezium
-    - [ ] ensure trace and span are created
-  - [ ] Ensure loki and tempo gets the dataset 
+  - [x] Build debezium dashboard (https://github.com/debezium/debezium-examples/blob/main/monitoring/README.md) look around for some dashboard to copy
+- [x] Create task to perform e2e verification
+  - [x] deployments are all up-and-running properly
+  - [x] Perform some calls to spring app to generate traffic so to
+    - [x] verify metrics for debezium
+    - [x] ensure trace and span are created
+  - [x] Ensure loki and tempo gets the dataset 
+- [x] add Jolokia

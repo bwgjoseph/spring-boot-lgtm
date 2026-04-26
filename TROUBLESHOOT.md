@@ -73,9 +73,24 @@ If you cannot login to Grafana:
 ## 📈 Observability Issues
 
 ### Loki 502 Bad Gateway / OOMKilled
-**Symptom:** Grafana shows a `502 Bad Gateway` when querying Loki logs. `kubectl get pods -n monitoring` shows `loki-read` or `loki-backend` with a `Terminated: OOMKilled` status.
-**Cause:** Default memory limits (128Mi) are too low for query processing.
-**Resolution:** Increase memory limits in `deployment/values-loki-scalable.yaml`. Recommended: `512Mi` for `read`/`backend` and `256Mi` for `write`.
+**Symptom:** Grafana shows a `502 Bad Gateway` when querying Loki logs.
+**Cause:** Default memory limits (128Mi) are too low for query processing, or the "Simple Scalable" mode is over-committing the node.
+**Resolution:** 
+1.  Increase memory limits in `deployment/values-loki-scalable.yaml`.
+2.  **Recommended for Sandbox:** Switch to the **Loki Single Binary** mode using `deployment/values-loki-singlebinary.yaml`. This consolidates all services into one pod to reduce overhead.
+
+### Application Crashes during Startup
+**Symptom:** Pod status is `CrashLoopBackOff` or `Running` but never `Ready`.
+**Cause:** The application initialization (Spring + Debezium + Jolokia) requires significant headroom and time.
+**Resolution:**
+1.  Ensure the memory limit is at least **1Gi** (2Gi recommended for heavy throughput) in `deployment/deployment.yaml`.
+2.  Ensure `initialDelaySeconds` for liveness/readiness probes is at least **120s**.
+
+### Jolokia 404/401 Errors
+**Symptom:** `http://localhost:8080/actuator/jolokia` returns 404 or 401.
+**Resolution:**
+1.  **404:** Ensure `jolokia-support-spring` is in `pom.xml`.
+2.  **401:** Jolokia is protected by Spring Security. Use Basic Auth with `user:password`.
 
 ### Grafana cannot reach Loki (Connection Refused)
 **Symptom:** Grafana logs show `dial tcp ...:80: connect: connection refused` when querying Loki.

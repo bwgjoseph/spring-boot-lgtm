@@ -32,7 +32,7 @@ To ensure realistic data capture, the suite performs active operations:
 2.  **Database Activity:** Performs a `updateOne` operation on the `kx.pokemon` collection in MongoDB to trigger a Debezium CDC event.
 
 ### Phase C: Data Pipeline Verification
-The verification script queries the backend APIs directly from within the Kubernetes cluster to bypass local ingress/network issues.
+The verification script queries the backend APIs directly from within the Kubernetes cluster. The `spring-boot-app` pod is utilized as the query proxy because it includes the necessary `wget` utility.
 
 | Verification Point | Query Type | Purpose |
 | :--- | :--- | :--- |

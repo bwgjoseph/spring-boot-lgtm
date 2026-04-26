@@ -59,8 +59,9 @@ In the Prometheus metrics graphs, you'll see small dots. These are **Exemplars**
 ### 📊 Dynamic Debezium Monitoring
 The sandbox includes an advanced **Dynamic JMX-to-Micrometer Bridge** for Debezium Embedded.
 *   **The Benefit:** It automatically discovers all Debezium MBeans and exposes them as Prometheus metrics with rich contextual tags.
-*   **Full Spectrum:** Unlike basic bridges, this implementation captures **Numeric** gauges (Lag, Throughput), **Boolean** flags (Connected, Snapshot Status), and **String/Array** metadata (Captured Collections, Last Event Position) as "Info" metrics.
-*   **Zero Configuration:** New connectors or collections are detected and monitored automatically without code changes.
+*   **Full Spectrum:** Captures **Numeric** gauges (Lag, Throughput), **Boolean** flags (Connected, Snapshot Status), and **String/Array** metadata (Captured Collections, Last Event Position) using a **Lazy Registration** pattern to ensure data integrity.
+*   **Jolokia Integration:** Provides raw JMX access via REST (`/actuator/jolokia`) for ad-hoc debugging of the "Ground Truth" MBeans.
+*   **Dedicated Dashboard:** Includes a pre-configured **Debezium Connector Monitoring** dashboard in Grafana for real-time CDC health tracking.
 
 ### 🔔 Integrated Alerting (Alertmanager)
 The sandbox includes a pre-configured **Alertmanager** to handle system and application health alerts.
