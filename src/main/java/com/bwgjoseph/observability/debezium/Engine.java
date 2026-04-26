@@ -24,6 +24,10 @@ public class Engine {
         this.engine = DebeziumEngine.create(Connect.class)
                 .using(mongodbConnector.asProperties())
                 .notifying(record -> {
+                    String eventContent = record.value().toString();
+                    if (eventContent.contains("last_test_id")) {
+                        log.info("CDC Event captured: {}", eventContent);
+                    }
                     log.debug("Received Change Event: {}", record);
                 })
                 .build();

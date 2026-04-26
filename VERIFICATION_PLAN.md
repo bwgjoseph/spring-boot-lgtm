@@ -1,6 +1,6 @@
 # 🧪 End-to-End (E2E) Observability Verification Plan
 
-This document outlines the automated end-to-end verification strategy for the Spring Boot LGTM observability sandbox. The plan ensures that the telemetry pipeline (Logs, Metrics, and Traces) is healthy, correlated, and enriched with Kubernetes metadata.
+This document outlines the hardened automated end-to-end verification strategy for the Spring Boot LGTM observability sandbox. The plan ensures that the telemetry pipeline (Logs, Metrics, and Traces) is healthy, correlated, and enriched with Kubernetes metadata through deterministic, strict testing.
 
 ---
 
@@ -13,43 +13,40 @@ task test:e2e
 ```
 
 ### Components
-1.  **`k8s-health.ps1`**: Validates the deployment status of all critical stack components.
-2.  **`traffic-gen.ps1`**: Generates synthetic activity in both the application and the database.
-3.  **`data-verify.ps1`**: Queries the internal service APIs to validate data ingestion and correlation.
+1.  **`k8s-health.ps1`**: Strictly waits for all critical stack pods to be in a `Ready` state before proceeding.
+2.  **`traffic-gen.ps1`**: Generates synthetic activity, verifying the application is responsive before starting.
+3.  **`data-verify.ps1`**: A polling-based verification engine that queries APIs until conditions are met or a timeout is reached.
 
 ---
 
-## 2. Logical Test Phases
+## 2. Robust Test Phases
 
-### Phase A: Infrastructure Readiness
-The suite uses `kubectl rollout status` to verify that all components are operational.
-*   **Target Components:** `spring-boot-app`, `alloy`, `prometheus-server`, `loki-gateway`, `tempo`, `mongodb` (ReplicaSet), and `mongodb-arbiter`.
-*   **Success Criterion:** All components reach a "Ready" state within the defined timeout (default: 5s per component).
+### Phase A: Strict Infrastructure Readiness
+The suite uses `kubectl wait --for=condition=Ready` with a 120s timeout for all components.
+*   **Target Components:** `spring-boot-app`, `alloy`, `prometheus-server`, `loki`, `tempo`, `mongodb`.
+*   **Success Criterion:** If any pod fails to reach a "Ready" state, the test fails immediately (Fail-Fast).
 
-### Phase B: Traffic Generation
-To ensure realistic data capture, the suite performs active operations:
-1.  **Application Activity:** Calls the `/pokemon/1` endpoint with a unique `test_id` parameter to generate application traces and logs.
-2.  **Database Activity:** Performs a `updateOne` operation on the `kx.pokemon` collection in MongoDB to trigger a Debezium CDC event.
+### Phase B: Deterministic Traffic Generation
+1.  **App Check:** Verifies the app is reachable via `curl` before triggering activity.
+2.  **Traffic Gen:** Injects unique `test_id` via API and MongoDB CDC stream.
+3.  **Success Criterion:** If the app is not responsive, the suite halts.
 
-### Phase C: Data Pipeline Verification
-The verification script queries the backend APIs directly from within the Kubernetes cluster. The `spring-boot-app` pod is utilized as the query proxy because it includes the necessary `wget` utility.
+### Phase C: Data Pipeline Verification (Polling Engine)
+The core logic now uses a back-off/retry strategy for all queries:
+*   **Strategy:** Poll every 5s for up to 120s.
+*   **Result:** A test only passes if the specific metric/log/trace count becomes `> 0`.
+*   **Loki Gateway:** Uses a prioritized failover: Gateway -> Pod Direct.
 
-| Verification Point | Query Type | Purpose |
+| Verification Point | Metric/Query | Validation Method |
 | :--- | :--- | :--- |
-| **Metrics (Prometheus)** | `debezium_total_number_of_events_seen` | Confirms CDC events are captured and bridged via JMX. |
-| **Logs (Loki)** | Query logs for the generated `test_id` | Verifies log ingestion, structured metadata, and correlation ID mapping. |
-| **Traces (Tempo)** | Search by `service.name=spring-boot-app` | Confirms OTLP trace ingestion and backend storage. |
-| **Enrichment (Alloy)** | Inspect `k8s.pod.name` in trace spans | Validates that Alloy is successfully enriching traces with cluster metadata. |
+| **Infra Health** | `kubectl wait` | Ready status for all pods. |
+| **Prometheus** | `debezium_total_number_of_events_seen` | Polling for positive integer. |
+| **Loki** | `{service_name="spring-boot-app"} |= "$testId"` | Polling until result found. |
+| **Tempo** | `api/search?tags=service.name=spring-boot-app` | Polling for trace count > 0. |
+| **Alloy** | `k8s.pod.name` | Verify metadata in retrieved span. |
 
 ---
 
 ## 3. Reporting
-Upon completion, the suite generates a comprehensive report:
-*   **`VERIFICATION_REPORT.md`**: A summary table indicating the pass/fail status of each verification pillar (Metrics, Logs, Traces, Enrichment) and the `test_id` used for that run.
-
----
-
-## 🛠️ Operational Notes
-*   **Time Sensitivity:** The suite includes a 30-second `Start-Sleep` interval after traffic generation to account for Alloy batching and Prometheus/Loki ingestion cycles.
-*   **Environment:** The suite relies on `jq` for JSON processing of API responses.
-*   **Resource Constraints:** On local clusters (Docker Desktop/KinD), components like Loki may occasionally show 502 errors if memory pressure is high. Verification results should be interpreted in the context of cluster capacity.
+*   **`VERIFICATION_REPORT.md`**: Includes an **Overall Status** header. If any phase or sub-test fails, the suite returns a non-zero exit code.
+*   **Readability:** Results are presented in an aggregated table with per-component status.
