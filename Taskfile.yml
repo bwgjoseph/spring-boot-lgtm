@@ -4,7 +4,7 @@ vars:
   NAMESPACE: monitoring
   DEPLOY_DIR: deployment
   # HELM CHART VERSIONS (Stable as of March 2026)
-  VER_ALLOY: "1.6.1"
+  VER_ALLOY: "1.8.0"
   VER_GRAFANA: "12.1.1"
   VER_LOKI: "9.3.4"
   VER_TEMPO: "2.0.0"
