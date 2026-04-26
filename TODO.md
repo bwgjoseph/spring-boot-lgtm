@@ -36,3 +36,4 @@
 - [ ] Figure out if possible to forward logs to syslog directly
 - [ ] Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
 - [ ] Gitlab CI dashboard integration
+- [ ] Prepare production grade loki/tempo in scable-mode by scaling down unncessary stuff to verify
