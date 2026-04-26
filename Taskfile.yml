@@ -5,7 +5,7 @@ vars:
   DEPLOY_DIR: deployment
   # HELM CHART VERSIONS (Stable as of March 2026)
   VER_ALLOY: "1.6.1"
-  VER_GRAFANA: "11.3.0"
+  VER_GRAFANA: "12.1.1"
   VER_LOKI: "9.3.4"
   VER_TEMPO: "2.0.0"
   VER_PROMETHEUS: "29.2.1"
