@@ -1,4 +1,16 @@
 deploymentMode: SingleBinary
+
+# Disable memory-heavy caches
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
+
+# Keep the gateway for standard routing
+gateway:
+  enabled: true
+
 loki:
   auth_enabled: false
   commonConfig:
