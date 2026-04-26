@@ -83,8 +83,9 @@ If you cannot login to Grafana:
 **Symptom:** Pod status is `CrashLoopBackOff` or `Running` but never `Ready`.
 **Cause:** The application initialization (Spring + Debezium + Jolokia) requires significant headroom and time.
 **Resolution:**
-1.  Ensure the memory limit is at least **1Gi** (2Gi recommended for heavy throughput) in `deployment/deployment.yaml`.
+1.  Ensure the memory limit is at least **1Gi** in `deployment/deployment.yaml`.
 2.  Ensure `initialDelaySeconds` for liveness/readiness probes is at least **120s**.
+3.  Set `timeoutSeconds: 5` for liveness/readiness probes to allow the JVM more time to respond during high-load startup sequences.
 
 ### Jolokia 404/401 Errors
 **Symptom:** `http://localhost:8080/actuator/jolokia` returns 404 or 401.

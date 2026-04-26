@@ -4,7 +4,8 @@
 - [x] Review https://grafana.com/docs/loki/latest/send-data/k8s-monitoring-helm/
 - [x] Enable alerting (Configured Alertmanager with Mattermost support and production-grade grouping)
 - [ ] Figure out what are the more commonly used alerts and defined it
-- [ ] RED metrics
+  - Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
+- [x] RED metrics
 - [x] Migrate loki (Effective March 16, 2026, the Grafana Loki Helm chart will be forked to a new repository . The chart in the Loki repository will continue to be maintained for GEL users only. See https://github.com/grafana/loki/issues/20705 for details.)
 - [x] Update configuration to be production ready (See `/production` directory)
     - [x] Ensure retention period is defined (90d for metrics/logs, 14d for traces)
@@ -34,7 +35,6 @@
   - [x] Ensure loki and tempo gets the dataset 
 - [x] add Jolokia
 - [ ] Figure out if possible to forward logs to syslog directly
-- [ ] Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
 - [ ] Gitlab CI dashboard integration
 - [ ] Prepare production grade loki/tempo in scable-mode by scaling down unncessary stuff to verify
 - [ ] Make all the dashboard support filter by namespace

@@ -1,5 +1,7 @@
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$logFile = "e2e_$timestamp.log"
+$logDir = "./verification/logs"
+if (!(Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir }
+$logFile = "$logDir/e2e_$timestamp.log"
 $env:LOG_FILE = $logFile
 
 # Header for the log

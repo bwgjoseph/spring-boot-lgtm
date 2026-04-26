@@ -98,5 +98,7 @@ if ($tempoRes -gt 0) { Add-Result "data" "Tempo" "Distributed Tracing" "PASS" "T
 
 $finalStatus = if ($global:failed) { "FAIL" } else { "PASS" }
 $report = $report.Replace("{STATUS}", $finalStatus)
-$report | Out-File -FilePath "VERIFICATION_REPORT.md" -Encoding utf8
-Write-Host "`nOverall Test Status: $finalStatus" -ForegroundColor ($finalStatus -eq "PASS" ? "Green" : "Red")
+# Save Report
+$global:report | Out-File -FilePath "verification/logs/VERIFICATION_REPORT.md" -Encoding utf8
+Write-Host "`nReport generated: verification/logs/VERIFICATION_REPORT.md" -ForegroundColor Cyan
+
