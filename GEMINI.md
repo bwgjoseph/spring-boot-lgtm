@@ -72,6 +72,7 @@ The project uses `Taskfile` to simplify complex operations.
 - `pom.xml`: Maven configuration with version alignment for OTEL (1.59.0) and MongoDB (5.6.2).
 - `src/main/resources/application.yaml`: Spring Boot application configuration.
 - `RESOURCES.md`: Detailed CPU and Memory allocation for all deployments.
+- `IMAGES.md`: Software Bill of Materials (SBOM) and container image inventory.
 - `deployment/values-alloy.yaml`: Configuration for Grafana Alloy enrichment and log processing.
 - `JMX_METRICS.md`: Documentation for Debezium monitoring.
 - `CUSTOM_ATTRIBUTES.md`: Documentation for cross-stack attribute mapping.
