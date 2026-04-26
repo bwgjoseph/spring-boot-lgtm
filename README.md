@@ -4,7 +4,7 @@ This project is a production-ready template and sandbox for implementing the **G
 
 It demonstrates a "Scrape & Push" architecture using Spring Boot 3.5+, Micrometer Tracing (OTEL Bridge), and W3C Trace Context.
 
-👉 **[Detailed Feature Guide (feature.md)](./feature.md)**
+👉 **[Detailed Feature Guide (feature.md)](FEATURE.md)**
 👉 **[Troubleshooting Guide (TROUBLESHOOT.md)](./TROUBLESHOOT.md)**
 
 ## 🚀 Key Features (Day 2 Ready)
@@ -97,11 +97,11 @@ graph TD
 | Component           | Role              | Helm Chart                        | Version   |
 |---------------------|-------------------|-----------------------------------|-----------|
 | **Spring Boot 3.5** | Application       | -                                 | -         |
-| **Grafana Alloy**   | Collector/Gateway | `grafana/alloy`                   | `1.6.1`   |
-| **Grafana**         | Visualization     | `grafana-community/grafana`       | `11.3.0`  |
-| **Loki**            | Log Storage       | `grafana-community/loki`          | `9.3.4`   |
+| **Grafana Alloy**   | Collector/Gateway | `grafana/alloy`                   | `1.8.0`   |
+| **Grafana**         | Visualization     | `grafana-community/grafana`       | `12.1.1`  |
+| **Loki**            | Log Storage       | `grafana-community/loki`          | `13.2.3`  |
 | **Tempo**           | Trace Storage     | `grafana-community/tempo`         | `2.0.0`   |
-| **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `28.13.0` |
+| **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `29.2.1`  |
 | **MinIO**           | Object Storage    | `minio/minio`                     | `5.4.0`   |
 | **MongoDB**         | DB / CDC Source   | `bitnami/mongodb` (OCI)           | `8.2.7`   |
 

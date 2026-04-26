@@ -139,7 +139,7 @@ kubectl get secret --namespace monitoring grafana -o jsonpath="{.data.admin-pass
 - **Tail-Sampling:** Configured in `values-alloy.yaml` (currently 100% sampling).
 - **Service Graph & Node Graph:** Automated dependency mapping generated in the Tempo "Service Graph" tab.
 - **Trace-to-Log / Trace-to-Metric:** Modernized links between Loki, Tempo, and Prometheus.
-  - See [learning_trace_to_log.md](../learning_trace_to_log.md) for troubleshooting details.
+  - See [learning_trace_to_log.md](../TRACE_TO_LOG.md) for troubleshooting details.
 
 ---
 

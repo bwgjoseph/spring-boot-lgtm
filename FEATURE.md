@@ -54,7 +54,7 @@ In the Prometheus metrics graphs, you'll see small dots. These are **Exemplars**
 ### 🔗 Log-Trace Correlation
 *   **Trace-to-Log:** While looking at a Trace in Tempo, click "Logs for this span" to see every log message written *during that specific request*.
 *   **Log-to-Trace:** While looking at a Log in Loki, click the "View Trace" button next to the Trace ID to see the full execution timeline of that request.
-*   **Deeper Dive:** See [learning_trace_to_log.md](./learning_trace_to_log.md) for detailed troubleshooting of this feature.
+*   **Deeper Dive:** See [learning_trace_to_log.md](TRACE_TO_LOG.md) for detailed troubleshooting of this feature.
 
 ### 📊 Dynamic Debezium Monitoring
 The sandbox includes an advanced **Dynamic JMX-to-Micrometer Bridge** for Debezium Embedded.

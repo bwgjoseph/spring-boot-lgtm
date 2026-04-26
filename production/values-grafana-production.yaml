@@ -4,7 +4,7 @@
 
 grafana:
   # User requested 1 replica for Grafana for a small team setup.
-  # Note: This deviates from the general HA recommendation in production_ready.md.
+  # Note: This deviates from the general HA recommendation in PRODUCTION_READY.md.
   replicas: 1 
 
   # Disable default SQLite persistence as we will use an external PostgreSQL database.

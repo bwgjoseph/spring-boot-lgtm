@@ -60,7 +60,44 @@ Debezium metrics are bridged from JMX MBeans. JMX ObjectName properties are auto
 
 ---
 
-## 🔍 How to Filter/Search
+## 💡 Implementation Patterns
+
+### 1. Request-Level Attributes (Manual Observation)
+For high-precision business logic where `@Observed` is too rigid, use manual `Observation` blocks:
+
+```java
+public Pokemon getPokemon(String pokemonId, String userId) {
+    Observation observation = Observation.createNotStarted("pokemon.lookup", observationRegistry)
+        .contextualName("fetch-pokemon-for-user")
+        .lowCardinalityKeyValue("pokemon.id", pokemonId) // Added to Metrics
+        .highCardinalityKeyValue("user.id", userId)      // Added to Spans (Tempo)
+        .start();
+
+    try (Observation.Scope scope = observation.openScope()) {
+        return restClient.get().uri("/{id}", pokemonId).retrieve().body(Pokemon.class);
+    } catch (Exception e) {
+        observation.error(e);
+        throw e;
+    } finally {
+        observation.stop();
+    }
+}
+```
+
+### 2. Global MDC Correlation (`userId`)
+To ensure `userId` appears in **Tempo Spans** (as an attribute) and **Loki Labels**:
+1. **Application:** Ensure `userId` is in your logging pattern (configured in `application.yaml`).
+2. **Alloy:** Use the `loki.process` stage in `values-alloy.yaml` to promote the MDC `userId` to a searchable Loki label:
+
+```hcl
+stage.regex {
+  // Matches: [spring-boot-app,trace_id,span_id,userId]
+  expression = ".*\\[(?P<app>.+?),(?P<trace_id>\\w*),(?P<span_id>\\w*),(?P<userId>\\w*)\\].*"
+}
+stage.labels {
+  values = { "user_id" = "userId" }
+}
+```
 
 ### In Loki (Grafana Logs)
 Look at the **Structured Metadata** panel or query directly:
