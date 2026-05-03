@@ -1,0 +1,104 @@
+alloy:
+  extraPorts:
+    - name: "otlp-grpc"
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+  configMap:
+    create: true
+    content: |-
+      // --- LOGS: DISCOVERY & RELABELING ---
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+
+      discovery.relabel "pods" {
+        targets = discovery.kubernetes.pods.targets
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app"]
+          target_label  = "service_name"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+      }
+
+      loki.source.kubernetes "pods" {
+        targets    = discovery.relabel.pods.output
+        forward_to = [loki.process.extract_metadata.receiver]
+      }
+
+      loki.process "extract_metadata" {
+        stage.regex {
+          expression = ".*\\[(?P<app>.+?),(?P<trace_id>\\w*),(?P<span_id>\\w*),(?P<userId>\\w*)\\].*"
+        }
+        stage.labels {
+          values = { "user_id" = "userId", "trace_id" = "trace_id", "span_id" = "span_id" }
+        }
+        stage.label_drop {
+          values = ["userId"]
+        }
+        forward_to = [loki.write.loki_backend.receiver]
+      }
+
+      loki.write "loki_backend" {
+        endpoint {
+          url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
+        }
+      }
+
+      // --- TRACES: OTLP INGESTION & PROCESSING ---
+      otelcol.receiver.otlp "default" {
+        grpc {
+          endpoint = "0.0.0.0:4317"
+        }
+        output {
+          traces  = [otelcol.processor.k8sattributes.default.input]
+        }
+      }
+
+      otelcol.processor.k8sattributes "default" {
+        extract {
+          metadata = ["k8s.pod.name", "k8s.namespace.name", "k8s.node.name"]
+        }
+        output {
+          traces  = [otelcol.processor.batch.default.input]
+        }
+      }
+
+      otelcol.processor.batch "default" {
+        output {
+          traces  = [otelcol.exporter.otlp.tempo.input]
+        }
+      }
+
+      otelcol.exporter.otlp "tempo" {
+        client {
+          endpoint = "tempo.monitoring.svc:4317"
+          tls {
+            insecure = true
+          }
+        }
+      }
+
+      // --- METRICS: PROMETHEUS SCRAPING ---
+      prometheus.scrape "spring_boot" {
+        targets    = discovery.relabel.pods.output
+        forward_to = [prometheus.remote_write.prom.receiver]
+      }
+
+      prometheus.remote_write "prom" {
+        endpoint {
+          url = "http://prometheus-server.monitoring.svc.cluster.local/api/v1/write"
+        }
+      }
+
+controller:
+  type: deployment
+  replicas: 2
+
+# Enable clustering for HA
+alloy:
+  clustering:
+    enabled: true

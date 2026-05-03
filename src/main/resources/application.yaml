@@ -6,6 +6,7 @@ spring:
       enabled: true
       uri: mongodb://root:password@localhost:27017/kx?authSource=admin
 debezium:
+  enabled: ${DEBEZIUM_ENABLED:true}
   properties:
     connector.class: io.debezium.connector.mongodb.MongoDbConnector
     mongodb.connection.string: mongodb://admin:password@localhost:27017/source?authSource=admin&replicaSet=mgrs
@@ -59,6 +60,8 @@ management:
       export:
         enabled: false
 logging:
+  level:
+    io.debezium: ${DEBEZIUM_LOG_LEVEL:INFO}
   pattern:
     # Using camelCase for traceId and spanId as indicated by user and common for Micrometer Tracing Bridge
     correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{userId:-}]"

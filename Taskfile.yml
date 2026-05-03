@@ -1,8 +1,10 @@
 version: '3'
 
 vars:
+  ENV: '{{.ENV | default "dev"}}'
   NAMESPACE: monitoring
-  DEPLOY_DIR: deployment
+  DEPLOY_DIR: 'deployment/{{.ENV}}'
+  COMMON_DIR: 'deployment/common'
   # HELM CHART VERSIONS (Stable as of March 2026)
   VER_ALLOY: "1.8.0"
   VER_GRAFANA: "12.1.1"
@@ -13,7 +15,7 @@ vars:
   VER_MONGODB: "18.6.31"
 
 tasks:
-  # --- INFRASTRUCTURE REPOS ---
+  # --- 📦 SETUP & FOUNDATION ---
   repos:
     desc: Add and update Helm repositories
     cmds:
@@ -21,52 +23,83 @@ tasks:
       - helm repo add grafana-community https://grafana-community.github.io/helm-charts
       - helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
       - helm repo add minio https://charts.min.io/
+      - helm repo add bitnami https://charts.bitnami.com/bitnami
       - helm repo update
 
   namespace:
     desc: Create the monitoring namespace if it doesn't exist
     cmds:
-      - kubectl create namespace {{.NAMESPACE}} --dry-run=client -o yaml > namespace.yaml
-      - kubectl apply --server-side -f namespace.yaml
-      - rm namespace.yaml
+      - kubectl create namespace {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply --server-side -f -
 
-  # --- INDIVIDUAL COMPONENTS ---
+  # --- ⚙️ CONFIGURATION (Secrets & ConfigMaps) ---
+  secret:mongodb:
+    desc: Create MongoDB secret for root credentials and replica set authentication
+    deps: [namespace]
+    cmds:
+      - kubectl create secret generic mongodb -n {{.NAMESPACE}} --from-literal=mongodb-root-password=password --from-literal=mongodb-replica-set-key=12345678901234567890 --dry-run=client -o yaml | kubectl apply -f -
+
+  secret:grafana:
+    desc: Create Grafana admin credentials secret
+    deps: [namespace]
+    cmds:
+      - kubectl create secret generic grafana-admin-credentials -n {{.NAMESPACE}} --from-literal=admin-user=admin --from-literal=admin-password=password --dry-run=client -o yaml | kubectl apply -f -
+
+  secret:
+    desc: Deploy all secrets (MongoDB, Grafana)
+    cmds:
+      - task: secret:mongodb
+      - task: secret:grafana
+
+  configmap:prometheus-alert:
+    desc: Deploy Prometheus alerting rules ConfigMap
+    deps: [namespace]
+    cmds:
+      - kubectl create configmap prometheus-alert-rules --from-file={{.COMMON_DIR}}/alerts/prometheus-alerting-rules.yaml -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+
+  configmap:grafana-datasource:
+    desc: Create ConfigMap for local datasources
+    deps: [namespace]
+    cmds:
+      - kubectl create configmap grafana-datasources --from-file={{.COMMON_DIR}}/datasources/datasources.yaml -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl label configmap grafana-datasources grafana_datasource=1 -n {{.NAMESPACE}} --overwrite
+
+  configmap:grafana-dashboard:
+    desc: Sync local dashboards to K8s by creating individual ConfigMaps per file
+    deps: [namespace]
+    cmds:
+      - pwsh -File ./verification/sync-dashboards.ps1 -dashboardsDir "{{.COMMON_DIR}}/dashboards"
+
+  configmap:
+    desc: Deploy all ConfigMaps (Alerts, Datasources, Dashboards)
+    cmds:
+      - task: configmap:prometheus-alert
+      - task: configmap:grafana-datasource
+      - task: configmap:grafana-dashboard
+
+  # --- 🏗️ INFRASTRUCTURE COMPONENTS ---
   minio:
-    desc: Install or Upgrade MinIO (Internal Object Storage)
+    desc: Install or Upgrade MinIO
     deps: [repos, namespace]
     cmds:
       - helm upgrade --install minio minio/minio -n {{.NAMESPACE}} --version {{.VER_MINIO}} -f {{.DEPLOY_DIR}}/values-minio.yaml
 
-  dashboards:
-    desc: Sync local dashboards to K8s by creating individual ConfigMaps per file
-    deps: [namespace]
+  mongodb:
+    desc: Install or Upgrade MongoDB ReplicaSet
+    deps: [namespace, secret:mongodb]
     cmds:
-      - pwsh -File ./verification/sync-dashboards.ps1
+      - helm upgrade --install mongodb bitnami/mongodb -n {{.NAMESPACE}} --version {{.VER_MONGODB}} -f {{.DEPLOY_DIR}}/values-mongodb.yaml
 
-  datasources:
-    desc: Create ConfigMap for local datasources
-    deps: [namespace]
+  prometheus:
+    desc: Install or Upgrade Prometheus
+    deps: [repos, namespace, configmap:prometheus-alert]
     cmds:
-      - kubectl create configmap local-datasources --from-file={{.DEPLOY_DIR}}/datasources.yaml -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
-      - kubectl label configmap local-datasources grafana_datasource=1 -n {{.NAMESPACE}} --overwrite
-
-  alloy:
-    desc: Install or Upgrade Grafana Alloy
-    deps: [repos, namespace]
-    cmds:
-      - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f {{.DEPLOY_DIR}}/values-alloy.yaml
-
-  grafana:
-    desc: Install or Upgrade Grafana
-    deps: [repos, namespace]
-    cmds:
-      - helm upgrade --install grafana grafana-community/grafana -n {{.NAMESPACE}} --version {{.VER_GRAFANA}} -f {{.DEPLOY_DIR}}/values-grafana.yaml
+      - helm upgrade --install prometheus prometheus-community/prometheus -n {{.NAMESPACE}} --version {{.VER_PROMETHEUS}} -f {{.DEPLOY_DIR}}/values-prometheus.yaml
 
   loki:
     desc: Install or Upgrade Loki
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install loki grafana-community/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f {{.DEPLOY_DIR}}/values-loki-singlebinary.yaml
+      - helm upgrade --install loki grafana-community/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f {{.DEPLOY_DIR}}/values-loki.yaml
 
   tempo:
     desc: Install or Upgrade Tempo
@@ -74,32 +107,26 @@ tasks:
     cmds:
       - helm upgrade --install tempo grafana-community/tempo -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f {{.DEPLOY_DIR}}/values-tempo.yaml
 
-  prometheus:
-    desc: Install or Upgrade Prometheus
-    deps: [repos, namespace, prometheus-rules]
+  grafana:
+    desc: Install or Upgrade Grafana
+    deps: [repos, namespace, secret:grafana]
     cmds:
-      - helm upgrade --install prometheus prometheus-community/prometheus -n {{.NAMESPACE}} --version {{.VER_PROMETHEUS}} -f {{.DEPLOY_DIR}}/values-prometheus.yaml
+      - helm upgrade --install grafana grafana-community/grafana -n {{.NAMESPACE}} --version {{.VER_GRAFANA}} -f {{.DEPLOY_DIR}}/values-grafana.yaml
 
-  prometheus-rules:
-    desc: Deploy Prometheus alerting rules ConfigMap
-    deps: [namespace]
+  alloy:
+    desc: Install or Upgrade Grafana Alloy
+    deps: [repos, namespace]
     cmds:
-      - kubectl create configmap prometheus-rules --from-file={{.DEPLOY_DIR}}/prometheus-alerting-rules.yaml -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+      - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f {{.DEPLOY_DIR}}/values-alloy.yaml
 
-  mongodb:
-    desc: Install or Upgrade MongoDB ReplicaSet (Bitnami OCI)
-    deps: [namespace]
-    cmds:
-      - helm upgrade --install mongodb oci://registry-1.docker.io/bitnamicharts/mongodb -n {{.NAMESPACE}} --version {{.VER_MONGODB}} -f {{.DEPLOY_DIR}}/values-mongodb.yaml
-
-  # --- APPLICATION TASKS ---
+  # --- 🚀 APPLICATION PIPELINE ---
   app:build:
     desc: Build the Spring Boot application and Docker image using Jib
     cmds:
       - .\\mvnw clean compile jib:dockerBuild
 
   app:load:
-    desc: Build and sideload the image into local Kubernetes (Docker Desktop/Kind)
+    desc: Build and sideload the image into local Kubernetes
     deps: [app:build]
     cmds:
       - docker save spring-boot-app:demo -o spring-boot-app.tar
@@ -112,21 +139,156 @@ tasks:
     desc: Deploy the Spring Boot application to Kubernetes
     deps: [namespace]
     cmds:
-      - kubectl apply -f {{.DEPLOY_DIR}}/deployment.yaml
+      - kubectl apply -f {{.DEPLOY_DIR}}/app.yaml
       - kubectl rollout restart deployment spring-boot-app -n {{.NAMESPACE}}
 
-  # --- COMPOSITE TASKS ---
-  infra:
-    desc: Install/Upgrade all infrastructure components (LGTM + Alloy + Storage + DB)
+  # --- 🧪 VERIFICATION & TESTING ---
+  verify:trigger:api:
+    desc: Trigger Pokemon API traffic
     cmds:
+      - pwsh -ExecutionPolicy Bypass -File ./verification/trigger-api.ps1 -testId TEST_API_1234
+
+  verify:trigger:mongo:
+    desc: Trigger MongoDB CDC event
+    cmds:
+      - pwsh -ExecutionPolicy Bypass -File ./verification/trigger-mongo.ps1 -testId TEST_MONGO_5678
+
+  verify:mongodb:
+    desc: Verify MongoDB replica set health and credentials
+    deps: [namespace]
+    cmds:
+      - kubectl rollout status statefulset/mongodb -n {{.NAMESPACE}} --timeout=60s
+      - kubectl get secret mongodb -n {{.NAMESPACE}}
+      - kubectl exec mongodb-0 -n {{.NAMESPACE}} -- sh -c "mongosh admin -u admin -p password --eval 'rs.status()' | grep -E 'PRIMARY|SECONDARY'"
+
+  verify:loki:
+    desc: Verify Loki health
+    deps: [namespace]
+    cmds:
+      - kubectl rollout status statefulset/loki -n {{.NAMESPACE}} --timeout=60s
+
+  verify:tempo:
+    desc: Verify Tempo health
+    deps: [namespace]
+    cmds:
+      - kubectl rollout status statefulset/tempo -n {{.NAMESPACE}} --timeout=60s
+
+  verify:prometheus:
+    desc: Verify Prometheus health and alerting rules
+    deps: [namespace]
+    cmds:
+      - kubectl rollout status deployment/prometheus-server -n {{.NAMESPACE}} --timeout=60s
+      - kubectl get configmap prometheus-alert-rules -n {{.NAMESPACE}}
+
+  verify:grafana:
+    desc: Verify Grafana health and datasources
+    deps: [namespace]
+    cmds:
+      - kubectl rollout status deployment/grafana -n {{.NAMESPACE}} --timeout=60s
+      - kubectl get configmap grafana-datasources -n {{.NAMESPACE}}
+      - kubectl get secret grafana-admin-credentials -n {{.NAMESPACE}}
+
+  verify:alloy:
+    desc: Verify Alloy health
+    deps: [namespace]
+    cmds:
+      - kubectl rollout status daemonset/alloy -n {{.NAMESPACE}} --timeout=60s
+
+  verify:app:
+    desc: Verify Spring Boot App health
+    deps: [namespace]
+    cmds:
+      - kubectl rollout status deployment/spring-boot-app -n {{.NAMESPACE}} --timeout=60s
+
+  verify:
+    desc: Run all component verification tasks
+    cmds:
+      - task: verify:mongodb
+      - task: verify:loki
+      - task: verify:tempo
+      - task: verify:prometheus
+      - task: verify:grafana
+      - task: verify:alloy
+      - task: verify:app
+
+  test:e2e:
+    desc: Run end-to-end observability verification
+    deps: [verify]
+    cmds:
+      - pwsh -File ./verification/run-all.ps1
+
+  # --- 🔌 PORT-FORWARDING (Modular) ---
+  pf:grafana:
+    desc: Port-forward Grafana (3000)
+    cmds:
+      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward service/grafana 3000:80 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - echo Grafana UI http://localhost:3000
+
+  pf:prometheus:
+    desc: Port-forward Prometheus (9090)
+    cmds:
+      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward service/prometheus-server 9090:80 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - echo Prometheus UI http://localhost:9090
+
+  pf:alertmanager:
+    desc: Port-forward Alertmanager (9093)
+    cmds:
+      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward service/prometheus-alertmanager 9093:9093 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - echo Alertmanager UI http://localhost:9093
+
+  pf:alloy:
+    desc: Port-forward Alloy (12345)
+    cmds:
+      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward daemonset/alloy 12345:12345 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - echo Grafana Alloy UI http://localhost:12345
+
+  pf:spring-app:
+    desc: Port-forward Spring Boot App (8080)
+    cmds:
+      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward service/spring-boot-app-svc 8080:8080 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - echo Application UI http://localhost:8080/actuator/health
+
+  pf:all:
+    desc: Port-forward all observability UIs
+    cmds:
+      - task: pf:grafana
+      - task: pf:prometheus
+      - task: pf:alertmanager
+      - task: pf:alloy
+      - task: pf:spring-app
+      - echo "All port-forwards started in background."
+
+  pf:kill:
+    desc: Kill a port-forward process by local port (e.g., task pf:kill PORT=3000)
+    cmds:
+      - pwsh -File ./verification/kill-port.ps1 -port {{.PORT}}
+
+  pf:kill-all:
+    desc: Kill all active port-forwarding processes
+    cmds:
+      - task: pf:kill
+        vars: { PORT: 3000 }
+      - task: pf:kill
+        vars: { PORT: 9090 }
+      - task: pf:kill
+        vars: { PORT: 9093 }
+      - task: pf:kill
+        vars: { PORT: 12345 }
+      - task: pf:kill
+        vars: { PORT: 8080 }
+
+  # --- 🛠️ UTILITIES & LIFECYCLE ---
+  infra:
+    desc: Install/Upgrade all infrastructure components
+    cmds:
+      - task: secret
+      - task: configmap
       - task: minio
       - task: mongodb
       - task: prometheus
       - task: loki
       - task: tempo
       - task: grafana
-      - task: dashboards
-      - task: datasources
       - task: alloy
 
   all:
@@ -136,49 +298,17 @@ tasks:
       - task: app:load
       - task: app:deploy
 
-  # --- UTILITY TASKS ---
-  port-forward:
-    desc: Port-forward all observability UIs (Grafana:3000, Prometheus:9090, Alertmanager:9093, Alloy:12345)
-    cmds:
-      - kubectl port-forward service/grafana 3000:80 -n {{.NAMESPACE}} &
-      - kubectl port-forward service/prometheus-server 9090:80 -n {{.NAMESPACE}} &
-      - kubectl port-forward service/prometheus-alertmanager 9093:9093 -n {{.NAMESPACE}} &
-      - kubectl port-forward daemonset/alloy 12345:12345 -n {{.NAMESPACE}} &
-      - kubectl port-forward service/spring-boot-app-svc 8080:8080 -n {{.NAMESPACE}} &
-      - echo "Port-forwards started in background."
-      - echo "Grafana Admin Password:"
-      - task: password
-
-  password:
-    desc: Get the Grafana admin password
-    cmds:
-      - kubectl get secret --namespace {{.NAMESPACE}} grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
-
-  clean:
-    desc: Remove the monitoring namespace and all its resources
-    cmds:
-      - kubectl delete namespace {{.NAMESPACE}} --ignore-not-found
-
-  # --- VERIFICATION TASKS ---
-  test:e2e:
-    desc: Run end-to-end observability verification
-    cmds:
-      - pwsh -File ./verification/run-all.ps1
-
   scale-down:
-    desc: Scale down all deployments and statefulsets to 0 replicas to save resources
+    desc: Scale down heavy components to save resources (Keeps MinIO/MongoDB as support)
     ignore_error: true
     cmds:
       - kubectl scale deployment spring-boot-app -n {{.NAMESPACE}} --replicas=0
       - kubectl scale deployment grafana -n {{.NAMESPACE}} --replicas=0
-      - kubectl scale deployment minio -n {{.NAMESPACE}} --replicas=0
       - kubectl scale deployment prometheus-kube-state-metrics -n {{.NAMESPACE}} --replicas=0
       - kubectl scale statefulset prometheus-alertmanager -n {{.NAMESPACE}} --replicas=0
       - kubectl scale deployment prometheus-server -n {{.NAMESPACE}} --replicas=0
       - kubectl scale statefulset loki -n {{.NAMESPACE}} --replicas=0
       - kubectl scale statefulset tempo -n {{.NAMESPACE}} --replicas=0
-      - kubectl scale statefulset mongodb -n {{.NAMESPACE}} --replicas=0
-      - kubectl scale statefulset mongodb-arbiter -n {{.NAMESPACE}} --replicas=0
 
   scale-up:
     desc: Scale up all deployments and statefulsets to original replica counts
@@ -193,3 +323,72 @@ tasks:
       - kubectl scale statefulset tempo -n {{.NAMESPACE}} --replicas=1
       - kubectl scale statefulset mongodb -n {{.NAMESPACE}} --replicas=2
       - kubectl scale statefulset mongodb-arbiter -n {{.NAMESPACE}} --replicas=1
+
+  password:grafana:
+    desc: Get the Grafana admin password
+    cmds:
+      - pwsh -File ./verification/get-secret.ps1 -secretName grafana-admin-credentials -keyName admin-password
+
+  password:minio:
+    desc: Get the MinIO root password
+    cmds:
+      - pwsh -File ./verification/get-secret.ps1 -secretName minio -keyName rootPassword
+
+
+  # --- UNINSTALL TASKS ---
+  uninstall:minio:
+    desc: Uninstall MinIO and its storage
+    cmds:
+      - helm uninstall minio -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete pvc -l app.kubernetes.io/instance=minio -n {{.NAMESPACE}} --ignore-not-found
+
+  uninstall:mongodb:
+    desc: Uninstall MongoDB and its storage
+    cmds:
+      - helm uninstall mongodb -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete pvc -l app.kubernetes.io/instance=mongodb -n {{.NAMESPACE}} --ignore-not-found
+
+  uninstall:prometheus:
+    desc: Uninstall Prometheus and its associated configuration and storage
+    cmds:
+      - helm uninstall prometheus -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete configmap prometheus-alert-rules -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete pvc -l app.kubernetes.io/instance=prometheus -n {{.NAMESPACE}} --ignore-not-found
+
+  uninstall:loki:
+    desc: Uninstall Loki and its storage
+    cmds:
+      - helm uninstall loki -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete pvc -l app.kubernetes.io/instance=loki -n {{.NAMESPACE}} --ignore-not-found
+
+  uninstall:tempo:
+    desc: Uninstall Tempo and its storage
+    cmds:
+      - helm uninstall tempo -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete pvc -l app.kubernetes.io/instance=tempo -n {{.NAMESPACE}} --ignore-not-found
+
+  uninstall:grafana:
+    desc: Uninstall Grafana and its configuration/storage
+    cmds:
+      - helm uninstall grafana -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete configmap grafana-datasources -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete configmap -l grafana_dashboard=1 -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete secret grafana-admin-credentials -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete pvc -l app.kubernetes.io/instance=grafana -n {{.NAMESPACE}} --ignore-not-found
+
+  uninstall:alloy:
+    desc: Uninstall Grafana Alloy
+    cmds:
+      - helm uninstall alloy -n {{.NAMESPACE}} --ignore-not-found
+
+  uninstall:infra:
+    desc: Uninstall all infrastructure components
+    cmds:
+      - task: uninstall:minio
+      - task: uninstall:mongodb
+      - task: uninstall:prometheus
+      - task: uninstall:loki
+      - task: uninstall:tempo
+      - task: uninstall:grafana
+      - task: uninstall:alloy
+

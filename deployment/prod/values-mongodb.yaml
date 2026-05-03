@@ -1,0 +1,22 @@
+architecture: replicaset
+replicaCount: 3
+replicaSetName: mgrs
+auth:
+  enabled: true
+  rootUser: admin
+  existingSecret: mongodb
+  secretPasswordKey: mongodb-root-password
+arbiter:
+  enabled: false # Use 3 full nodes for prod HA
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+resources:
+  limits:
+    cpu: 1
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi

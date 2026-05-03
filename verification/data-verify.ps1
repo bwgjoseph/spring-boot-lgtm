@@ -50,31 +50,28 @@ $global:report += "`n`n## 📊 E2E Data Pipeline Results`n| Component | Test Cas
 
 # 2. Data Verification
 $queryPod = kubectl get pods -n monitoring -l app=spring-boot-app -o jsonpath='{.items[0].metadata.name}'
-$promSvc = "http://prometheus-server.monitoring.svc.cluster.local"
-$lokiSvc = "http://loki-gateway.monitoring.svc.cluster.local"
+$promSvc = "http://prometheus-server.monitoring.svc.cluster.local:80"
+$lokiSvc = "http://loki-gateway.monitoring.svc.cluster.local:80"
 $tempoSvc = "http://tempo.monitoring.svc.cluster.local:3200"
+
 # Polling function
 function Poll-Query($name, $url, $jqFilter) {
-    Write-Host "Polling $name at $url ..." -ForegroundColor Gray
+    Write-Host "--- Polling $name ---" -ForegroundColor Cyan
+    Write-Host "URL: $url" -ForegroundColor Gray
 
-    # Pre-flight: Check if pod is actually listening on port 8080 (our app port)
-    for ($j = 0; $j -lt 5; $j++) {
-        $portCheck = kubectl exec $queryPod -n monitoring -- sh -c "netstat -tuln" 2>$null | Select-String "8080"
-        if ($portCheck) { break }
-        Write-Host "Waiting for query pod network readiness..." -ForegroundColor Gray
-        Start-Sleep -Seconds 2
-    }
-
-    for ($i = 0; $i -lt 12; $i++) {
-        Write-Host "Attempt $($i+1): Querying $name..." -ForegroundColor Gray
+    for ($i = 0; $i -lt 5; $i++) {
+        Write-Host "Attempt $($i+1)/5: Querying $name..." -ForegroundColor Gray
         $res = kubectl exec $queryPod -n monitoring -- wget -qO- "$url" 2>$null | jq -r "$jqFilter"
+        
+        Write-Host "DEBUG: Raw response (jq filter '$jqFilter'):" -ForegroundColor DarkGray
+        Write-Host $res -ForegroundColor DarkGray
 
-        if ($res -and $res -ne "null" -and $res -ne "[]" -and $res -gt 0) { 
+        if ($res -and $res -ne "null" -and $res -ne "[]" -and $res -ne "0") { 
             Write-Host "Successfully retrieved data from $name." -ForegroundColor Green
             return $res 
         }
 
-        Write-Host "Result empty, retrying in 10s..." -ForegroundColor Yellow
+        Write-Host "Result empty or invalid, retrying in 10s..." -ForegroundColor Yellow
         Start-Sleep -Seconds 10
     }
     return 0
@@ -82,10 +79,10 @@ function Poll-Query($name, $url, $jqFilter) {
 
 
 Write-Host "--- Starting Data Verification ---" -ForegroundColor Cyan
-Start-Sleep -Seconds 60
+Start-Sleep -Seconds 30
 
 # Metrics
-$promRes = Poll-Query "Prometheus" "$promSvc/api/v1/query?query=debezium_total_number_of_events_seen" '.data.result[0].value[1]'
+$promRes = Poll-Query "Prometheus" "$promSvc/api/v1/query?query=debezium_total_number_of_events_seen{context='streaming'}" '.data.result[0].value[1]'
 if ($promRes -gt 0) { Add-Result "data" "Prometheus" "Debezium CDC Metrics" "PASS" "Events: $promRes" } else { Add-Result "data" "Prometheus" "Debezium CDC Metrics" "FAIL" "No events" }
 
 # Logs

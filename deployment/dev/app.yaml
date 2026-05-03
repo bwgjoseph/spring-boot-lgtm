@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spring-boot-app
+  namespace: monitoring
+  labels:
+    app: spring-boot-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spring-boot-app
+  template:
+    metadata:
+      labels:
+        app: spring-boot-app
+      annotations:
+        # Enable Prometheus scraping for this pod
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+      - name: spring-boot-app
+        image: spring-boot-app:demo
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DEBEZIUM_ENABLED
+          value: "true"
+        - name: MANAGEMENT_OTLP_TRACING_ENDPOINT
+          value: "http://alloy.monitoring.svc:4317"
+        - name: MANAGEMENT_OTLP_TRACING_TRANSPORT
+          value: "grpc"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "deployment.environment=staging,service.version=1.0.0"
+        - name: DEBEZIUM_MONGODB_CONNECTION_STRING
+          value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
+        - name: SPRING_DATA_MONGODB_URI
+          value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
+        # Ensure application name matches the service_name label for correlation
+        - name: SPRING_APPLICATION_NAME
+          value: "spring-boot-app"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 120
+          timeoutSeconds: 5
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 120
+          timeoutSeconds: 5
+          periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spring-boot-app-svc
+  namespace: monitoring
+spec:
+  selector:
+    app: spring-boot-app
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

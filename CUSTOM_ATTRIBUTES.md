@@ -91,8 +91,8 @@ To ensure `userId` appears in **Tempo Spans** (as an attribute) and **Loki Label
 
 ```hcl
 stage.regex {
-  // Matches: [spring-boot-app,trace_id,span_id,userId]
-  expression = ".*\\[(?P<app>.+?),(?P<trace_id>\\w*),(?P<span_id>\\w*),(?P<userId>\\w*)\\].*"
+  // Matches: [spring-boot-app,traceId,spanId,userId] (handles empty fields)
+  expression = ".*\\[(?P<app>[^,]*),(?P<traceId>[^,]*),(?P<spanId>[^,]*),(?P<userId>[^,]*)\\].*"
 }
 stage.labels {
   values = { "user_id" = "userId" }

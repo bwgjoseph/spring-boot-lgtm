@@ -103,14 +103,14 @@ graph TD
 | **Tempo**           | Trace Storage     | `grafana-community/tempo`         | `2.0.0`   |
 | **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `29.2.1`  |
 | **MinIO**           | Object Storage    | `minio/minio`                     | `5.4.0`   |
-| **MongoDB**         | DB / CDC Source   | `bitnami/mongodb` (OCI)           | `8.2.7`   |
+| **MongoDB**         | DB / CDC Source   | `bitnami/mongodb` (OCI)           | `18.6.31` |
 
 
 ## 🏁 Getting Started
 
 The easiest way to deploy or upgrade the entire stack is using **Taskfile**. This automates the repository setup, namespace creation, and version-locking.
 
-👉 **[Read the Full Installation & Upgrade Guide (INSTALL.md)](./deployment/INSTALL.md)**
+👉 **[Read the Full Installation & Upgrade Guide (INSTALLATION.md)](./INSTALLATION.md)**
 
 ### Quick Build & Deploy
 ```bash
@@ -137,6 +137,7 @@ This project contains specialized configurations to handle hardware and mount pr
    - Search for `http_server_requests_seconds_bucket` to see **Exemplars** (clickable dots linking to traces).
    - Use the **Service Graph** tab in Tempo to see the automated architecture map.
    - Query Loki logs to see the `[service-name,traceId,spanId,userId]` correlation pattern.
+   - Use the robust regex filter: `| regexp ".*\\[(?P<app>[^,]*),(?P<traceId>[^,]*),(?P<spanId>[^,]*),(?P<userId>[^,]*)\\].*"`
 3. **Custom Attributes:** 
    - Check Tempo span attributes for `user_id`, `deployment.environment`, and `k8s.pod.name`.
    - Check Loki Structured Metadata for `user_id`.

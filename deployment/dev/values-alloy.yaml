@@ -47,8 +47,8 @@ alloy:
         forward_to = [loki.write.local.receiver]
 
         stage.regex {
-          // Matches standard Spring Boot MDC format: [app,traceId,spanId,userId]
-          expression = ".*\\[(?P<app>.+?),(?P<traceId>\\w*),(?P<spanId>\\w*),(?P<userId>\\w*)\\].*"
+          // Matches format: [app,traceId,spanId,userId] allowing empty values
+          expression = ".*\\[(?P<app>[^,]*),(?P<traceId>[^,]*),(?P<spanId>[^,]*),(?P<userId>[^,]*)\\].*"
         }
 
         stage.structured_metadata {
@@ -59,12 +59,11 @@ alloy:
           }
         }
 
-        // Drop the internal camelCase capture groups so only snake_case remains in Loki
+        // Drop internal capture groups
         stage.label_drop {
           values = ["app", "traceId", "spanId", "userId"]
         }
       }
-
       // --- METRICS: PROMETHEUS SCRAPING ---
       
       // Filter pods to only those with 'prometheus.io/scrape: "true"' annotation

@@ -1,0 +1,30 @@
+tempo:
+  repository: grafana/tempo
+  tag: 2.6.1
+  
+  storage:
+    trace:
+      backend: s3
+      s3:
+        endpoint: minio.monitoring.svc:9000
+        bucket: tempo
+        access_key: admin
+        secret_key: password123
+        insecure: true
+        forcepathstyle: true
+
+  # Scalable components
+  ingester:
+    replicas: 3
+    resources:
+      limits:
+        memory: 1Gi
+  querier:
+    replicas: 3
+  queryFrontend:
+    replicas: 2
+  
+  metricsGenerator:
+    enabled: true
+    remoteWrite:
+      - url: http://prometheus-server.monitoring.svc.cluster.local/api/v1/write

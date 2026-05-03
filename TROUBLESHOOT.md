@@ -76,14 +76,14 @@ If you cannot login to Grafana:
 **Symptom:** Grafana shows a `502 Bad Gateway` when querying Loki logs.
 **Cause:** Default memory limits (128Mi) are too low for query processing, or the "Simple Scalable" mode is over-committing the node.
 **Resolution:** 
-1.  Increase memory limits in `deployment/values-loki-scalable.yaml`.
-2.  **Recommended for Sandbox:** Switch to the **Loki Single Binary** mode using `deployment/values-loki-singlebinary.yaml`. This consolidates all services into one pod to reduce overhead.
+1.  Increase memory limits in `deployment/prod/values-loki.yaml`.
+2.  **Recommended for Sandbox:** Use the **Loki Single Binary** mode in `deployment/dev/values-loki.yaml`. Consolidates all services into one pod.
 
 ### Application Crashes during Startup
 **Symptom:** Pod status is `CrashLoopBackOff` or `Running` but never `Ready`.
 **Cause:** The application initialization (Spring + Debezium + Jolokia) requires significant headroom and time.
 **Resolution:**
-1.  Ensure the memory limit is at least **1Gi** in `deployment/deployment.yaml`.
+1.  Ensure the memory limit is at least **1Gi** in `deployment/dev/app.yaml`.
 2.  Ensure `initialDelaySeconds` for liveness/readiness probes is at least **120s**.
 3.  Set `timeoutSeconds: 5` for liveness/readiness probes to allow the JVM more time to respond during high-load startup sequences.
 
@@ -111,6 +111,7 @@ If you cannot login to Grafana:
 **Resolution:**
 1.  Increase memory limits in `values-tempo.yaml` to at least `1Gi`.
 2.  Increase `livenessProbe` and `readinessProbe` `initialDelaySeconds` and `timeoutSeconds` to account for slow startups in local environments.
+
 ### Trace-to-Log: No results found (Zero-width time range)
 **Symptom:** In Tempo, clicking "Logs for this span" results in "No results found" even though the query is correct.
 **Cause:** The logs search time range exactly matches the span start/end times. If logs were ingested with a slight delay or clock drift exists, they may fall outside this exact window.
@@ -131,15 +132,7 @@ If you cannot login to Grafana:
     ```
 3.  Redeploy Tempo using `task tempo`.
 
-### Trace-to-Log: No results found (Zero-width time range)
-**Symptom:** In Tempo, clicking "Logs for this span" results in "No results found" even though the query is correct.
-**Cause:** The logs search time range exactly matches the span start/end times. If logs were ingested with a slight delay or clock drift exists, they may fall outside this exact window.
-**Resolution:**
-1.  In `deployment/datasources.yaml`, ensure `spanStartTimeShift` is set to a negative value (e.g., `-5s`) and `spanEndTimeShift` is set to a positive value (e.g., `5s`).
-2.  This expands the search window around the span, increasing the chance of finding correlated logs.
-
 ### TraceQL metrics not configured / local-blocks processor not found
-...
 **Symptom:** Grafana Traces Drilldown page shows "TraceQL metrics not configured" or "localblocks processor not found".
 **Cause:** The `local-blocks` processor is not enabled in the Tempo `metrics_generator` configuration. This processor is required for the Traces Drilldown feature.
 **Resolution:**
@@ -160,7 +153,7 @@ If you cannot login to Grafana:
 **Symptom:** `kubectl get pods` shows `mongodb-arbiter-0` or `mongodb-0` as `Pending`. `kubectl describe pod` shows `Insufficient memory`.
 **Cause:** The Bitnami chart's default resource requests are too high for a local Docker Desktop/KinD node.
 **Resolution:** 
-1.  Lower the `requests` and `limits` in `deployment/values-mongodb.yaml`.
+1.  Lower the `requests` and `limits` in `deployment/dev/values-mongodb.yaml`.
 2.  Example: Set `memory` requests to `128Mi` or `256Mi`.
 3.  Ensure the `global.resourcesPreset` is set to `"none"`.
 
@@ -176,10 +169,21 @@ If you cannot login to Grafana:
 **Cause:** Debezium initializes these metrics with `-1.0` until the first event is processed in that specific context (`snapshot` vs `streaming`).
 **Resolution:** Generate some activity in the database (e.g., `db.collection.insertOne(...)`). The metrics will update on the next scrape.
 
+### Debezium Not Capturing Changes
+**Symptom:** Logs show `After applying the include/exclude list filters, no changes will be captured`, and CDC metrics remain at 0 or empty.
+**Cause:** Debezium requires the database and collection to exist *before* the connector initializes, and it only captures *changes* (events). If the collection doesn't exist, it has nothing to watch; if it exists but is empty, updates won't generate Oplog entries.
+**Resolution:**
+1.  **Bootstrap the Database:** Ensure the target database (`kx`) and collection (`pokemon`) exist.
+    ```javascript
+    db.getSiblingDB('kx').createCollection('pokemon');
+    db.getSiblingDB('kx').pokemon.insertOne({name: 'Pikachu'});
+    ```
+2.  **Trigger a Change:** Debezium monitors the Oplog for operations (`insert`, `update`, `replace`, `delete`). A simple `updateOne` on an existing document is the most reliable way to verify the event pipeline.
+3.  **Verify Metrics:** Monitor `debezium_total_number_of_events_seen` in Prometheus.
+
 ### Verifying ReplicaSet Status
 If the app cannot connect to MongoDB, verify the cluster health manually:
 ```powershell
 kubectl exec -it mongodb-0 -n monitoring -- mongosh admin -u admin -p password --eval "rs.status()"
 ```
 Look for `stateStr: 'PRIMARY'` and ensure at least one other member is `SECONDARY`.
-

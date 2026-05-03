@@ -36,16 +36,19 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
 ## Building and Running
 The project uses `Taskfile` to simplify complex operations.
 
-| Task | Command | Description |
-|------|---------|-------------|
+- **Prometheus:** Metrics Storage (`29.2.1`, scraped from Alloy).
+...
 | **Full Setup** | `task all` | Builds the app and deploys the entire LGTM stack + App to K8s. |
-| **Infra Only** | `task infra` | Deploys Prometheus, Loki, Tempo, Grafana, Alertmanager, and Alloy. |
+| **Infra Only** | `task infra` | Deploys Prometheus, Loki, Tempo, Grafana, and Alloy. |
 | **App Build** | `task app:build` | Builds the Spring Boot app and Docker image using Jib. |
-| **App Load** | `task app:load` | Builds and sideloads the image into local K8s (Kind/Docker Desktop). |
+| **App Load** | `task app:load` | Builds and sideloads the image into local K8s. |
 | **App Deploy** | `task app:deploy` | Deploys the application to the `monitoring` namespace. |
-| **Dashboards** | `task dashboards` | Syncs local dashboards from `deployment/dashboards/` to K8s. |
-| **Port Forward** | `task port-forward` | Forwards Grafana (3000), Prometheus (9090), Alloy (12345), and App (8080). |
-| **Get Password** | `task password` | Retrieves the Grafana admin password. |
+| **Verification** | `task verify` | Runs automated health checks for all components. |
+| **E2E Test** | `task test:e2e` | Runs deterministic data-pipeline verification. |
+| **Port Forward** | `task pf:all` | Forwards all UIs (Grafana, Prom, Alloy, App). |
+| **Clean All** | `task clean` | Wipes all ConfigMaps and the monitoring namespace. |
+| **Clean Config** | `task clean:configmap` | Surgically removes only Prometheus/Grafana ConfigMaps. |
+
 
 ## Development Conventions
 

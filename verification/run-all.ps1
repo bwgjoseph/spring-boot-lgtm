@@ -18,11 +18,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Infrastructure Health Check Failed" }
 
     # 2. Generate Traffic
-    $testId = pwsh -NoProfile -File ./verification/traffic-gen.ps1
-    $testId | ForEach-Object { Add-Content -Path $logFile -Value $_ }
-    $testId = $testId | Select-Object -Last 1
+    # Execute trigger scripts
+    $testId = [guid]::NewGuid().ToString().Substring(0,8)
+    ./verification/trigger-api.ps1 -testId $testId
+    ./verification/trigger-mongo.ps1 -testId $testId
     
-    if (-not $testId) { throw "Failed to generate Test ID" }
+    Add-Content -Path $logFile -Value "TestID: $testId"
 
     # 3. Verify Data
     pwsh -NoProfile -File ./verification/data-verify.ps1 -testId $testId

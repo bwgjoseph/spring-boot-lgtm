@@ -1,10 +1,10 @@
+param([string]$dashboardsDir = "deployment/dashboards")
 $namespace = "monitoring"
-$deployDir = "deployment"
 
 Write-Host "--- Syncing Dashboards to K8s ---" -ForegroundColor Cyan
 
-Get-ChildItem -Path "$deployDir/dashboards" -Filter *.json | ForEach-Object {
-    $name = "dash-" + $_.BaseName.ToLower().Replace(" ", "-")
+Get-ChildItem -Path "$dashboardsDir" -Filter *.json | ForEach-Object {
+    $name = "grafana-dash-" + $_.BaseName.ToLower().Replace(" ", "-")
     Write-Host "Syncing dashboard: $name..." -NoNewline
     
     kubectl create configmap $name --from-file=$($_.FullName) -n $namespace --dry-run=client -o yaml | kubectl apply -f - | Out-Null

@@ -6,7 +6,7 @@ metadata:
   labels:
     app: spring-boot-app
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: spring-boot-app
@@ -32,21 +32,20 @@ spec:
         - name: MANAGEMENT_OTLP_TRACING_TRANSPORT
           value: "grpc"
         - name: OTEL_RESOURCE_ATTRIBUTES
-          value: "deployment.environment=staging,service.version=1.0.0"
+          value: "deployment.environment=production,service.version=1.0.0"
         - name: DEBEZIUM_MONGODB_CONNECTION_STRING
           value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
         - name: SPRING_DATA_MONGODB_URI
           value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
-        # Ensure application name matches the service_name label for correlation
         - name: SPRING_APPLICATION_NAME
           value: "spring-boot-app"
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "100m"
-          limits:
             memory: "1Gi"
             cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
         livenessProbe:
           httpGet:
             path: /actuator/health/liveness
