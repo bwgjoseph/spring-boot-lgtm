@@ -38,11 +38,10 @@ tasks:
       - helm upgrade --install minio minio/minio -n {{.NAMESPACE}} --version {{.VER_MINIO}} -f {{.DEPLOY_DIR}}/values-minio.yaml
 
   dashboards:
-    desc: Create ConfigMap for local dashboards
+    desc: Sync local dashboards to K8s by creating individual ConfigMaps per file
     deps: [namespace]
     cmds:
-      - kubectl create configmap local-dashboards --from-file={{.DEPLOY_DIR}}/dashboards -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
-      - kubectl label configmap local-dashboards grafana_dashboard=1 -n {{.NAMESPACE}} --overwrite
+      - pwsh -File ./verification/sync-dashboards.ps1
 
   datasources:
     desc: Create ConfigMap for local datasources
