@@ -38,3 +38,6 @@
 - [ ] Gitlab CI dashboard integration
 - [ ] Prepare production grade loki/tempo in scable-mode by scaling down unncessary stuff to verify
 - [ ] Make all the dashboard support filter by namespace
+- [ ] Find suitable grafana plugins to install
+- [ ] Configure git-sync
+- [ ] Integrate with Keycloak SSO
