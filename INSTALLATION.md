@@ -101,6 +101,7 @@ To access the various dashboards from your local machine, use the Taskfile:
 
 *   **All UIs:** `task pf:all`
 *   **Grafana only:** `task pf:grafana` (http://localhost:3000)
+*   **MinIO only:** `task pf:minio` (http://localhost:9001 - Console)
 *   **Alertmanager only:** `task pf:alertmanager` (http://localhost:9093)
 *   **Application only:** `task pf:spring-app` (http://localhost:8080/actuator/health)
 

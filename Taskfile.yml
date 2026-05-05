@@ -77,6 +77,11 @@ tasks:
       - task: configmap:grafana-dashboard
 
   # --- 🏗️ INFRASTRUCTURE COMPONENTS ---
+  storage:bootstrap:
+    desc: Ensure MinIO buckets for Loki and Tempo exist
+    cmds:
+      - pwsh -ExecutionPolicy Bypass -File ./verification/storage-bootstrap.ps1
+
   minio:
     desc: Install or Upgrade MinIO
     deps: [repos, namespace]
@@ -99,7 +104,7 @@ tasks:
     desc: Install or Upgrade Loki
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install loki grafana-community/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f {{.DEPLOY_DIR}}/values-loki.yaml
+      - helm upgrade --install loki grafana-community/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f {{.LOKI_VALUES | default (printf "%s/values-loki.yaml" .DEPLOY_DIR)}}
 
   tempo:
     desc: Install or Upgrade Tempo
@@ -248,9 +253,18 @@ tasks:
       - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward service/spring-boot-app-svc 8080:8080 -n {{.NAMESPACE}}' -WindowStyle Hidden"
       - echo Application UI http://localhost:8080/actuator/health
 
+  pf:minio:
+    desc: Port-forward MinIO (9000) and Console (9001)
+    cmds:
+      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward service/minio 9000:9000 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward service/minio-console 9001:9001 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - echo MinIO API http://localhost:9000
+      - echo MinIO Console http://localhost:9001
+
   pf:all:
     desc: Port-forward all observability UIs
     cmds:
+      - task: pf:minio
       - task: pf:grafana
       - task: pf:prometheus
       - task: pf:alertmanager
@@ -266,6 +280,10 @@ tasks:
   pf:kill-all:
     desc: Kill all active port-forwarding processes
     cmds:
+      - task: pf:kill
+        vars: { PORT: 9000 }
+      - task: pf:kill
+        vars: { PORT: 9001 }
       - task: pf:kill
         vars: { PORT: 3000 }
       - task: pf:kill

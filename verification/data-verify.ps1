@@ -51,8 +51,22 @@ $global:report += "`n`n## 📊 E2E Data Pipeline Results`n| Component | Test Cas
 # 2. Data Verification
 $queryPod = kubectl get pods -n monitoring -l app=spring-boot-app -o jsonpath='{.items[0].metadata.name}'
 $promSvc = "http://prometheus-server.monitoring.svc.cluster.local:80"
-$lokiSvc = "http://loki-gateway.monitoring.svc.cluster.local:80"
-$tempoSvc = "http://tempo.monitoring.svc.cluster.local:3200"
+
+# Auto-detect Loki endpoint (Gateway vs Single Binary)
+$hasLokiGateway = kubectl get svc -n monitoring -l "app.kubernetes.io/component=gateway,app.kubernetes.io/name=loki" -o name
+if ($hasLokiGateway) {
+    $lokiSvc = "http://loki-gateway.monitoring.svc.cluster.local:80"
+} else {
+    $lokiSvc = "http://loki.monitoring.svc.cluster.local:3100"
+}
+
+# Auto-detect Tempo endpoint (Distributed vs Single Binary)
+$hasTempoDistributed = kubectl get svc -n monitoring -l "app.kubernetes.io/component=query-frontend,app.kubernetes.io/name=tempo" -o name
+if ($hasTempoDistributed) {
+    $tempoSvc = "http://tempo-query-frontend.monitoring.svc.cluster.local:3200"
+} else {
+    $tempoSvc = "http://tempo.monitoring.svc.cluster.local:3200"
+}
 
 # Polling function
 function Poll-Query($name, $url, $jqFilter) {

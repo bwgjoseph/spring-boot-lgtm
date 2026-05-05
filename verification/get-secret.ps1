@@ -13,4 +13,4 @@ if (-not $secret) {
 
 $bytes = [System.Convert]::FromBase64String($secret)
 $password = [System.Text.Encoding]::UTF8.GetString($bytes)
-Write-Host $password
+Write-Output $password

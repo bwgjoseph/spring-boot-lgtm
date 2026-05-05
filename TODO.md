@@ -41,3 +41,5 @@
 - [ ] Find suitable grafana plugins to install
 - [ ] Configure git-sync
 - [ ] Integrate with Keycloak SSO
+- [ ] Ensure both tempo and loki are storing in s3
+- [ ] Setup https://github.com/grafana/gcx
