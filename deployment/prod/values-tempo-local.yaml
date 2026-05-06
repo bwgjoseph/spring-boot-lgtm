@@ -1,10 +1,23 @@
-# Production-grade Scalable Monolithic Tempo (using Single Binary chart)
-replicas: 3
+# Optimized for local verification of Scalable Monolithic mode
+replicas: 2
+
+# Disable anti-affinity for single-node cluster
+# The tempo chart (v2.0.0) doesn't have a high-level affinity toggle in the same way as Loki.
+affinity: {}
 
 tempo:
   repository: grafana/tempo
   tag: 2.10.1
   
+  # Resource limits for the pod
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
   extraArgs:
     config.expand-env: "true"
 
@@ -15,15 +28,8 @@ tempo:
           name: minio
           key: rootPassword
 
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 2
-      memory: 4Gi
-
 # Manually define the config to ensure correct field names and structure
+# This IS at the top level in version 2.0.0
 config: |
   server:
     http_listen_port: 3200
@@ -55,7 +61,8 @@ config: |
       ring:
         kvstore:
           store: inmemory
-        replication_factor: 3
+        replication_factor: 1
+    max_block_duration: 1m
   metrics_generator:
     storage:
       path: /var/tempo/wal
@@ -68,7 +75,4 @@ config: |
 
 persistence:
   enabled: true
-  size: 20Gi
-
-tempoQuery:
-  enabled: true
+  size: 5Gi

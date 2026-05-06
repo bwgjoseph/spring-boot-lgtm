@@ -43,3 +43,11 @@
 - [ ] Integrate with Keycloak SSO
 - [ ] Ensure both tempo and loki are storing in s3
 - [ ] Setup https://github.com/grafana/gcx
+- [ ] Figure out all configs to disable anonymous usage data. e.g. tempo has `reportingEnabled:true`
+- [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
+- [ ] Ensure `examplars` is setup correctly
+- [ ] Create spring-boot-starter to inject span and/or resource attributes that can be [useful](https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/best-practices/) 
+  - and/or also useful ootb solution - https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/set-up-collector/grafana-alloy/automatic-logging/
+- [ ] Scan through https://grafana.com/docs/tempo/latest/metrics-from-traces/
+- [ ] Enable [service-graph](https://grafana.com/docs/tempo/latest/metrics-from-traces/service_graphs/enable-service-graphs/)
+- [ ] To sync up the values-*-local with values-* to ensure the config is updated

@@ -110,7 +110,7 @@ tasks:
     desc: Install or Upgrade Tempo
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install tempo grafana-community/tempo -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f {{.DEPLOY_DIR}}/values-tempo.yaml
+      - helm upgrade --install tempo grafana-community/tempo -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f {{.TEMPO_VALUES | default (printf "%s/values-tempo.yaml" .DEPLOY_DIR)}}
 
   grafana:
     desc: Install or Upgrade Grafana

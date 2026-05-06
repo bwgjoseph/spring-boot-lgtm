@@ -15,17 +15,19 @@ This plan outlines the component-by-component verification of the production-gra
 2. [x] **Wipe Dev:** Performed full namespace purge (`kubectl delete namespace monitoring`).
 3. [x] **Deploy Prod:** `task loki ENV=prod LOKI_VALUES=deployment/prod/values-loki-local.yaml`.
 4. [x] **Verification:** Confirmed 2x replicas for read/write/backend and successful log push via `loki-gateway`.
-5. [ ] **Revert:** `task uninstall:loki` followed by `task loki`. (Pending: Current state is active for user inspection).
+5. [ ] **Extract Image:** Extract all the images required to run and update `IMAGES.md`
+6. [ ] **Revert:** `task uninstall:loki` followed by `task loki`. (Pending: Current state is active for user inspection).
 
 ---
 
-## ⚡ Phase 2: Tempo Distributed
-**Goal:** Verify Tempo distributed mode with S3 (MinIO) backend.
-1. [ ] **Refine Prod Values:** Finalize `deployment/prod/values-tempo.yaml`.
-2. [ ] **Wipe Dev:** `task uninstall:tempo`.
-3. [ ] **Deploy Prod:** `task tempo ENV=prod`.
-4. [ ] **Verification:** Run `task verify:tempo` and `task test:e2e`.
-5. [ ] **Revert:** `task uninstall:tempo` followed by `task tempo`.
+## ⚡ Phase 2: Tempo Scalable Monolithic
+**Goal:** Verify Tempo scalable monolithic mode with S3 (MinIO) backend.
+1. [x] **Refine Prod Values:** Finalize `deployment/prod/values-tempo-local.yaml` (Fixed nesting + enabled env expansion).
+2. [x] **Wipe Dev:** Performed `task uninstall:tempo`.
+3. [x] **Deploy Prod:** `task tempo ENV=prod TEMPO_VALUES=deployment/prod/values-tempo-local.yaml`.
+4. [x] **Verification:** Confirmed 2x replicas and **verified files in MinIO** (`single-tenant/` directory created after flush).
+5. [ ] **Extract Image:** Extract all the images required to run and update `IMAGES.md`
+6. [ ] **Revert:** `task uninstall:tempo` followed by `task tempo`.
 
 ---
 
@@ -35,7 +37,8 @@ This plan outlines the component-by-component verification of the production-gra
 2. [ ] **Wipe Dev:** `task uninstall:alloy`.
 3. [ ] **Deploy Prod:** `task alloy ENV=prod`.
 4. [ ] **Verification:** Run `task verify:alloy` and `task test:e2e`.
-5. [ ] **Revert:** `task uninstall:alloy` followed by `task alloy`.
+5. [ ] **Extract Image:** Extract all the images required to run and update `IMAGES.md`
+6. [ ] **Revert:** `task uninstall:alloy` followed by `task alloy`.
 
 ---
 
