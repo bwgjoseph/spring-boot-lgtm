@@ -119,10 +119,11 @@ tasks:
       - helm upgrade --install grafana grafana-community/grafana -n {{.NAMESPACE}} --version {{.VER_GRAFANA}} -f {{.DEPLOY_DIR}}/values-grafana.yaml
 
   alloy:
-    desc: Install or Upgrade Grafana Alloy
+    desc: Install or Upgrade Alloy
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f {{.DEPLOY_DIR}}/values-alloy.yaml
+      - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f {{.ALLOY_VALUES | default (printf "%s/values-alloy.yaml" .DEPLOY_DIR)}}
+
 
   # --- 🚀 APPLICATION PIPELINE ---
   app:build:

@@ -15,8 +15,8 @@ This plan outlines the component-by-component verification of the production-gra
 2. [x] **Wipe Dev:** Performed full namespace purge (`kubectl delete namespace monitoring`).
 3. [x] **Deploy Prod:** `task loki ENV=prod LOKI_VALUES=deployment/prod/values-loki-local.yaml`.
 4. [x] **Verification:** Confirmed 2x replicas for read/write/backend and successful log push via `loki-gateway`.
-5. [ ] **Extract Image:** Extract all the images required to run and update `IMAGES.md`
-6. [ ] **Revert:** `task uninstall:loki` followed by `task loki`. (Pending: Current state is active for user inspection).
+5. [x] **Extract Image:** Updated `IMAGES.md` with verified images.
+6. [x] **Revert:** Performed revert/cleanup.
 
 ---
 
@@ -26,19 +26,19 @@ This plan outlines the component-by-component verification of the production-gra
 2. [x] **Wipe Dev:** Performed `task uninstall:tempo`.
 3. [x] **Deploy Prod:** `task tempo ENV=prod TEMPO_VALUES=deployment/prod/values-tempo-local.yaml`.
 4. [x] **Verification:** Confirmed 2x replicas and **verified files in MinIO** (`single-tenant/` directory created after flush).
-5. [ ] **Extract Image:** Extract all the images required to run and update `IMAGES.md`
-6. [ ] **Revert:** `task uninstall:tempo` followed by `task tempo`.
+5. [x] **Extract Image:** Updated `IMAGES.md` with verified images.
+6. [x] **Revert:** Performed revert/cleanup.
 
 ---
 
 ## 🔗 Phase 3: Alloy Clustered Gateway
 **Goal:** Verify Alloy running as a clustered Deployment for HA ingestion.
-1. [ ] **Refine Prod Values:** Finalize `deployment/prod/values-alloy.yaml`.
-2. [ ] **Wipe Dev:** `task uninstall:alloy`.
-3. [ ] **Deploy Prod:** `task alloy ENV=prod`.
-4. [ ] **Verification:** Run `task verify:alloy` and `task test:e2e`.
-5. [ ] **Extract Image:** Extract all the images required to run and update `IMAGES.md`
-6. [ ] **Revert:** `task uninstall:alloy` followed by `task alloy`.
+1. [x] **Refine Prod Values:** Finalized `deployment/prod/values-alloy-local.yaml`.
+2. [x] **Wipe Dev:** Performed `task uninstall:alloy`.
+3. [x] **Deploy Prod:** `task alloy ENV=prod ALLOY_VALUES=deployment/prod/values-alloy-local.yaml`.
+4. [x] **Verification:** Confirmed 2-node gossip cluster formation, OTLP ingestion, and log forwarding.
+5. [x] **Extract Image:** Updated `IMAGES.md` with verified images.
+6. [x] **Revert:** Performed revert/cleanup.
 
 ---
 
