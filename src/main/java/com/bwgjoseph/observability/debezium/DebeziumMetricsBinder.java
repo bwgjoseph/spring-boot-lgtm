@@ -1,34 +1,37 @@
 package com.bwgjoseph.observability.debezium;
 
+import java.lang.management.ManagementFactory;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanAttributeInfo;
+import javax.management.MBeanInfo;
+import javax.management.MBeanServer;
+import javax.management.MalformedObjectNameException;
+import javax.management.Notification;
+import javax.management.NotificationListener;
+import javax.management.ObjectName;
+
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.binder.MeterBinder;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
-
-import javax.management.AttributeList;
-import javax.management.MBeanAttributeInfo;
-import javax.management.MBeanInfo;
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
-import java.lang.management.ManagementFactory;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A Dynamic MeterBinder that discovers all Debezium JMX MBeans and exposes 
- * their numeric attributes as Micrometer Gauges.
+ * A Dynamic MeterBinder that uses NotificationListener for reactive Debezium MBean discovery.
  */
 @Slf4j
 @Component
 @ConditionalOnProperty(name = "debezium.enabled", havingValue = "true", matchIfMissing = true)
-public class DebeziumMetricsBinder implements MeterBinder {
+public class DebeziumMetricsBinder implements MeterBinder, NotificationListener, InitializingBean {
 
     private final MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
     private final Set<String> registeredMeters = ConcurrentHashMap.newKeySet();
@@ -37,45 +40,58 @@ public class DebeziumMetricsBinder implements MeterBinder {
     @Override
     public void bindTo(MeterRegistry registry) {
         this.registry = registry;
-        // Initial scan
-        scanAndRegister();
+        try {
+            scanInitialMBeans();
+        } catch (Exception e) {
+            log.error("Failed to scan Debezium MBeans during bindTo", e);
+        }
     }
 
-    /**
-     * Periodically scan for new Debezium MBeans (e.g., when a connector starts)
-     */
-    @Scheduled(fixedDelay = 30000)
-    public void scanAndRegister() {
-        if (this.registry == null) return;
-
-        log.debug("Scanning MBean server for Debezium metrics...");
+    @Override
+    public void afterPropertiesSet() throws Exception {
         try {
-            // Find all MBeans in the debezium domain
-            ObjectName pattern = new ObjectName("debezium.*:*");
-            Set<ObjectName> mBeans = mBeanServer.queryNames(pattern, null);
+            // Subscribe to MBean registration/unregistration notifications
+            ObjectName delegate = new ObjectName("JMImplementation:type=MBeanServerDelegate");
+            mBeanServer.addNotificationListener(delegate, this, null, null);
+        } catch (InstanceNotFoundException | MalformedObjectNameException e) {
+            log.error("Failed to initialize Debezium MBean listener", e);
+        }
+    }
 
-            if (mBeans.isEmpty()) {
-                log.warn("No Debezium MBeans found. Available domains: {}", (Object) mBeanServer.getDomains());
-            }
+    private void scanInitialMBeans() throws Exception {
+        if (this.registry == null) return;
+        ObjectName pattern = new ObjectName("debezium.*:*");
+        Set<ObjectName> mBeans = mBeanServer.queryNames(pattern, null);
+        for (ObjectName mBeanName : mBeans) {
+            registerMBean(mBeanName);
+        }
+    }
 
-            for (ObjectName mBeanName : mBeans) {
-                registerMBean(mBeanName);
+    @Override
+    public void handleNotification(Notification notification, Object handback) {
+        if (notification instanceof javax.management.MBeanServerNotification) {
+            javax.management.MBeanServerNotification mbsn = (javax.management.MBeanServerNotification) notification;
+            ObjectName mBeanName = mbsn.getMBeanName();
+
+            if (mBeanName.getDomain().startsWith("debezium")) {
+                if (notification.getType().equals(javax.management.MBeanServerNotification.REGISTRATION_NOTIFICATION)) {
+                    log.info("New Debezium MBean registered: {}", mBeanName);
+                    registerMBean(mBeanName);
+                }
             }
-        } catch (Exception e) {
-            log.warn("Error during Debezium MBean discovery: {}", e.getMessage());
         }
     }
 
     private void registerMBean(ObjectName name) {
+        if (this.registry == null) {
+            return;
+        }
         try {
             MBeanInfo info = mBeanServer.getMBeanInfo(name);
             MBeanAttributeInfo[] attributes = info.getAttributes();
 
-            // Extract tags from the ObjectName properties (e.g., type, context, server)
             List<Tag> tags = new ArrayList<>();
             name.getKeyPropertyList().forEach((k, v) -> tags.add(Tag.of(k, v)));
-
-            // Extract database type from domain (e.g., debezium.mongodb -> mongodb)
             String domain = name.getDomain();
             if (domain.contains(".")) {
                 tags.add(Tag.of("db_type", domain.substring(domain.lastIndexOf(".") + 1)));
@@ -85,7 +101,6 @@ public class DebeziumMetricsBinder implements MeterBinder {
                 String metricName = "debezium." + attr.getName().replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
                 String meterKey = name.getCanonicalName() + ":" + attr.getName();
 
-                // Avoid duplicates
                 if (attr.isReadable() && !registeredMeters.contains(meterKey)) {
                     Object value = tryGetAttribute(name, attr.getName());
 
@@ -130,43 +145,26 @@ public class DebeziumMetricsBinder implements MeterBinder {
         .register(registry);
     }
 
-    /**
-     * Registers a string info metric. 
-     * returns true if registration was successful (value was not empty), false otherwise.
-     */
     private boolean registerStringInfo(String metricName, ObjectName name, MBeanAttributeInfo attr, List<Tag> tags) {
         String formattedValue = formatValue(tryGetAttribute(name, attr.getName()));
-
-        // If the value is empty or null, we skip registration for this scan.
-        // This allows a future scan to register it once the data is actually available.
         if (formattedValue == null || formattedValue.trim().isEmpty() || formattedValue.equals("[]")) {
-            log.debug("Skipping registration for {} because value is currently empty", metricName);
             return false;
         }
 
-        log.info("Registering Debezium info metric: {} with value: {}", metricName, formattedValue);
-        
         Gauge.builder(metricName, mBeanServer, s -> 1.0)
         .tags(tags)
         .tags("value", formattedValue)
         .description(attr.getDescription())
         .register(registry);
-
         return true;
     }
 
     private String formatValue(Object value) {
-        if (value instanceof String[] array) {
-            return String.join(",", array);
-        }
+        if (value instanceof String[] array) return String.join(",", array);
         return String.valueOf(value);
     }
 
     private Object tryGetAttribute(ObjectName name, String attribute) {
-        try {
-            return mBeanServer.getAttribute(name, attribute);
-        } catch (Exception e) {
-            return null;
-        }
+        try { return mBeanServer.getAttribute(name, attribute); } catch (Exception e) { return null; }
     }
 }
