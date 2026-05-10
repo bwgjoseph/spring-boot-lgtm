@@ -6,10 +6,11 @@ function Log-Action($Message, $Color = "Gray") {
     if ($env:LOG_FILE) { Add-Content -Path $env:LOG_FILE -Value $Message }
 }
 
-Log-Action "Step 2: Triggering 5 MongoDB changes..." "Gray"
+Log-Action "Step 2: Triggering 5 MongoDB changes in 'kx' database..." "Gray"
 for ($i = 1; $i -le 5; $i++) {
-    $mongoCmd = "db.getSiblingDB('kx').pokemon.updateOne({name: 'Pikachu'}, {`$set: {last_test_id: '$testId-$i'}})"
-    kubectl exec mongodb-0 -n $namespace -- mongosh admin -u admin -p password --eval "$mongoCmd" > $null
+    # Ensure database 'kx' and collection 'pokemon' exist
+    $mongoCmd = "db.getSiblingDB('kx').pokemon.updateOne({name: 'Pikachu'}, {`$set: {last_test_id: '$testId-$i'}}, {upsert: true})"
+    kubectl exec mongodb-0 -n $namespace -c mongodb -- /opt/bitnami/mongodb/bin/mongosh admin -u admin -p password --quiet --eval "$mongoCmd" > $null
     if ($LASTEXITCODE -eq 0) {
         Log-Action "   -> MongoDB update $i successful." "Green"
     } else {

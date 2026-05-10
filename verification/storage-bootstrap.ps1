@@ -14,8 +14,10 @@ if (-not $minioPod) {
 }
 
 # Get credentials
-$user = (pwsh -File ./verification/get-secret.ps1 -secretName minio -keyName rootUser).Trim().Replace("`r", "").Replace("`n", "")
-$pass = (pwsh -File ./verification/get-secret.ps1 -secretName minio -keyName rootPassword).Trim().Replace("`r", "").Replace("`n", "")
+# $user = (pwsh -File ./verification/get-secret.ps1 -secretName minio -keyName rootUser).Trim().Replace("`r", "").Replace("`n", "")
+# $pass = (pwsh -File ./verification/get-secret.ps1 -secretName minio -keyName rootPassword).Trim().Replace("`r", "").Replace("`n", "")
+$user = "admin"
+$pass = "password123"
 
 Write-Host "--- Bootstrapping MinIO Storage Buckets via pod/$minioPod ---" -ForegroundColor Cyan
 

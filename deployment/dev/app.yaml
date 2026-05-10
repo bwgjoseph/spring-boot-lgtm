@@ -30,7 +30,7 @@ spec:
         - name: DEBEZIUM_ENABLED
           value: "true"
         - name: MANAGEMENT_OTLP_TRACING_ENDPOINT
-          value: "http://alloy.monitoring.svc:4317"
+          value: "http://alloy.monitoring.svc.cluster.local:4317"
         - name: MANAGEMENT_OTLP_TRACING_TRANSPORT
           value: "grpc"
         - name: OTEL_RESOURCE_ATTRIBUTES

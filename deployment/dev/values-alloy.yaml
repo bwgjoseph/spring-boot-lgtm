@@ -1,17 +1,40 @@
 alloy:
+  # Clustering disabled for dev/sandbox to save resources
+  clustering:
+    enabled: false
+  
+  # Expose essential ports for OTLP ingestion
   extraPorts:
     - name: "otlp-grpc"
       port: 4317
       targetPort: 4317
       protocol: TCP
+  
+  # Headless service for reliable discovery
+  service:
+    enabled: true
+    clusterIP: None 
+  
+  # Path for WAL/Persistence
+  storagePath: /var/lib/alloy/data 
+  
+  # Add hostPath volume mount for /var/log/pods to enable Alloy log tailing
+  extraVolumes:
+    - name: varlog
+      hostPath:
+        path: /var/log/pods
+  extraVolumeMounts:
+    - name: varlog
+      mountPath: /var/log/pods
+      readOnly: true
+  
   configMap:
     create: true
     content: |-
-      // --- LOGS: DISCOVERY & RELABELING ---
-      discovery.kubernetes "all_pods" {
-        role = "pod"
-      }
+      // --- SHARED DISCOVERY (The Radar + Firewall) ---
+      discovery.kubernetes "all_pods" { role = "pod" }
 
+      // --- LOGS: DISCOVERY & RELABELING ---
       discovery.relabel "pod_logs" {
         targets = discovery.kubernetes.all_pods.targets
         rule {
@@ -36,12 +59,6 @@ alloy:
         forward_to = [loki.process.extract_metadata.receiver]
       }
 
-      loki.write "local" {
-        endpoint {
-          url = "http://loki-gateway.monitoring.svc:80/loki/api/v1/push"
-        }
-      }
-
       // Metadata Extraction: Promote trace_id and span_id to structured metadata
       loki.process "extract_metadata" {
         forward_to = [loki.write.local.receiver]
@@ -59,12 +76,17 @@ alloy:
           }
         }
 
-        // Drop internal capture groups
+        // Drop internal capture groups to avoid label bloat
         stage.label_drop {
           values = ["app", "traceId", "spanId", "userId"]
         }
       }
-      // --- METRICS: PROMETHEUS SCRAPING ---
+
+      loki.write "local" {
+        endpoint { url = "http://loki-gateway.monitoring.svc.cluster.local:80/loki/api/v1/push" }
+      }
+
+      // --- METRICS: PROMETHEUS SCRAPING (ANNOTATION BASED) ---
       
       // Filter pods to only those with 'prometheus.io/scrape: "true"' annotation
       discovery.relabel "spring_boot_pods" {
@@ -109,177 +131,54 @@ alloy:
       }
 
       prometheus.scrape "spring_boot" {
-        targets = discovery.relabel.spring_boot_pods.output
-        forward_to = [prometheus.remote_write.prom.receiver]
-      }
-
-      // Self-monitoring: Scraping Alloy's own metrics
-      prometheus.scrape "alloy" {
-        targets = [{"__address__" = "localhost:12345"}]
+        targets    = discovery.relabel.spring_boot_pods.output
         forward_to = [prometheus.remote_write.prom.receiver]
       }
 
       prometheus.remote_write "prom" {
         endpoint {
-          url = "http://prometheus-server.monitoring.svc:80/api/v1/write"
+          url = "http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/write"
+          send_exemplars = true
         }
       }
 
-      // --- TRACES: OTLP INGESTION & PROCESSING ---
+      // --- TRACES: OTLP INGESTION (DIRECT PATH FOR DEV) ---
       otelcol.receiver.otlp "default" {
         grpc { endpoint = "0.0.0.0:4317" }
-        output {
-          traces  = [otelcol.processor.k8sattributes.default.input]
-          metrics = [otelcol.exporter.otlp.tempo.input]
-        }
+        output { traces = [otelcol.processor.k8sattributes.default.input] }
       }
 
-      // Enrich spans with K8s metadata based on the source IP
       otelcol.processor.k8sattributes "default" {
         extract {
-          metadata = [
-            "k8s.namespace.name",
-            "k8s.pod.name",
-            "k8s.pod.uid",
-            "k8s.node.name",
-            "k8s.deployment.name",
-            "k8s.statefulset.name",
-            "k8s.daemonset.name",
-            "k8s.cronjob.name",
-            "k8s.job.name",
-          ]
+          metadata = ["k8s.pod.name", "k8s.namespace.name", "k8s.node.name"]
         }
-        output {
-          traces = [otelcol.processor.tail_sampling.default.input]
-        }
-      }
-
-      // Tail-based Sampling: Keep all errors, sample 100% of successful requests
-      otelcol.processor.tail_sampling "default" {
-        policy {
-          name = "sample-errors"
-          type = "status_code"
-          status_code { status_codes = ["ERROR"] }
-        }
-        policy {
-          name = "probabilistic-sample"
-          type = "probabilistic"
-          probabilistic { sampling_percentage = 100.0 } // configure to any % for sampling
-        }
-        output {
-          traces = [otelcol.processor.batch.default.input]
-        }
+        output { traces = [otelcol.processor.batch.default.input] }
       }
 
       otelcol.processor.batch "default" {
-        output {
-          traces = [otelcol.exporter.otlp.tempo.input]
-        }
+        output { traces = [otelcol.exporter.otlp.tempo.input] }
       }
 
       otelcol.exporter.otlp "tempo" {
         client {
-          endpoint = "tempo.monitoring.svc:4317"
+          endpoint = "tempo.monitoring.svc.cluster.local:4317"
           tls { insecure = true }
         }
       }
 
-      // --- K8S CLUSTER MONITORING: DISCOVERY ---
-
-      // Discovery for Node Exporter and Kubelet
-      discovery.kubernetes "nodes" {
-        role = "node"
-      }
-
-      // Discovery for Kube-State-Metrics service
-      discovery.kubernetes "services" {
-        role = "service"
-      }
-
-      // --- K8S CLUSTER MONITORING: SCRAPING ---
-
-      discovery.relabel "cadvisor" {
-        targets = discovery.kubernetes.nodes.targets
-        rule {
-          action = "replace"
-          source_labels = ["id"]
-          regex = "^/kubepods/(?:.+)/pod([^/]+)/.+$"
-          target_label = "pod_uid"
-        }
-        rule {
-          action = "replace"
-          source_labels = ["id"]
-          regex = "^/kubepods/(?:.+)/pod[^/]+/([^/]+)$"
-          target_label = "container"
-        }
-      }
-
-      // Filter to only the KSM service
-      discovery.relabel "ksm" {
-        targets = discovery.kubernetes.services.targets
-        rule {
-          source_labels = ["__meta_kubernetes_service_name"]
-          regex = "prometheus-kube-state-metrics"
-          action = "keep"
-        }
-      }
-
-      // Filter to only the Node Exporter service
-      discovery.relabel "node_exporter" {
-        targets = discovery.kubernetes.services.targets
-        rule {
-          source_labels = ["__meta_kubernetes_service_name"]
-          regex = "prometheus-node-exporter"
-          action = "keep"
-        }
-      }
-
-      // Scrape cAdvisor for per-container CPU/Memory metrics
-      prometheus.scrape "cadvisor" {
-        targets = discovery.relabel.cadvisor.output
-        scheme = "https"
-        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-        tls_config {
-          ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-          // DOCKER-DESKTOP: Insecure skip is required because the Kubelet 
-          // certificate usually doesn't match the node IP in Docker Desktop.
-          // FOR PRODUCTION: Configure proper CA verification if possible.
-          insecure_skip_verify = true
-        }
-        metrics_path = "/metrics/cadvisor"
-        forward_to = [prometheus.remote_write.prom.receiver]
-      }
-
-      // Scrape Kubelet for node health
-      prometheus.scrape "kubelet" {
-        targets = discovery.kubernetes.nodes.targets
-        scheme = "https"
-        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-        tls_config {
-          ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-          // DOCKER-DESKTOP: Insecure skip is required because the Kubelet 
-          // certificate usually doesn't match the node IP in Docker Desktop.
-          // FOR PRODUCTION: Configure proper CA verification if possible.
-          insecure_skip_verify = true
-        }
-        forward_to = [prometheus.remote_write.prom.receiver]
-      }
-
-      // Scrape Kube-State-Metrics (Object state like Deployment health)
-      prometheus.scrape "kube_state_metrics" {
-        targets    = discovery.relabel.ksm.output
-        forward_to = [prometheus.remote_write.prom.receiver]
-      }
-
-      // Scrape Node Exporter (Hardware metrics)
-      prometheus.scrape "node_exporter" {
-        targets    = discovery.relabel.node_exporter.output
-        forward_to = [prometheus.remote_write.prom.receiver]
-      }
-
 controller:
   type: daemonset
+  terminationGracePeriodSeconds: 60
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
 
-service:
+# Minimal persistence for sandbox
+persistence:
   enabled: true
-  type: ClusterIP
+  size: 5Gi
+  accessModes: [ReadWriteOnce]

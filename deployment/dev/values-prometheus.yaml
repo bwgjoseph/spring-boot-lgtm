@@ -3,11 +3,12 @@ server:
   remoteWriteReceiver: true
   
   # Set retention period
-  retention: "14d"
+  retention: "7d"
   
   # Prometheus server command-line flags
   # Leave empty to let the chart manage mandatory flags and avoid duplicates
-  extraArgs: {}
+  extraArgs:
+    web.enable-remote-write-receiver: ""
   
   # Prometheus configuration file contents
   config:

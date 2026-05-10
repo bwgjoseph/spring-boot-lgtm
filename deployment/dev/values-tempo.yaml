@@ -3,10 +3,10 @@ tempo:
   resources:
     requests:
       cpu: 10m
-      memory: 256Mi
+      memory: 128Mi
     limits:
       cpu: 500m
-      memory: 1Gi
+      memory: 512Mi
 
   livenessProbe:
     initialDelaySeconds: 60
@@ -44,7 +44,7 @@ config: |
         path: /var/tempo/wal
   compactor:
     compaction:
-      block_retention: 72h # 3 days
+      block_retention: 24h # 1 day
   distributor:
     receivers:
       otlp:

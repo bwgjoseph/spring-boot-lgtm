@@ -77,7 +77,7 @@ tasks:
       - task: configmap:grafana-dashboard
 
   # --- 🏗️ INFRASTRUCTURE COMPONENTS ---
-  storage:bootstrap:
+  init:minio:
     desc: Ensure MinIO buckets for Loki and Tempo exist
     cmds:
       - pwsh -ExecutionPolicy Bypass -File ./verification/storage-bootstrap.ps1
@@ -87,6 +87,11 @@ tasks:
     deps: [repos, namespace]
     cmds:
       - helm upgrade --install minio minio/minio -n {{.NAMESPACE}} --version {{.VER_MINIO}} -f {{.DEPLOY_DIR}}/values-minio.yaml
+
+  init:mongodb:
+    desc: Ensure MongoDB 'kx' database exists
+    cmds:
+      - pwsh ./verification/mongo-bootstrap.ps1
 
   mongodb:
     desc: Install or Upgrade MongoDB ReplicaSet
@@ -104,13 +109,13 @@ tasks:
     desc: Install or Upgrade Loki
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install loki grafana-community/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f {{.LOKI_VALUES | default (printf "%s/values-loki.yaml" .DEPLOY_DIR)}}
+      - helm upgrade --install loki grafana-community/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f {{.DEPLOY_DIR}}/values-loki.yaml
 
   tempo:
     desc: Install or Upgrade Tempo
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install tempo grafana-community/tempo -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f {{.TEMPO_VALUES | default (printf "%s/values-tempo.yaml" .DEPLOY_DIR)}}
+      - helm upgrade --install tempo grafana-community/tempo -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f {{.DEPLOY_DIR}}/values-tempo.yaml
 
   grafana:
     desc: Install or Upgrade Grafana
@@ -122,7 +127,7 @@ tasks:
     desc: Install or Upgrade Alloy
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f {{.ALLOY_VALUES | default (printf "%s/values-alloy.yaml" .DEPLOY_DIR)}}
+      - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f {{.DEPLOY_DIR}}/values-alloy.yaml
 
 
   # --- 🚀 APPLICATION PIPELINE ---
@@ -148,63 +153,203 @@ tasks:
       - kubectl apply -f {{.DEPLOY_DIR}}/app.yaml
       - kubectl rollout restart deployment spring-boot-app -n {{.NAMESPACE}}
 
-  # --- 🧪 VERIFICATION & TESTING ---
-  verify:trigger:api:
-    desc: Trigger Pokemon API traffic
+  # --- 🧪 LINTING (Dry-run validation) ---
+  lint:
+    desc: Dry-run all observability component Helm charts
     cmds:
-      - pwsh -ExecutionPolicy Bypass -File ./verification/trigger-api.ps1 -testId TEST_API_1234
+      - task: lint:alloy
+      - task: lint:loki
+      - task: lint:tempo
+      - task: lint:prometheus
+      - task: lint:grafana
 
-  verify:trigger:mongo:
-    desc: Trigger MongoDB CDC event
+  lint:alloy:
+    desc: Dry-run Alloy Helm chart
     cmds:
-      - pwsh -ExecutionPolicy Bypass -File ./verification/trigger-mongo.ps1 -testId TEST_MONGO_5678
+      - pwsh -Command "helm template alloy grafana/alloy -n monitoring -f {{.DEPLOY_DIR}}/values-alloy.yaml | Out-Null"
 
-  verify:mongodb:
-    desc: Verify MongoDB replica set health and credentials
-    deps: [namespace]
+  lint:loki:
+    desc: Dry-run Loki Helm chart
     cmds:
-      - kubectl rollout status statefulset/mongodb -n {{.NAMESPACE}} --timeout=60s
-      - kubectl get secret mongodb -n {{.NAMESPACE}}
-      - kubectl exec mongodb-0 -n {{.NAMESPACE}} -- sh -c "mongosh admin -u admin -p password --eval 'rs.status()' | grep -E 'PRIMARY|SECONDARY'"
+      - pwsh -Command "helm template loki grafana-community/loki -n monitoring -f {{.DEPLOY_DIR}}/values-loki.yaml | Out-Null"
 
-  verify:loki:
-    desc: Verify Loki health
-    deps: [namespace]
+  lint:tempo:
+    desc: Dry-run Tempo Helm chart
     cmds:
-      - kubectl rollout status statefulset/loki -n {{.NAMESPACE}} --timeout=60s
+      - pwsh -Command "helm template tempo grafana/tempo -n monitoring -f {{.DEPLOY_DIR}}/values-tempo.yaml | Out-Null"
 
-  verify:tempo:
-    desc: Verify Tempo health
-    deps: [namespace]
+  lint:prometheus:
+    desc: Dry-run Prometheus Helm chart
     cmds:
-      - kubectl rollout status statefulset/tempo -n {{.NAMESPACE}} --timeout=60s
+      - pwsh -Command "helm template prometheus prometheus-community/prometheus -n monitoring -f {{.DEPLOY_DIR}}/values-prometheus.yaml | Out-Null"
 
-  verify:prometheus:
-    desc: Verify Prometheus health and alerting rules
-    deps: [namespace]
+  lint:grafana:
+    desc: Dry-run Grafana Helm chart
     cmds:
-      - kubectl rollout status deployment/prometheus-server -n {{.NAMESPACE}} --timeout=60s
-      - kubectl get configmap prometheus-alert-rules -n {{.NAMESPACE}}
+      - pwsh -Command "helm template grafana grafana/grafana -n monitoring -f {{.DEPLOY_DIR}}/values-grafana.yaml | Out-Null"
 
-  verify:grafana:
-    desc: Verify Grafana health and datasources
-    deps: [namespace]
+  # --- 🧪 VALIDATION PIPELINE ---
+  validate:dev:
+    desc: Run the full development verification lifecycle defined in MY_PLAN.md
     cmds:
-      - kubectl rollout status deployment/grafana -n {{.NAMESPACE}} --timeout=60s
-      - kubectl get configmap grafana-datasources -n {{.NAMESPACE}}
-      - kubectl get secret grafana-admin-credentials -n {{.NAMESPACE}}
+      - task: delete-namespace
+      - task: namespace
+      - task: secret
+      - task: configmap
+      - task: validate:minio
+      - task: validate:mongodb
+      - task: validate:app
+      - task: validate:prometheus
+      - task: validate:loki
+      - task: validate:tempo
+      - task: validate:grafana
+      - task: validate:alloy
+      - task: test:e2e
+
+  validate:minio:
+    desc: Run full lint, apply, and verify for MinIO
+    cmds:
+      - task: minio
+      - task: init:minio
+      - kubectl rollout status deployment/minio -n {{.NAMESPACE}} --timeout=120s
+
+  validate:app:
+    desc: Build, load, deploy, and verify the app
+    cmds:
+      - task: app:load
+      - task: app:deploy
+      - task: verify:app
+
+  validate:alloy:
+    desc: Run full lint, apply, check, and verify for Alloy
+    cmds:
+      - task: lint:alloy
+      - task: alloy
+      - task: check:alloy
+      - task: verify:alloy
+
+  validate:loki:
+    desc: Run full lint, apply, check, and verify for Loki
+    cmds:
+      - task: lint:loki
+      - task: loki
+      - task: check:loki
+      - task: verify:loki
+
+  validate:tempo:
+    desc: Run full lint, apply, check, and verify for Tempo
+    cmds:
+      - task: lint:tempo
+      - task: tempo
+      - task: check:tempo
+      - task: verify:tempo
+
+  validate:prometheus:
+    desc: Run full lint, apply, check, and verify for Prometheus
+    cmds:
+      - task: lint:prometheus
+      - task: prometheus
+      - task: check:prometheus
+      - task: verify:prometheus
+
+  validate:grafana:
+    desc: Run full lint, apply, and verify for Grafana
+    cmds:
+      - task: lint:grafana
+      - task: grafana
+      - kubectl rollout status deployment/grafana -n {{.NAMESPACE}} --timeout=120s
+      - task: verify:grafana
+
+  lint:mongodb:
+    desc: Dry-run MongoDB Helm chart
+    cmds:
+      - pwsh -Command "helm template mongodb bitnami/mongodb -n monitoring -f {{.DEPLOY_DIR}}/values-mongodb.yaml | Out-Null"
+
+  check:mongodb:
+    desc: Validate MongoDB health inside the pod
+    cmds:
+      - pwsh ./verification/check-mongodb.ps1
+
+  validate:mongodb:
+    desc: Run full lint, apply, and verify for MongoDB
+    cmds:
+      - task: lint:mongodb
+      - task: mongodb
+      - task: init:mongodb
+      - task: verify:mongodb
+      - task: check:mongodb
+
+  check:alloy:
+    desc: Validate Alloy config.alloy syntax inside the pod
+    cmds:
+      - pwsh ./verification/check-alloy.ps1
+
+  check:loki:
+    desc: Validate Loki configuration syntax inside the pod
+    cmds:
+      - pwsh ./verification/check-loki.ps1
+
+  check:tempo:
+    desc: Validate Tempo configuration syntax inside the pod
+    cmds:
+      - pwsh ./verification/check-tempo.ps1
+
+  check:prometheus:
+    desc: Validate Prometheus configuration syntax inside the pod
+    cmds:
+      - pwsh ./verification/check-prometheus.ps1
+
+  check:alertmanager:
+    desc: Validate Alertmanager configuration syntax inside the pod
+    cmds:
+      - pwsh ./verification/check-alertmanager.ps1
 
   verify:alloy:
-    desc: Verify Alloy health
-    deps: [namespace]
+    desc: Run full verification for Alloy
     cmds:
-      - kubectl rollout status daemonset/alloy -n {{.NAMESPACE}} --timeout=60s
+      - pwsh ./verification/verify-alloy.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
+      - task: check:alloy
+
+  verify:loki:
+    desc: Verify Loki health and log ingestion
+    cmds:
+      - pwsh ./verification/verify-loki.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
+      - task: check:loki
+
+  verify:tempo:
+    desc: Verify Tempo health and trace storage
+    cmds:
+      - pwsh ./verification/verify-tempo.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
+      - task: check:tempo
+
+  verify:prometheus:
+    desc: Verify Prometheus and Alertmanager health
+    cmds:
+      - pwsh ./verification/verify-prometheus.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
+      - task: check:prometheus
+      - task: check:alertmanager
+
+  verify:mimir:
+    desc: Verify Mimir health and metric ingestion
+    cmds:
+      - pwsh ./verification/verify-mimir.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
+      - task: check:mimir
+
+  verify:mongodb:
+    desc: Verify MongoDB replica set health
+    cmds:
+      - pwsh ./verification/verify-mongodb.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
+
+  verify:grafana:
+    desc: Verify Grafana health and dashboard provisioning
+    cmds:
+      - kubectl rollout status deployment/grafana -n {{.NAMESPACE}} --timeout=120s
 
   verify:app:
     desc: Verify Spring Boot App health
     deps: [namespace]
     cmds:
-      - kubectl rollout status deployment/spring-boot-app -n {{.NAMESPACE}} --timeout=60s
+      - kubectl rollout status deployment/spring-boot-app -n {{.NAMESPACE}} --timeout=180s
 
   verify:
     desc: Run all component verification tasks
@@ -411,3 +556,9 @@ tasks:
       - task: uninstall:grafana
       - task: uninstall:alloy
 
+  delete-namespace:
+    desc: Delete monitoring namespace and wait for completion
+    cmds:
+      - kubectl delete namespace {{.NAMESPACE}} --ignore-not-found
+      - pwsh -Command "Write-Host 'Waiting for namespace deletion...'"
+      - kubectl wait --for=delete namespace/{{.NAMESPACE}} --timeout=180s

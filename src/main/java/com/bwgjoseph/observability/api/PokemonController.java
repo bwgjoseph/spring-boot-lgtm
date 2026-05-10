@@ -24,9 +24,9 @@ public class PokemonController {
 
     @Observed(name = "pokemon.controller", contextualName = "get-pokemon")
     @GetMapping("/pokemon/{id}")
-    public Pokemon get(@PathVariable String id, @AuthenticationPrincipal UserDetails user) {
+    public Pokemon get(@PathVariable String id, @org.springframework.web.bind.annotation.RequestParam(required = false) String test_id, @AuthenticationPrincipal UserDetails user) {
         log.info("User is {}", user);
-        log.info("Controller received request for ID: {}", id);
+        log.info("Controller received request for ID: {} with test_id: {}", id, test_id);
 
         Pokemon ditto = this.pokemonAPI.getPokemon(id);
 
