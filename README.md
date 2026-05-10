@@ -144,15 +144,27 @@ This project contains specialized configurations to handle hardware and mount pr
 4. **Debezium Metrics:**
    - Search for `debezium_streaming_total_number_of_events_seen` in Prometheus to track CDC health.
 
-## ⚙️ Production Tuning
+## ⚙️ Lifecycle Management
 
-When moving from this sandbox to a real production environment, consider the following adjustments:
+The stack follows a standardized lifecycle for every component (`alloy`, `loki`, `tempo`, `mimir`, `grafana`). Use these tasks to manage your environment:
 
-### Service Graph (values-tempo.yaml)
-The current settings are optimized for immediate feedback in a low-traffic sandbox. In production, Tempo's `metricsGenerator` ring should be backed by a persistent store like Etcd or memberlist.
+| Action | Command | Description |
+| :--- | :--- | :--- |
+| **Deploy** | `task <component>` | Installs/Upgrades the component using Helm. |
+| **Verify** | `task verify:<component> [ENV=prod] [MODE=full]` | Runs modular smoke-tests (ENV: dev/prod, MODE: full/semi). |
+| **Uninstall**| `task uninstall:<component>` | Removes the component and its persistent storage. |
 
-### Tail-based Sampling (values-alloy.yaml)
-The sandbox captures 100% of traces. In production, you should dial back the `probabilistic` sampling percentage (e.g., `1%` to `10%`) for successful requests while keeping `sample-errors` at 100%.
+*Example: Manage Alloy*
+```bash
+task alloy              # Deploy/Upgrade
+task verify:alloy       # Validate status and config
+task uninstall:alloy    # Clean up
+```
 
-### Resource Attributes (deployment.yaml)
-Custom attributes are set via `OTEL_RESOURCE_ATTRIBUTES`. In production, these should be dynamically populated via Helm values or CI/CD pipelines.
+## ⚙️ Moving to Production
+
+This project includes a production-hardened framework. When migrating from the local sandbox to a production cluster, do not rely on manual tuning; instead, follow the formal architecture and requirements documentation:
+
+👉 **[System Architecture (ARCHITECTURE.md)](./ARCHITECTURE.md)**
+👉 **[Component-Specific Decisions (ADR/)](./ADR/)**
+👉 **[Production Requirements (REQUIREMENTS.md)](./REQUIREMENTS.md)**
