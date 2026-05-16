@@ -1,23 +1,26 @@
-# Loki Deployment Mode: SimpleScalable separates read/write/backend for independent scaling
-# Loki Deployment Mode: SimpleScalable separates read/write/backend for independent scaling
 deploymentMode: SimpleScalable
 
+# Caching disabled to fit local resource constraints.
+# TO_RESOLVE: Re-enable and correctly map resources for Memcached sub-chart.
 chunksCache:
-  enabled: true
-  memcached:
-    replicas: 3
+  enabled: false
 
 resultsCache:
-  enabled: true
-  memcached:
-    replicas: 3
+  enabled: false
 
 loki:
   auth_enabled: false
-  
-  # HA configuration: 3 replicas ensure zero data loss on pod failure
+
   commonConfig:
-    replication_factor: 3
+    replication_factor: 1
+
+  # Local Sandbox Tuning: Aggressive flushes for verification scripts.
+  # Production Recommendation: Use default (e.g., chunk_idle_period: 30m, max_chunk_age: 1h)
+  # to reduce S3 API pressure and object storage overhead.
+  ingester:
+    chunk_idle_period: 1m
+    max_chunk_age: 1m
+    flush_op_timeout: 10s
 
   # Enable memberlist service for clustering/gossip protocol
   memberlist:
@@ -34,10 +37,10 @@ loki:
         secretKeyRef:
           name: minio
           key: rootPassword
-  
+
   # Production Guardrails & Retention Policy
   limits_config:
-    retention_period: 720h # 30 days
+    retention_period: 72h # 3 days
     max_query_parallelism: 32
     max_streams_per_user: 0
     reject_old_samples: true
@@ -78,9 +81,8 @@ loki:
           prefix: index_
           period: 24h
 
-# Write path: scaled to 3 replicas for high-availability ingestion
 write:
-  replicas: 3
+  replicas: 1
   extraEnv:
     - name: S3_SECRET_KEY
       valueFrom:
@@ -89,15 +91,14 @@ write:
           key: rootPassword
   resources:
     requests:
-      cpu: 200m
-      memory: 512Mi
+      cpu: 50m
+      memory: 128Mi
     limits:
-      cpu: 1
-      memory: 1Gi
+      cpu: 500m
+      memory: 512Mi
 
-# Read path: scaled to 3 replicas for consistent search performance
 read:
-  replicas: 3
+  replicas: 1
   extraEnv:
     - name: S3_SECRET_KEY
       valueFrom:
@@ -106,15 +107,14 @@ read:
           key: rootPassword
   resources:
     requests:
-      cpu: 200m
-      memory: 512Mi
+      cpu: 50m
+      memory: 128Mi
     limits:
-      cpu: 1
-      memory: 1Gi
+      cpu: 500m
+      memory: 512Mi
 
-# Backend path: handles compactor and indexing logic
 backend:
-  replicas: 3
+  replicas: 1
   extraEnv:
     - name: S3_SECRET_KEY
       valueFrom:
@@ -123,18 +123,17 @@ backend:
           key: rootPassword
   resources:
     requests:
-      cpu: 200m
-      memory: 512Mi
+      cpu: 50m
+      memory: 128Mi
     limits:
-      cpu: 1
-      memory: 1Gi
+      cpu: 500m
+      memory: 512Mi
 
 # Gateway: Nginx ingress for external/internal traffic routing
 gateway:
   enabled: true
-  replicas: 3
+  replicas: 1
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
-
+      cpu: 50m
+      memory: 128Mi

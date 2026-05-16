@@ -86,7 +86,7 @@ tasks:
     desc: Install or Upgrade MinIO
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install minio minio/minio -n {{.NAMESPACE}} --version {{.VER_MINIO}} -f {{.DEPLOY_DIR}}/values-minio.yaml
+      - helm upgrade --install minio minio/minio -n {{.NAMESPACE}} --version {{.VER_MINIO}} -f deployment/{{.ENV}}/values-minio.yaml
 
   init:mongodb:
     desc: Ensure MongoDB 'kx' database exists
@@ -97,37 +97,37 @@ tasks:
     desc: Install or Upgrade MongoDB ReplicaSet
     deps: [namespace, secret:mongodb]
     cmds:
-      - helm upgrade --install mongodb bitnami/mongodb -n {{.NAMESPACE}} --version {{.VER_MONGODB}} -f {{.DEPLOY_DIR}}/values-mongodb.yaml
+      - helm upgrade --install mongodb bitnami/mongodb -n {{.NAMESPACE}} --version {{.VER_MONGODB}} -f deployment/{{.ENV}}/values-mongodb.yaml
 
   prometheus:
     desc: Install or Upgrade Prometheus
     deps: [repos, namespace, configmap:prometheus-alert]
     cmds:
-      - helm upgrade --install prometheus prometheus-community/prometheus -n {{.NAMESPACE}} --version {{.VER_PROMETHEUS}} -f {{.DEPLOY_DIR}}/values-prometheus.yaml
+      - helm upgrade --install prometheus prometheus-community/prometheus -n {{.NAMESPACE}} --version {{.VER_PROMETHEUS}} -f deployment/{{.ENV}}/values-prometheus.yaml
 
   loki:
     desc: Install or Upgrade Loki
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install loki grafana-community/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f {{.DEPLOY_DIR}}/values-loki.yaml
+      - helm upgrade --install loki grafana-community/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f deployment/{{.ENV}}/values-loki.yaml
 
   tempo:
     desc: Install or Upgrade Tempo
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install tempo grafana-community/tempo -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f {{.DEPLOY_DIR}}/values-tempo.yaml
+      - helm upgrade --install tempo grafana-community/tempo -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f deployment/{{.ENV}}/values-tempo.yaml
 
   grafana:
     desc: Install or Upgrade Grafana
     deps: [repos, namespace, secret:grafana]
     cmds:
-      - helm upgrade --install grafana grafana-community/grafana -n {{.NAMESPACE}} --version {{.VER_GRAFANA}} -f {{.DEPLOY_DIR}}/values-grafana.yaml
+      - helm upgrade --install grafana grafana-community/grafana -n {{.NAMESPACE}} --version {{.VER_GRAFANA}} -f deployment/{{.ENV}}/values-grafana.yaml
 
   alloy:
     desc: Install or Upgrade Alloy
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f {{.DEPLOY_DIR}}/values-alloy.yaml
+      - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f deployment/{{.ENV}}/values-alloy.yaml
 
 
   # --- 🚀 APPLICATION PIPELINE ---
@@ -146,7 +146,7 @@ tasks:
     desc: Deploy the Spring Boot application to Kubernetes
     deps: [namespace]
     cmds:
-      - kubectl apply -f {{.DEPLOY_DIR}}/app.yaml
+      - kubectl apply -f deployment/{{.ENV}}/app.yaml
       - kubectl rollout restart deployment spring-boot-app -n {{.NAMESPACE}}
 
   # --- 🧪 LINTING (Dry-run validation) ---
@@ -162,27 +162,27 @@ tasks:
   lint:alloy:
     desc: Dry-run Alloy Helm chart
     cmds:
-      - pwsh -Command "helm template alloy grafana/alloy -n monitoring -f {{.DEPLOY_DIR}}/values-alloy.yaml | Out-Null"
+      - pwsh -Command "helm template alloy grafana/alloy -n monitoring -f deployment/{{.ENV}}/values-alloy.yaml | Out-Null"
 
   lint:loki:
     desc: Dry-run Loki Helm chart
     cmds:
-      - pwsh -Command "helm template loki grafana-community/loki -n monitoring -f {{.DEPLOY_DIR}}/values-loki.yaml | Out-Null"
+      - pwsh -Command "helm template loki grafana-community/loki -n monitoring -f deployment/{{.ENV}}/values-loki.yaml | Out-Null"
 
   lint:tempo:
     desc: Dry-run Tempo Helm chart
     cmds:
-      - pwsh -Command "helm template tempo grafana-community/tempo -n monitoring -f {{.DEPLOY_DIR}}/values-tempo.yaml | Out-Null"
+      - pwsh -Command "helm template tempo grafana-community/tempo -n monitoring -f deployment/{{.ENV}}/values-tempo.yaml | Out-Null"
 
   lint:prometheus:
     desc: Dry-run Prometheus Helm chart
     cmds:
-      - pwsh -Command "helm template prometheus prometheus-community/prometheus -n monitoring -f {{.DEPLOY_DIR}}/values-prometheus.yaml | Out-Null"
+      - pwsh -Command "helm template prometheus prometheus-community/prometheus -n monitoring -f deployment/{{.ENV}}/values-prometheus.yaml | Out-Null"
 
   lint:grafana:
     desc: Dry-run Grafana Helm chart
     cmds:
-      - pwsh -Command "helm template grafana grafana/grafana -n monitoring -f {{.DEPLOY_DIR}}/values-grafana.yaml | Out-Null"
+      - pwsh -Command "helm template grafana grafana/grafana -n monitoring -f deployment/{{.ENV}}/values-grafana.yaml | Out-Null"
 
   # --- 🧪 VALIDATION PIPELINE ---
   validate:dev:
@@ -259,7 +259,7 @@ tasks:
   lint:mongodb:
     desc: Dry-run MongoDB Helm chart
     cmds:
-      - pwsh -Command "helm template mongodb bitnami/mongodb -n monitoring -f {{.DEPLOY_DIR}}/values-mongodb.yaml | Out-Null"
+      - pwsh -Command "helm template mongodb bitnami/mongodb -n monitoring -f deployment/{{.ENV}}/values-mongodb.yaml | Out-Null"
 
   check:mongodb:
     desc: Validate MongoDB health inside the pod
@@ -558,3 +558,58 @@ tasks:
       - kubectl delete namespace {{.NAMESPACE}} --ignore-not-found
       - pwsh -Command "Write-Host 'Waiting for namespace deletion...'"
       - kubectl wait --for=delete namespace/{{.NAMESPACE}} --timeout=180s
+
+  # --- ?? SURGICAL SWAP TASKS ---
+  swap:loki:
+    desc: Swap Loki from FROM=dev to TO=prod-local for HA verification
+    vars:
+      FROM: '{{.FROM | default "dev"}}'
+      TO: '{{.TO | default "prod-local"}}'
+    cmds:
+      - task: uninstall:loki
+      - pwsh ./verification/storage-bootstrap.ps1 -wipe loki
+      - task: loki
+        vars: { ENV: '{{.TO}}' }
+      - task: verify:loki
+        vars: { ENV: '{{.TO}}' }
+
+  swap:tempo:
+    desc: Swap Tempo from FROM=dev to TO=prod-local for HA verification
+    vars:
+      FROM: '{{.FROM | default "dev"}}'
+      TO: '{{.TO | default "prod-local"}}'
+    cmds:
+      - task: uninstall:tempo
+      - pwsh ./verification/storage-bootstrap.ps1 -wipe tempo
+      - task: tempo
+        vars: { ENV: '{{.TO}}' }
+      - task: verify:tempo
+        vars: { ENV: '{{.TO}}' }
+
+  swap:alloy:
+    desc: Swap Alloy from FROM=dev to TO=prod-local for HA verification
+    vars:
+      FROM: '{{.FROM | default "dev"}}'
+      TO: '{{.TO | default "prod-local"}}'
+    cmds:
+      - task: uninstall:alloy
+      - task: alloy
+        vars: { ENV: '{{.TO}}' }
+      - task: verify:alloy
+        vars: { ENV: '{{.TO}}' }
+
+  swap:mimir:
+    desc: Swap Mimir (Prometheus -> Mimir Monolithic)
+    vars:
+      FROM: '{{.FROM | default "dev"}}'
+      TO: '{{.TO | default "prod-local"}}'
+    cmds:
+      - task: uninstall:prometheus
+      - pwsh ./verification/storage-bootstrap.ps1 -wipe mimir
+      - task: mimir
+        vars: { ENV: '{{.TO}}' }
+      # Update Grafana to use HA endpoints and Mimir
+      - kubectl create configmap grafana-datasources --from-file=datasources=deployment/prod-local/datasources-prod-local.yaml -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl rollout restart deployment/grafana -n {{.NAMESPACE}}
+      - task: verify:mimir
+        vars: { ENV: '{{.TO}}' }
