@@ -8,13 +8,15 @@ Write-Host "--- Verifying Tempo ($Env Mode: $Mode) ---" -ForegroundColor Cyan
 # Detection
 # In the current dev setup, the statefulset is named 'tempo'. 
 # In scalable mode, we expect separate read/write components.
-$isScalable = (kubectl get deployment -n monitoring -l app.kubernetes.io/component=query-frontend -o name).Length -gt 0
+# Detection
+$tempoPods = kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo -o name
+$isScalable = ($tempoPods.Length -gt 1)
 $mode = if ($isScalable) { "scalable-monolithic" } else { "single-binary" }
 
 Write-Host "  - Detected Topology: $mode"
 
 # 1. Health
-$comp = if ($isScalable) { "deployment/tempo-query-frontend" } else { "statefulset/tempo" }
+$comp = if ($isScalable) { "statefulset/tempo" } else { "statefulset/tempo" }
 kubectl rollout status $comp -n monitoring --timeout=60s
 
 # 2. Traffic Simulation
@@ -27,8 +29,9 @@ if ($Mode -eq "full") {
 # 3. Memberlist / Ring check
 if ($isScalable) {
     $pod = kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo -o name | Select-Object -First 1
-    $ring = kubectl exec -n monitoring $pod -- curl -s http://localhost:3200/ring | Select-String "HEALTHY"
-    if ($ring) { Write-Host "  - [✓] Memberlist Ring: Healthy." } else { Write-Warning "  - Memberlist Ring: Unhealthy." }
+    # Check ring status using wget if available, or just check pod readiness
+    $ring = kubectl exec -n monitoring $pod -- wget -qO- http://localhost:3200/ring 2>$null | Select-String "HEALTHY"
+    if ($ring) { Write-Host "  - [✓] Memberlist Ring: Healthy." } else { Write-Warning "  - Memberlist Ring: Unhealthy (check manually)." }
 }
 
 # 4. S3 check

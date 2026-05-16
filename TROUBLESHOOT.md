@@ -124,18 +124,20 @@ If you cannot login to Grafana:
 1.  In `deployment/datasources.yaml`, ensure `spanStartTimeShift` is set to a negative value (e.g., `-5s`) and `spanEndTimeShift` is set to a positive value (e.g., `5s`).
 2.  This expands the search window around the span, increasing the chance of finding correlated logs.
 
-### Tempo Retention Period Configuration
-**Symptom:** Tempo pod fails to start with `field compaction not found in type storage.Config` or `field compaction not found in type app.Config`. Or, traces are not being pruned after the expected period.
-**Cause:** The `compaction` block was incorrectly placed under `storage` or at the top level. In Tempo 2.x, `compaction` settings must be nested within a top-level `compactor` block.
+### Tempo: "Field not found" Schema Errors
+**Symptom:** Pods crash with `failed parsing config... field not found in type ...`.
+**Cause:** Tempo 2.x enforces a strict configuration schema. Legacy fields (e.g., `search_finished_blocks`, `max_spans_per_trace`) have been removed or relocated to prevent OOM errors and configuration drift.
 **Resolution:**
-1.  In `values-tempo.yaml`, ensure the `compactor` block is defined at the top level of the `config` string.
-2.  Nest the `compaction` block inside `compactor`.
-    ```yaml
-    compactor:
-      compaction:
-        block_retention: 72h # 3 days
-    ```
-3.  Redeploy Tempo using `task tempo`.
+1.  Check pod logs (`kubectl logs <pod-name> -c tempo`) to identify the exact field causing the `unmarshal error`.
+2.  Remove or move the invalid field. Use the official [Tempo Configuration Reference](https://grafana.com/docs/tempo/latest/configuration/) to verify the correct schema.
+3.  Force restart the pod to trigger a fresh ConfigMap mount: `kubectl delete pod <pod-name> --force --grace-period=0`.
+
+### Tempo: "CrashLoopBackOff" on Config Change
+**Symptom:** Pod fails to start after updating `values-tempo.yaml`.
+**Cause:** Kubernetes ConfigMap volume mounts are not immediately refreshed when the ConfigMap is updated. The pod may be holding a stale volume snapshot.
+**Resolution:**
+1.  Verify the ConfigMap content: `kubectl get cm tempo -o yaml`.
+2.  If the ConfigMap is correct but the pod is still failing, manually delete the pod to force a re-mount: `kubectl delete pod <pod-name> --force --grace-period=0`.
 
 ### TraceQL metrics not configured / local-blocks processor not found
 **Symptom:** Grafana Traces Drilldown page shows "TraceQL metrics not configured" or "localblocks processor not found".

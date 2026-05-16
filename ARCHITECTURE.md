@@ -17,9 +17,9 @@ Optimized for resource efficiency and rapid feedback loops.
 
 ### B. Production / HA (Prod)
 Optimized for durability, high-availability, and long-term retention.
-- **Loki:** `SimpleScalable` mode. Includes distributed read/write/backend components, Memcached caching for queries/chunks, and replication factor of 3.
-- **Tempo:** `Scalable Monolithic` mode with 3 replicas and Memberlist gossip coordination.
-- **Mimir:** Monolithic HA-ready deployment.
+- **Loki:** `SimpleScalable` mode. Includes distributed read/write/backend components, Memcached caching for queries/chunks, and replication factor of 3 (min 2 for sandbox HA validation).
+- **Tempo:** `Scalable Monolithic` mode with 3 replicas (min 2 for sandbox HA validation), Memberlist gossip coordination, and Memcached-backed search.
+- **Mimir:** Monolithic HA-ready deployment using S3 block storage.
 - **Alloy:** Clustered DaemonSet (2+ replicas) with Gossip protocol enabled for trace affinity.
 - **Persistence:** S3-native object storage (MinIO/AWS S3) with compactor-enforced physical retention.
 

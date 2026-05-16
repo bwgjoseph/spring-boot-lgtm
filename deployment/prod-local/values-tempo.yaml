@@ -1,5 +1,5 @@
-# Tempo Deployment: Scalable Monolithic (Single Binary) with 3 replicas for HA
-replicas: 3
+# Tempo Deployment: Scalable Monolithic (Single Binary) with 2 replicas for HA
+replicas: 2
 
 tempo:
   # Configuration expansion to support environment variables in values
@@ -17,11 +17,11 @@ tempo:
   # Resource allocations sized for high-throughput ingestion and metrics generation
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 250m
+      memory: 512Mi
     limits:
-      cpu: 2
-      memory: 4Gi
+      cpu: 1
+      memory: 1Gi
 
   # Termination grace period for reliable WAL flushing to S3
   terminationGracePeriodSeconds: 60
@@ -59,7 +59,7 @@ config: |
       ring:
         kvstore:
           store: memberlist # Transition to memberlist for HA resilience
-        replication_factor: 3
+        replication_factor: 2
 
   metrics_generator:
     storage:
@@ -76,4 +76,4 @@ config: |
 # Persistence: High-IOPS SSD volume for WAL durability
 persistence:
   enabled: true
-  size: 20Gi
+  size: 5Gi
