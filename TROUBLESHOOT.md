@@ -2,7 +2,7 @@
 
 This guide documents known issues and resolutions encountered while developing and deploying the Spring Boot LGTM stack.
 
-## 🚀 Image Pull Issues (KinD / Docker Desktop)
+## 🚀 Image Pull Issues (KinD / Docker / Rancher Desktop)
 
 ### Symptom
 The application pod stays in `ImagePullBackOff` or `ErrImagePull` state, even though the image was successfully built locally using `.\mvnw jib:dockerBuild`.
@@ -15,46 +15,30 @@ Events:
 ```
 
 ### Root Cause
-If your Kubernetes cluster is running as a **KinD (Kubernetes in Docker)** node (e.g., node name is `desktop-control-plane`), it uses an internal container runtime (`containerd`) that is isolated from your host's Docker daemon. 
-
-Even if you are using the `docker-desktop` context, newer versions of Docker Desktop may run a KinD-like architecture where images built to the host daemon are not automatically available to the Kubernetes nodes.
+1.  **KinD / Isolated Runtime:** If your Kubernetes cluster uses an internal container runtime (like `containerd` inside a Docker container) that is isolated from your host's Docker daemon, the image must be explicitly "sideloaded".
+2.  **Rancher/Docker Desktop (Moby):** If you use the Docker (moby) engine, the daemon is usually shared, and sideloading is automatic. However, if the node hostname doesn't match the expected Docker container name, manual `docker cp` commands will fail.
 
 ### Resolution
+The project includes a smart sideloading script that automatically detects your environment.
 
-#### Option A: Using `kind` CLI (Preferred)
-If you have the `kind` binary installed, run:
+**Run the automated task:**
 ```powershell
-kind load docker-image spring-boot-app:demo --name kind
+task app:load
 ```
 
-#### Option B: Manual Load (If `kind` is missing)
-If `kind` is not available, follow these manual steps to bridge the host daemon and the node runtime:
+This task calls `verification/sideload-image.ps1`, which:
+- Checks if the Kubernetes node is a Docker container (like `kind-control-plane`).
+- If yes: Saves, copies, and imports the image using `ctr`.
+- If no (shared daemon like Rancher Desktop): Skips sideloading as the image is already available.
 
-1.  **Save the image to a tarball:**
-    ```powershell
-    docker save spring-boot-app:demo -o spring-boot-app.tar
-    ```
-
-2.  **Copy the tarball into the node container:**
-    ```powershell
-    docker cp spring-boot-app.tar desktop-control-plane:/spring-boot-app.tar
-    ```
-
-3.  **Import the image into the node's `containerd` runtime:**
-    ```powershell
-    docker exec desktop-control-plane ctr -n k8s.io images import /spring-boot-app.tar
-    ```
-
-4.  **Clean up:**
-    ```powershell
-    rm spring-boot-app.tar
-    docker exec desktop-control-plane rm /spring-boot-app.tar
-    ```
-
-### Verification
-Verify that the image is now visible to the cluster:
+### Manual Verification
+Verify that the image is visible to the cluster:
 ```powershell
-docker exec desktop-control-plane crictl images | Select-String "spring-boot-app"
+# For containerized nodes (kind)
+docker exec <node-container-name> crictl images | Select-String "spring-boot-app"
+
+# For shared daemon nodes (Rancher/Docker Desktop)
+docker images spring-boot-app:demo
 ```
 
 ## 🔍 General Connectivity
@@ -71,6 +55,27 @@ If you cannot login to Grafana:
 2.  Note that the default username is always `admin`.
 
 ## 📈 Observability Issues
+
+### Loki: "No data found in 'loki' bucket" (Verification Warning)
+**Symptom:** `task verify:loki` reports `WARNING: - No data found in 'loki' bucket`.
+**Cause:** Loki buffers logs in memory/WAL and only flushes to S3 every 30m-2h by default. In a dev environment, the verification script (waiting 60s) finishes before the flush occurs.
+**Resolution:**
+1.  Ensure `deployment/dev/values-loki.yaml` has aggressive ingester settings for dev:
+    ```yaml
+    ingester:
+      chunk_idle_period: 30s
+      max_chunk_age: 1m
+    ```
+2.  Restart Loki after applying: `kubectl rollout restart statefulset/loki -n monitoring`.
+3.  **Path Note:** The script searches the **root** of the bucket (looking for the `fake/` tenant prefix) because TSDB schema with authentication disabled does not use a `chunks/` subfolder.
+
+### Alloy: "Logs: No log processing detected" (Verification Warning)
+**Symptom:** `task verify:alloy` reports `WARNING: - Logs: No log processing detected`.
+**Cause:** This usually means Alloy is not successfully tailing files or is failing to push them to Loki.
+**Resolution:**
+1.  **Check Metrics:** The project uses `loki_write_sent_entries_total` to verify the log pipeline. Verify this metric in the Alloy UI (`localhost:12345`).
+2.  **Check Logs:** Confirm Alloy is discoverying and tailing pods: `kubectl logs -l app.kubernetes.io/name=alloy -n monitoring`.
+3.  **Check RBAC:** Ensure Alloy has `get`, `list`, and `watch` permissions for `pods` and `namespaces` (handled by the Helm chart, but verify if using custom RBAC).
 
 ### Loki 502 Bad Gateway / OOMKilled
 **Symptom:** Grafana shows a `502 Bad Gateway` when querying Loki logs.

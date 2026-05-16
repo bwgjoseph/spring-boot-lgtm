@@ -30,11 +30,13 @@ try {
     $metrics = Invoke-RestMethod -Uri 'http://localhost:12345/metrics' -ErrorAction Stop
     
     # Assertions
-    $logs = $metrics -match "loki_source_kubernetes_targets_total"
+    # We check loki_write_sent_entries_total because it confirms the whole pipeline 
+    # (discovery -> source -> process -> write) is working.
+    $logs = $metrics -match "loki_write_sent_entries_total"
     $metricsScraped = $metrics -match "prometheus_target_interval_length_seconds_count"
     $spans = $metrics -match "otelcol_receiver_accepted_spans"
 
-    if ($logs) { Write-Host "  - [✓] Logs: Targets discovered." } else { Write-Warning "  - Logs: No log targets found." }
+    if ($logs) { Write-Host "  - [✓] Logs: Pipeline active." } else { Write-Warning "  - Logs: No log processing detected." }
     if ($metricsScraped) { Write-Host "  - [✓] Metrics: Scraping active." } else { Write-Warning "  - Metrics: No scraping detected." }
     if ($spans) { Write-Host "  - [✓] Traces: OTLP spans accepted." } else { Write-Warning "  - Traces: No spans accepted." }
 } finally {

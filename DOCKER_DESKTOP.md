@@ -1,23 +1,31 @@
-# 🐳 Docker Desktop Configuration Guide
+# 🐳 Docker & Rancher Desktop Configuration Guide
 
-This project contains specific configurations to ensure the Grafana LGTM stack runs smoothly on **Docker Desktop (Windows/macOS)**. These settings bypass certain hardware-level restrictions inherent in the Docker Desktop virtualization layer.
+This project contains specific configurations to ensure the Grafana LGTM stack runs smoothly on **Docker Desktop** or **Rancher Desktop** (Windows/macOS). These settings bypass certain hardware-level restrictions or architectural differences in local Kubernetes distributions.
 
-## 🛠️ Docker Desktop Specifics
+## 🛠️ Local Engine Specifics
 
-### 1. Node Exporter: `hostRootFsMount`
+### 1. Image Sideloading (The `app:load` task)
+Depending on your local engine, images built by the host may or may not be available to Kubernetes:
+- **Rancher Desktop (with Docker/Moby):** The Docker daemon is shared. Images are available immediately.
+- **Docker Desktop (WSL2):** Usually shares the daemon. Images are available immediately.
+- **KinD / Isolated Runtimes:** Images must be explicitly sideloaded into the node.
+
+**The Solution:** Use `task app:load`. It calls a smart script (`verification/sideload-image.ps1`) that detects your cluster type and only performs a sideload if necessary.
+
+### 2. Node Exporter: `hostRootFsMount`
 *   **Location:** `deployment/values-prometheus.yaml`
 *   **Setting:** `prometheus-node-exporter.hostRootFsMount.enabled: false`
-*   **Why?** Node Exporter typically tries to mount the host's root file system (`/`) to monitor disk usage. It requires "shared" mount propagation. Docker Desktop's virtual machine does not support this type of propagation for the root path, causing the pod to crash with `ContainerCannotRun`.
-*   **Production Move:** Set this back to `true` on Linux-based Kubernetes clusters (EKS, GKE, Bare Metal) to get full disk monitoring.
+*   **Why?** Node Exporter typically tries to mount the host's root file system (`/`) to monitor disk usage. Docker Desktop's virtual machine does not support this type of propagation for the root path, causing the pod to crash with `ContainerCannotRun`.
+*   **Production Move:** Set this back to `true` on standard Linux clusters (EKS, GKE, Bare Metal).
 
-### 2. Alloy: `insecure_skip_verify` for Kubelet
+### 3. Alloy: `insecure_skip_verify` for Kubelet
 *   **Location:** `deployment/values-alloy.yaml`
-*   **Setting:** `insecure_skip_verify: true` (under `prometheus.scrape "cadvisor"` and `"kubelet"`)
-*   **Why?** The Kubelet on Docker Desktop serves metrics over HTTPS using a self-signed certificate that is usually bound to an internal IP or hostname that doesn't match the discovery target.
-*   **Production Move:** On production clusters, you should ideally use the internal Cluster CA (`/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`) and verify the hostname if the infrastructure provides stable DNS for nodes.
+*   **Setting:** `insecure_skip_verify: true`
+*   **Why?** The Kubelet on local clusters often serves metrics over HTTPS using self-signed certificates that don't match the internal hostname.
+*   **Production Move:** Use the internal Cluster CA for verification.
 
-### 3. Resource Allocation
-Running the full LGTM stack (Prometheus, Loki, Tempo, Grafana) plus Alloy and a Spring Boot app can be resource-intensive.
+## 🚀 Resource Allocation
+...
 *   **Recommendation:** Ensure Docker Desktop is allocated at least **8GB of RAM** and **4 CPUs**.
 *   **Symptoms of Low Memory:** Alloy pods may enter `OOMKilled` state or Prometheus may experience "Write Ahead Log" (WAL) corruption.
 

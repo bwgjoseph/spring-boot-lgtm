@@ -58,3 +58,4 @@ This stack is governed by individual Architectural Decision Records (ADRs). Use 
 - **Standardized Ingestion:** All components prioritize S3-native storage to separate compute from durability.
 - **Trace Correlation:** Cross-stack navigation is enabled via mandatory `trace_id` promotion to Structured Metadata (Loki) and Exemplars (Mimir).
 - **Production Guardrails:** Each component is locked to mandatory resource/cardinality limits defined in its respective ADR to prevent cluster instability.
+- **Developer Lifecycle:** Local sandbox environments use optimized flush intervals (e.g., `chunk_idle_period: 30s` for Loki) to ensure data appears in verification scripts without production-scale wait times.

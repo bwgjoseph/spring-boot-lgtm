@@ -140,11 +140,7 @@ tasks:
     desc: Build and sideload the image into local Kubernetes
     deps: [app:build]
     cmds:
-      - docker save spring-boot-app:demo -o spring-boot-app.tar
-      - docker cp spring-boot-app.tar desktop-control-plane:/spring-boot-app.tar
-      - docker exec desktop-control-plane ctr -n k8s.io images import /spring-boot-app.tar
-      - docker exec desktop-control-plane rm /spring-boot-app.tar
-      - pwsh -Command "if (Test-Path spring-boot-app.tar) { Remove-Item spring-boot-app.tar }"
+      - pwsh ./verification/sideload-image.ps1 -ImageName spring-boot-app:demo -TarFile spring-boot-app.tar
 
   app:deploy:
     desc: Deploy the Spring Boot application to Kubernetes
@@ -176,7 +172,7 @@ tasks:
   lint:tempo:
     desc: Dry-run Tempo Helm chart
     cmds:
-      - pwsh -Command "helm template tempo grafana/tempo -n monitoring -f {{.DEPLOY_DIR}}/values-tempo.yaml | Out-Null"
+      - pwsh -Command "helm template tempo grafana-community/tempo -n monitoring -f {{.DEPLOY_DIR}}/values-tempo.yaml | Out-Null"
 
   lint:prometheus:
     desc: Dry-run Prometheus Helm chart

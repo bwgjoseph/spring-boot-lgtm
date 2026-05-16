@@ -11,7 +11,7 @@ This document tracks all container images currently deployed in the `monitoring`
 | **Loki Canary** | `loki-canary` | `docker.io/grafana/loki-canary:3.7.1` |
 | **Loki Gateway** | `nginx` | `docker.io/nginxinc/nginx-unprivileged:1.30-alpine` |
 | **Loki Access Log** | `access-log-exporter` | `ghcr.io/jkroepke/access-log-exporter:0.3.11` |
-| **Tempo** | `tempo` | `docker.io/grafana/tempo:2.10.1` |
+| **Tempo** | `tempo` | `docker.io/grafana-community/tempo:2.10.1` |
 | **Prometheus** | `prometheus` | `quay.io/prometheus/prometheus:v3.11.2` |
 | **Alertmanager** | `alertmanager` | `quay.io/prometheus/alertmanager:v0.32.0` |
 | **Kube-State-Metrics** | `kube-state-metrics` | `registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.18.0` |

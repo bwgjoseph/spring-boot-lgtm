@@ -43,12 +43,14 @@ if (-not $minioPod) {
     Write-Host "  - MinIO detected (pod/$minioPod). Checking S3 chunks in-cluster..."
     
     # Run mc ls inside the MinIO pod
-    $mcOutput = kubectl exec -n monitoring $minioPod -- mc ls local/loki/chunks --recursive --json | ConvertFrom-Json -ErrorAction SilentlyContinue
+    # We check the root of the loki bucket because with TSDB and no-auth, 
+    # Loki stores objects under the 'fake/' prefix, not a 'chunks/' folder.
+    $mcOutput = kubectl exec -n monitoring $minioPod -- mc ls local/loki --recursive --json | ConvertFrom-Json -ErrorAction SilentlyContinue
     
     if ($mcOutput -and $mcOutput.Count -gt 0) { 
-        Write-Host "  - [✓] S3 Chunks found ($($mcOutput.Count) items)." 
+        Write-Host "  - [✓] S3 Data found ($($mcOutput.Count) items)." 
     } else { 
-        Write-Warning "  - No S3 chunks found in 'loki/chunks' bucket." 
+        Write-Warning "  - No data found in 'loki' bucket." 
     }
 }
 
