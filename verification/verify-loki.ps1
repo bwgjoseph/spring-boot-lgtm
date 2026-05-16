@@ -6,16 +6,21 @@ param (
 Write-Host "--- Verifying Loki ($Env Mode: $Mode) ---"
 
 # Detect Topology
-$isSimpleScalable = (kubectl get statefulset -n monitoring -l app.kubernetes.io/component=write -o name).Length -gt 0
-$mainComponent = if ($isSimpleScalable) { "statefulset/loki-write" } else { "statefulset/loki" }
+$isSimpleScalable = (kubectl get deployment -n monitoring -l app.kubernetes.io/component=write -o name).Length -gt 0
+$mainComponent = if ($isSimpleScalable) { "deployment/loki-write" } else { "statefulset/loki" }
 $configMapName = if ($isSimpleScalable) { "loki-config" } else { "loki" }
 
 Write-Host "  - Detected Topology: $(if ($isSimpleScalable) { 'SimpleScalable' } else { 'SingleBinary' })"
-Write-Host "  - Using component: $mainComponent"
 
 # 1. Deployment Validation
 Write-Host "[1/4] Checking Pod Status..."
-kubectl rollout status $mainComponent -n monitoring --timeout=120s
+if ($isSimpleScalable) {
+    kubectl rollout status deployment/loki-write -n monitoring --timeout=60s
+    kubectl rollout status deployment/loki-read -n monitoring --timeout=60s
+    kubectl rollout status deployment/loki-backend -n monitoring --timeout=60s
+} else {
+    kubectl rollout status statefulset/loki -n monitoring --timeout=60s
+}
 
 # 2. Configuration Audit
 Write-Host "[2/4] Auditing Configuration..."

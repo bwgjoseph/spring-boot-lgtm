@@ -35,10 +35,18 @@ try {
     $logs = $metrics -match "loki_write_sent_entries_total"
     $metricsScraped = $metrics -match "prometheus_target_interval_length_seconds_count"
     $spans = $metrics -match "otelcol_receiver_accepted_spans"
+    $cluster = $metrics -match "alloy_cluster_members"
 
     if ($logs) { Write-Host "  - [✓] Logs: Pipeline active." } else { Write-Warning "  - Logs: No log processing detected." }
     if ($metricsScraped) { Write-Host "  - [✓] Metrics: Scraping active." } else { Write-Warning "  - Metrics: No scraping detected." }
     if ($spans) { Write-Host "  - [✓] Traces: OTLP spans accepted." } else { Write-Warning "  - Traces: No spans accepted." }
+    if ($cluster) { 
+        $count = ($metrics | Select-String "alloy_cluster_members").ToString().Split(" ")[-1]
+        Write-Host "  - [✓] Clustering: $count members active." 
+    }
+} catch {
+    Write-Error "Verification failed: $($_.Exception.Message)"
+    exit 1
 } finally {
     Stop-Job $job
     Remove-Job $job
