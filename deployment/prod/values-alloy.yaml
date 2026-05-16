@@ -1,104 +1,234 @@
 alloy:
+  # Enables gossip protocol for clustered trace tail-sampling
+  clustering:
+    enabled: true
+  
+  # Expose essential ports for OTLP ingestion, tail-sampling
   extraPorts:
     - name: "otlp-grpc"
       port: 4317
       targetPort: 4317
       protocol: TCP
+    - name: "otlp-sampling"
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
+  
+  # Headless service ensures gRPC discovery
+  service:
+    enabled: true
+    clusterIP: None 
+  
+  # Path for Write-Ahead Log to enable durability across pod restarts
+  storagePath: /var/lib/alloy/data 
+  
+  # Log Collection: Mount host logs for node-local tailing
+  extraVolumes:
+    - name: varlog
+      hostPath:
+        path: /var/log/pods
+  extraVolumeMounts:
+    - name: varlog
+      mountPath: /var/log/pods
+      readOnly: true
+  
+  # Main pipeline configuration: discovery, log tailing, trace sampling, metrics scraping
   configMap:
     create: true
     content: |-
-      // --- LOGS: DISCOVERY & RELABELING ---
-      discovery.kubernetes "pods" {
-        role = "pod"
-      }
+      // --- SHARED DISCOVERY (The Rafdar + Firewall) ---
+      discovery.kubernetes "all_pods" { role = "pod" }
 
-      discovery.relabel "pods" {
-        targets = discovery.kubernetes.pods.targets
-        rule {
-          source_labels = ["__meta_kubernetes_pod_label_app"]
-          target_label  = "service_name"
-        }
+      // --- LOGS: DISCOVERY & RELABELING ---
+      discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.all_pods.targets
         rule {
           source_labels = ["__meta_kubernetes_namespace"]
           target_label  = "namespace"
         }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_label_app"]
+          separator     = ";"
+          regex         = "^(?:;*)([^;]+).*$"
+          replacement   = "$1"
+          target_label  = "service_name"
+        }
       }
 
-      loki.source.kubernetes "pods" {
-        targets    = discovery.relabel.pods.output
+      loki.source.kubernetes "logs" {
+        targets    = discovery.relabel.pod_logs.output
         forward_to = [loki.process.extract_metadata.receiver]
       }
 
+      // Metadata Extraction: Promote trace_id and span_id to structured metadata
       loki.process "extract_metadata" {
+        forward_to = [loki.write.local.receiver]
+
         stage.regex {
-          expression = ".*\\[(?P<app>.+?),(?P<trace_id>\\w*),(?P<span_id>\\w*),(?P<userId>\\w*)\\].*"
+          // Matches format: [app,traceId,spanId,userId] allowing empty values
+          expression = ".*\\[(?P<app>[^,]*),(?P<traceId>[^,]*),(?P<spanId>[^,]*),(?P<userId>[^,]*)\\].*"
         }
-        stage.labels {
-          values = { "user_id" = "userId", "trace_id" = "trace_id", "span_id" = "span_id" }
-        }
-        stage.label_drop {
-          values = ["userId"]
-        }
-        forward_to = [loki.write.loki_backend.receiver]
-      }
 
-      loki.write "loki_backend" {
-        endpoint {
-          url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
-        }
-      }
-
-      // --- TRACES: OTLP INGESTION & PROCESSING ---
-      otelcol.receiver.otlp "default" {
-        grpc {
-          endpoint = "0.0.0.0:4317"
-        }
-        output {
-          traces  = [otelcol.processor.k8sattributes.default.input]
-        }
-      }
-
-      otelcol.processor.k8sattributes "default" {
-        extract {
-          metadata = ["k8s.pod.name", "k8s.namespace.name", "k8s.node.name"]
-        }
-        output {
-          traces  = [otelcol.processor.batch.default.input]
-        }
-      }
-
-      otelcol.processor.batch "default" {
-        output {
-          traces  = [otelcol.exporter.otlp.tempo.input]
-        }
-      }
-
-      otelcol.exporter.otlp "tempo" {
-        client {
-          endpoint = "tempo.monitoring.svc:4317"
-          tls {
-            insecure = true
+        stage.structured_metadata {
+          values = {
+            "trace_id" = "traceId",
+            "span_id"  = "spanId",
+            "user_id"  = "userId",
           }
         }
+
+        // Drop internal capture groups to avoid label bloat
+        stage.label_drop {
+          values = ["app", "traceId", "spanId", "userId"]
+        }
       }
 
-      // --- METRICS: PROMETHEUS SCRAPING ---
+      loki.write "local" {
+        endpoint { url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push" }
+      }
+
+      // --- METRICS: PROMETHEUS SCRAPING (ANNOTATION BASED) ---
+      
+      // Filter pods to only those with 'prometheus.io/scrape: "true"' annotation
+      discovery.relabel "spring_boot_pods" {
+        targets = discovery.kubernetes.all_pods.targets
+        
+        rule {
+          source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_scrape"]
+          action = "keep"
+          regex = "true"
+        }
+        
+        rule {
+          source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_path"]
+          action = "replace"
+          target_label = "__metrics_path__"
+          regex = "(.+)"
+        }
+        
+        rule {
+          source_labels = ["__address__", "__meta_kubernetes_pod_annotation_prometheus_io_port"]
+          action = "replace"
+          regex = "([^:]+)(?::\\d+)?;(\\d+)"
+          replacement = "$1:$2"
+          target_label = "__address__"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_label_app"]
+          separator     = ";"
+          regex         = "^(?:;*)([^;]+).*$"
+          replacement   = "$1"
+          target_label  = "service_name"
+        }
+      }
+
       prometheus.scrape "spring_boot" {
-        targets    = discovery.relabel.pods.output
+        targets    = discovery.relabel.spring_boot_pods.output
         forward_to = [prometheus.remote_write.prom.receiver]
       }
 
       prometheus.remote_write "prom" {
         endpoint {
           url = "http://prometheus-server.monitoring.svc.cluster.local/api/v1/write"
+          send_exemplars = true
         }
+      }
+
+      // --- TRACES: CLUSTERED TAIL-SAMPLING ---
+      otelcol.receiver.otlp "ingest" {
+        grpc { endpoint = "0.0.0.0:4317" }
+        output { traces = [otelcol.exporter.loadbalancing.internal.input] }
+      }
+
+      otelcol.exporter.loadbalancing "internal" {
+        routing_key = "traceID"
+        resolver {
+          dns {
+            hostname = "alloy.monitoring.svc.cluster.local"
+            port     = "4318"
+          }
+        }
+        protocol {
+          otlp {
+            client {
+              tls { insecure = true }
+            }
+          }
+        }
+      }
+
+      otelcol.receiver.otlp "sampling" {
+        grpc { endpoint = "0.0.0.0:4318" }
+        output { traces = [otelcol.processor.k8sattributes.default.input] }
+      }
+
+      otelcol.processor.k8sattributes "default" {
+        extract {
+          metadata = ["k8s.pod.name", "k8s.namespace.name", "k8s.node.name"]
+        }
+        output { traces = [otelcol.processor.tail_sampling.default.input] }
+      }
+
+      otelcol.processor.tail_sampling "default" {
+        decision_wait = "10s"
+        policy {
+          name = "keep-errors"
+          type = "status_code"
+          status_code { status_codes = ["ERROR"] }
+        }
+        policy {
+          name = "sample-success"
+          type = "probabilistic"
+          probabilistic { sampling_percentage = 10 }
+        }
+        output { traces = [otelcol.exporter.otlp.tempo.input] }
+      }
+
+      otelcol.processor.batch "default" {
+        output { traces = [otelcol.exporter.otlp.tempo.input] }
+      }
+
+      otelcol.exporter.otlp "tempo" {
+        client {
+          endpoint = "tempo.monitoring.svc.cluster.local:4317"
+          tls { insecure = true }
+        }
+      }
+
+      // --- SELF-OBSERVABILITY ---
+      prometheus.exporter.self "myself" {}
+      prometheus.scrape "self" {
+        targets    = prometheus.exporter.self.myself.targets
+        forward_to = [prometheus.remote_write.prom.receiver]
       }
 
 controller:
   type: deployment
   replicas: 2
+  # Ensure tail-sampling decisions are completed
+  terminationGracePeriodSeconds: 60
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
 
-# Enable clustering for HA
-alloy:
-  clustering:
-    enabled: true
+# Operational Resilience: Local SSD for WAL
+persistence:
+  enabled: true
+  size: 20Gi

@@ -12,15 +12,15 @@ Optimized for resource efficiency and rapid feedback loops.
 - **Loki:** `SingleBinary` mode. No caching, minimal resource footprint.
 - **Tempo:** `SingleBinary` mode (1 replica).
 - **Mimir:** Standalone Prometheus instance (metrics).
-- **Alloy:** Standalone (Non-clustered) deployment.
+- **Alloy:** Standalone deployment.
 - **Persistence:** Local SSD PVCs (MinIO).
 
 ### B. Production / HA (Prod)
 Optimized for durability, high-availability, and long-term retention.
-- **Loki:** `SimpleScalable` mode. Includes distributed read/write/backend components, Memcached caching for queries/chunks, and replication factor of 3 (min 2 for sandbox HA validation).
+- **Loki:** `SimpleScalable` mode. Distributed read/write/backend components, Memcached caching for queries/chunks, and replication factor of 3 (min 2 for sandbox HA validation).
 - **Tempo:** `Scalable Monolithic` mode with 3 replicas (min 2 for sandbox HA validation), Memberlist gossip coordination, and Memcached-backed search.
 - **Mimir:** Monolithic HA-ready deployment using S3 block storage.
-- **Alloy:** Clustered DaemonSet (2+ replicas) with Gossip protocol enabled for trace affinity.
+- **Alloy:** Clustered Deployment (2+ replicas, designed to transition to DaemonSet in multi-node clusters) with Gossip protocol and Tail-based sampling enabled for trace affinity.
 - **Persistence:** S3-native object storage (MinIO/AWS S3) with compactor-enforced physical retention.
 
 ## 2. Integrated Data Flow
@@ -70,8 +70,9 @@ graph TD
         App1[Spring Boot App Pods]
     end
 
-    subgraph Collection [Collection Layer - Clustered]
-        AlloyProd[Alloy - Clustered DaemonSet]
+    subgraph Collection [Collection Layer]
+        AlloyProd[Alloy - Clustered Deployment]
+        AlloyProd <--> |"Gossip (7946)"| AlloyProd
     end
 
     subgraph Storage [Storage Layer - HA/Scalable]
@@ -85,20 +86,20 @@ graph TD
         Mem[Memcached]
     end
 
-    App1 -- "OTLP/gRPC (Push)" --> AlloyProd
-    AlloyProd -- "Scrape (Pull)" --> App1
+    App1 -- "OTLP (Push)" --> AlloyProd
+    App1 -- "Metrics (Pull)" --> AlloyProd
     
-    AlloyProd <--> |"Gossip (7946)"| AlloyProd
-    AlloyProd -- "Forwarding" --> LokiProd
-    AlloyProd -- "Forwarding" --> TempoProd
-    AlloyProd -- "Remote Write" --> MimirProd
+    AlloyProd -- "Log/Metrics/Trace Forwarding" --> LokiProd & TempoProd & MimirProd
 
-    LokiProd & TempoProd & MimirProd --> S3
-    LokiProd <--> Mem
-    TempoProd <--> Mem
+    LokiProd --> S3
+    TempoProd --> S3
+    MimirProd --> S3
+
+    LokiProd & TempoProd <--> Mem
 
     style AlloyProd fill:#f9f,stroke:#333,stroke-width:2px
     style S3 fill:#bbf,stroke:#333,stroke-dasharray: 5 5
+    style Mem fill:#ddd,stroke:#333,stroke-dasharray: 3 3
 ```
 
 ## 3. Reference Documentation (The ADR Library)

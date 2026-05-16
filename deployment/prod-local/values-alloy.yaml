@@ -1,24 +1,28 @@
 alloy:
-  # Clustering disabled for dev/sandbox to save resources
+  # Enables gossip protocol for clustered trace tail-sampling
   clustering:
-    enabled: false
-  
-  # Expose essential ports for OTLP ingestion
+    enabled: true
+    
+  # Expose essential ports for OTLP ingestion, tail-sampling
   extraPorts:
     - name: "otlp-grpc"
       port: 4317
       targetPort: 4317
       protocol: TCP
+    - name: "otlp-sampling"
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
   
-  # Headless service for reliable discovery
+  # Headless service ensures gRPC discovery
   service:
     enabled: true
-    clusterIP: None 
+    clusterIP: None
   
-  # Path for WAL/Persistence
+  # Path for Write-Ahead Log to enable durability across pod restarts
   storagePath: /var/lib/alloy/data 
   
-  # Add hostPath volume mount for /var/log/pods to enable Alloy log tailing
+  # Log Collection: Mount host logs for node-local tailing
   extraVolumes:
     - name: varlog
       hostPath:
@@ -28,10 +32,11 @@ alloy:
       mountPath: /var/log/pods
       readOnly: true
   
+  # Main pipeline configuration: discovery, log tailing, trace sampling, metrics scraping
   configMap:
     create: true
     content: |-
-      // --- SHARED DISCOVERY (The Radar + Firewall) ---
+      // --- SHARED DISCOVERY (The Rafdar + Firewall) ---
       discovery.kubernetes "all_pods" { role = "pod" }
 
       // --- LOGS: DISCOVERY & RELABELING ---
@@ -83,7 +88,7 @@ alloy:
       }
 
       loki.write "local" {
-        endpoint { url = "http://loki-gateway.monitoring.svc.cluster.local:80/loki/api/v1/push" }
+        endpoint { url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push" }
       }
 
       // --- METRICS: PROMETHEUS SCRAPING (ANNOTATION BASED) ---
@@ -137,14 +142,36 @@ alloy:
 
       prometheus.remote_write "prom" {
         endpoint {
-          url = "http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/write"
+          url = "http://prometheus-server.monitoring.svc.cluster.local/api/v1/write"
           send_exemplars = true
         }
       }
 
-      // --- TRACES: OTLP INGESTION (DIRECT PATH FOR DEV) ---
-      otelcol.receiver.otlp "default" {
+      // --- TRACES: CLUSTERED TAIL-SAMPLING ---
+      otelcol.receiver.otlp "ingest" {
         grpc { endpoint = "0.0.0.0:4317" }
+        output { traces = [otelcol.exporter.loadbalancing.internal.input] }
+      }
+
+      otelcol.exporter.loadbalancing "internal" {
+        routing_key = "traceID"
+        resolver {
+          dns {
+            hostname = "alloy.monitoring.svc.cluster.local"
+            port     = "4318"
+          }
+        }
+        protocol {
+          otlp {
+            client {
+              tls { insecure = true }
+            }
+          }
+        }
+      }
+
+      otelcol.receiver.otlp "sampling" {
+        grpc { endpoint = "0.0.0.0:4318" }
         output { traces = [otelcol.processor.k8sattributes.default.input] }
       }
 
@@ -152,7 +179,22 @@ alloy:
         extract {
           metadata = ["k8s.pod.name", "k8s.namespace.name", "k8s.node.name"]
         }
-        output { traces = [otelcol.processor.batch.default.input] }
+        output { traces = [otelcol.processor.tail_sampling.default.input] }
+      }
+
+      otelcol.processor.tail_sampling "default" {
+        decision_wait = "10s"
+        policy {
+          name = "keep-errors"
+          type = "status_code"
+          status_code { status_codes = ["ERROR"] }
+        }
+        policy {
+          name = "sample-success"
+          type = "probabilistic"
+          probabilistic { sampling_percentage = 10 }
+        }
+        output { traces = [otelcol.exporter.otlp.tempo.input] }
       }
 
       otelcol.processor.batch "default" {
@@ -166,18 +208,27 @@ alloy:
         }
       }
 
+      // --- SELF-OBSERVABILITY ---
+      prometheus.exporter.self "myself" {}
+      prometheus.scrape "self" {
+        targets    = prometheus.exporter.self.myself.targets
+        forward_to = [prometheus.remote_write.prom.receiver]
+      }
+
 controller:
-  type: daemonset
+  type: deployment
+  replicas: 2
+  # Ensure tail-sampling decisions are completed
   terminationGracePeriodSeconds: 60
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 500m
+      memory: 1Gi
 
-# Minimal persistence for sandbox
+# Operational Resilience: Local SSD for WAL
 persistence:
   enabled: true
   size: 5Gi

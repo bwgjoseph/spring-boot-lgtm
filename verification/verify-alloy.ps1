@@ -5,10 +5,22 @@ param (
 
 Write-Host "--- Verifying Alloy Pipeline ($Env Mode: $Mode) ---"
 
-# 1. Deployment Validation
+# 1. Detect Topology & Resources
 Write-Host "[1/4] Checking Pod Status..."
-$status = kubectl rollout status daemonset/alloy -n monitoring --timeout=60s
-if ($LASTEXITCODE -ne 0) { Write-Error "Alloy DaemonSet rollout failed"; exit 1 }
+# Try finding as deployment, then daemonset
+$resource = kubectl get deployment -n monitoring -l app.kubernetes.io/name=alloy -o name 2>$null
+if (-not $resource) {
+    $resource = kubectl get daemonset -n monitoring -l app.kubernetes.io/name=alloy -o name 2>$null
+}
+
+if ($resource) {
+    Write-Host "  - Validating $resource..."
+    kubectl rollout status $resource -n monitoring --timeout=60s
+    if ($LASTEXITCODE -ne 0) { Write-Error "Alloy rollout failed"; exit 1 }
+} else {
+    Write-Error "Alloy resource not found."
+    exit 1
+}
 
 # 2. Traffic Simulation
 if ($Mode -eq "full") {
