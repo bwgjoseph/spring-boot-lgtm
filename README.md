@@ -168,3 +168,7 @@ This project includes a production-hardened framework. When migrating from the l
 👉 **[System Architecture (ARCHITECTURE.md)](./ARCHITECTURE.md)**
 👉 **[Component-Specific Decisions (ADR/)](./ADR/)**
 👉 **[Production Requirements (REQUIREMENTS.md)](./REQUIREMENTS.md)**
+
+## Upgrading
+
+This [repo](https://grafana-community.github.io/helm-charts/changelog/?owner=grafana-community&repo=helm-charts&chart=loki) provide changelog across helm chart version, making it easy to understand the changes, and to perform the upgrade

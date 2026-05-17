@@ -6,11 +6,12 @@ vars:
   DEPLOY_DIR: 'deployment/{{.ENV}}'
   COMMON_DIR: 'deployment/common'
   # HELM CHART VERSIONS (Stable as of March 2026)
-  VER_ALLOY: "1.8.0"
+  VER_ALLOY: "1.8.1"
   VER_GRAFANA: "12.1.1"
-  VER_LOKI: "13.2.3"
-  VER_TEMPO: "2.0.0"
-  VER_PROMETHEUS: "29.2.1"
+  VER_LOKI: "15.0.1"
+  VER_TEMPO: "2.1.2"
+  VER_MIMIR: "6.0.6"
+  VER_PROMETHEUS: "29.7.0"
   VER_MINIO: "5.4.0"
   VER_MONGODB: "18.6.31"
 
@@ -240,12 +241,18 @@ tasks:
       - task: check:tempo
       - task: verify:tempo
 
+  check:alertmanager:
+    desc: Validate Alertmanager configuration syntax inside the pod
+    cmds:
+      - pwsh ./verification/check-alertmanager.ps1
+
   validate:prometheus:
     desc: Run full lint, apply, check, and verify for Prometheus
     cmds:
       - task: lint:prometheus
       - task: prometheus
       - task: check:prometheus
+      - task: check:alertmanager
       - task: verify:prometheus
 
   validate:grafana:
@@ -295,41 +302,30 @@ tasks:
     cmds:
       - pwsh ./verification/check-prometheus.ps1
 
-  check:alertmanager:
-    desc: Validate Alertmanager configuration syntax inside the pod
-    cmds:
-      - pwsh ./verification/check-alertmanager.ps1
-
   verify:alloy:
     desc: Run full verification for Alloy
     cmds:
       - pwsh ./verification/verify-alloy.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
-      - task: check:alloy
 
   verify:loki:
     desc: Verify Loki health and log ingestion
     cmds:
       - pwsh ./verification/verify-loki.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
-      - task: check:loki
 
   verify:tempo:
     desc: Verify Tempo health and trace storage
     cmds:
       - pwsh ./verification/verify-tempo.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
-      - task: check:tempo
 
   verify:prometheus:
     desc: Verify Prometheus and Alertmanager health
     cmds:
       - pwsh ./verification/verify-prometheus.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
-      - task: check:prometheus
-      - task: check:alertmanager
 
   verify:mimir:
     desc: Verify Mimir health and metric ingestion
     cmds:
       - pwsh ./verification/verify-mimir.ps1 -Env {{.ENV | default "dev"}} -Mode {{.MODE | default "full"}}
-      - task: check:mimir
 
   verify:mongodb:
     desc: Verify MongoDB replica set health
@@ -613,3 +609,14 @@ tasks:
       - kubectl rollout restart deployment/grafana -n {{.NAMESPACE}}
       - task: verify:mimir
         vars: { ENV: '{{.TO}}' }
+
+  mimir:
+    desc: Install or Upgrade Mimir
+    deps: [repos, namespace]
+    cmds:
+      - helm upgrade --install mimir grafana/mimir-distributed -n {{.NAMESPACE}} --version {{.VER_MIMIR}} -f deployment/{{.ENV}}/values-mimir.yaml
+
+  uninstall:mimir:
+    desc: Uninstall Mimir
+    cmds:
+      - helm uninstall mimir -n {{.NAMESPACE}} --ignore-not-found
