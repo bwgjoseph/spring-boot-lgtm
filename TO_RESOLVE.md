@@ -6,5 +6,16 @@
 - [ ] **Prometheus Remote Write Configuration:** Configure existing Prometheus Helm release to act as a pass-through by enabling `remoteWrite` to the Mimir endpoint.
 - [ ] **Grafana Datasource Migration:** Update Grafana to transition from `Prometheus` datasource to `Mimir` datasource upon completion of the Mimir swap.
 - [ ] **Alerting Rules Migration:** Migrate alerting rules from Prometheus `serverFiles` to Mimir's `ruler` configuration.
-- [ ] **Alloy High-Cardinality Firewall:** Implement formal filtering/drop rules for high-cardinality labels to protect Loki and Mimir indexes.
-- [ ] **Alloy External Forwarding (Gateway Pattern):** Configure Alloy to mirror trace/log telemetry to external gateways for cross-team data sharing.
+- [ ] **Storage - RWX Support:** Check for NFS/shared StorageClass support.
+- [ ] **Storage - Alloy SSD PVCs:** Confirm availability of local SSD PVCs for Alloy WAL.
+- [ ] **Storage - Class Performance:** Identify high-performance SSD/NVMe storage classes.
+- [ ] **Infrastructure - S3 Backend:** Finalize managed cloud S3 vs self-hosted MinIO choice.
+- [ ] **Infrastructure - Mattermost Webhook:** Secure webhook URL for Alertmanager.
+- [ ] **Network - Ingress:** Verify Nginx/Traefik gRPC support for OTLP.
+- [ ] **Network - Internal DNS:** Confirm stability of cluster DNS resolution.
+- [ ] **Workload - Volume Estimates:** Gather daily log/trace/series metrics for capacity planning.
+- [ ] **Lessons Learned - Resource Constraints:** Standardize local sandbox resource requests/limits (10m CPU / 64Mi RAM) in all charts to prevent scheduling deadlocks.
+- [ ] **Lessons Learned - Configuration Schema:** Use explicit `config: |` blocks in Helm values to bypass chart-template version-mismatch issues for Tempo/Loki.
+- [ ] **Lessons Learned - Anti-Affinity:** Ensure `podAntiAffinity` is set to `soft` or `disabled` for gateway/ingress components in single-node environments.
+- [ ] **Lessons Learned - Memberlist DNS:** Always use cluster service DNS (`loki-memberlist`) instead of hardcoded pod names for Gossip/HashRing coordination.
+- [ ] **Lessons Learned - S3 Credentials:** Explicitly configure `extraEnv` for every component (Ingester/Querier/Index Gateway) as they do not inherit from the global scope.

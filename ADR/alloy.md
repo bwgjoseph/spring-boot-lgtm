@@ -47,7 +47,7 @@ flowchart TD
     style DiskB fill:#eee,stroke:#333
 ```
 
-1.  **Deployment Topology:** Deploy Grafana Alloy as a **DaemonSet** across all worker nodes in the production cluster.
+1.  **Deployment Topology:** Deploy Grafana Alloy as a **DaemonSet** for multi-node production clusters. For HA validation in single-node sandboxes, a **Deployment (2+ replicas)** with internal clustering is used.
 2.  **Telemetry Processing Model:**
     *   **Local-Only Path (Logs & Metrics):** Logs are trailed from node-local `/var/log/pods` and **enriched with K8s labels** via the local Kubelet. Metrics are scraped locally. This data is exported directly to egress.
     *   **Clustered Path (Traces):** Ingested from local pods but load-balanced cluster-wide to ensure "TraceID Affinity" before tail-based sampling and export.
@@ -75,6 +75,7 @@ This architecture should be re-evaluated if the following thresholds are reached
 - **The Memory Wall:** If Tail-Sampling requirements (`decision_wait`) cause Alloy's memory usage to exceed **1Gi per node**, consider a hybrid model (DaemonSet for logs, centralized Deployment for traces).
 - **Connection Churn:** If the cluster-wide count of concurrent gRPC streams exceeds **5,000**, investigate L7 load balancing (e.g., Istio/Linkerd) or further distribution.
 - **Ingestion Lag:** If "p99 Ingestion Lag" exceeds **200ms**, it indicates node-level resource starvation.
+
 ## Implementation Source of Truth
 - **Helm Value:** `controller.type: daemonset`
 - **Application Config:** Use Downward API `status.hostIP` for the OTLP endpoint.
@@ -87,7 +88,7 @@ This table maps the production implementation in `deployment/prod/values-alloy.y
 
 | YAML Path / Component | Logic / Value | Functional Purpose | Requirement / ADR Link |
 | :--- | :--- | :--- | :--- |
-| `controller.type` | `daemonset` | 1-to-1 node-local collection; bypasses gRPC LB issues. | `ADR` Sec 1 / `req` Sec 2 |
+| `controller.type` | `deployment` | HA validation (2 replicas) for local sandboxes. | `ADR` Sec 1 / `req` Sec 2 |
 | `alloy.clustering.enabled` | `true` | Enables Gossip (7946) for trace affinity. | `ADR` Sec 4 / `REQUIREMENTS` Sec 1.2 |
 | `service.clusterIP` | `None` | Headless service for pod discovery by loadbalancer. | `ADR` Sec 3.0 |
 | `discovery.relabel` | `${HOSTNAME}` | **Critical:** Filters scraping to only local node pods. | `req/alloy.md` Sec 5.0 |
@@ -100,7 +101,6 @@ This table maps the production implementation in `deployment/prod/values-alloy.y
 | `terminationGracePeriod` | `60s` | Completes sampling decisions during pod restart. | `ADR` Sec 11 / `req` Sec 6 |
 
 ## Consequences
-...
 - **Positive:** Robust internal networking, automated horizontal scaling, and future-proofed for cross-team data sharing.
 - **Negative:** Higher aggregate resource footprint (6 pods vs. 2-3).
 - **Risk:** Trace data currently in memory for the `decision_wait` window is lost if a pod is terminated.

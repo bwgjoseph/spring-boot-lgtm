@@ -1,28 +1,29 @@
 # GEMINI.md - Project Instructions
 
 ## Project Overview
-This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed to demonstrate the **Grafana LGTM stack** (Loki, Grafana, Tempo, Mimir/Prometheus) using **Grafana Alloy** as the central collector. It follows a "Scrape & Push" architecture.
+This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed to demonstrate the **Grafana LGTM stack** (Loki, Grafana, Tempo, Mimir/Prometheus) using **Grafana Alloy** as the central collector. It follows a "Scrape & Push" architecture optimized for High Availability (HA).
 
 ### Tech Stack
 - **Framework:** Spring Boot 3.5.x
 - **Language:** Java 25
 - **Observability:** 
-  - **Micrometer Tracing (OTEL Bridge):** For traces (OpenTelemetry SDK version 1.59.0).
+  - **Micrometer Tracing (OTEL Bridge):** OpenTelemetry SDK version 1.59.0.
   - **Micrometer Observation API:** For manual instrumentation and context propagation.
   - **Micrometer Prometheus Registry:** For metric scraping via `/actuator/prometheus`.
   - **Jolokia support-spring:** For raw JMX access via `/actuator/jolokia`.
-  - **Grafana Alloy:** Collector/Gateway (`1.6.1`). Features `loki.process` for structured metadata extraction and `otelcol.processor.k8sattributes` for span enrichment.
+  - **Grafana Alloy (1.8.1):** Features `loki.process` metadata extraction and `otelcol.processor.tail_sampling`.
 - **Storage:** 
-  - **Loki:** Log Storage (`9.3.4`, Single Binary mode).
-  - **Tempo:** Trace Storage and Service Graph generation (`2.0.0`).
-  - **Prometheus:** Metrics Storage (`28.13.0`, scraped from Alloy).
-  - **MinIO:** Internal Object Storage (`5.4.0`).
-  - **MongoDB:** 3-node ReplicaSet (Primary, Secondary, Arbiter) deployed via Bitnami Helm chart (`8.2.7`). Instrumented for CDC via Debezium.
+  - **Loki (15.0.1):** Log Storage (SimpleScalable mode with Index Gateway).
+  - **Tempo (2.1.2):** Trace Storage and Service Graph generation (Scalable Monolithic mode).
+  - **Prometheus (29.7.0):** Metrics scraper and Alerting engine.
+  - **Mimir (6.0.6):** Metrics Long-term Storage (Monolithic HA mode).
+  - **MinIO (5.4.0):** Internal Object Storage for Loki, Tempo, and Mimir.
+  - **MongoDB (18.6.31):** 3-node ReplicaSet instrumented for CDC via Debezium.
 - **Build & Deployment:** 
-  - **Maven:** Build system with BOM management for OTEL and Debezium.
-  - **Jib:** Builds Docker images (`jib-maven-plugin`).
-  - **Helm:** Kubernetes deployments (`deployment/`).
-  - **Taskfile:** Orchestration for infrastructure and app deployment.
+  - **Maven:** Build system with BOM management.
+  - **Jib:** Container image building (`jib-maven-plugin`).
+  - **Helm:** Kubernetes deployment orchestration.
+  - **Taskfile:** Automation of infrastructure and application lifecycles.
 
 ## Development Environment
 - **Operating System:** Windows
@@ -34,48 +35,42 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
   - Use `.\mvnw` instead of `./mvnw`.
 
 ## Building and Running
-The project uses `Taskfile` to simplify complex operations.
+The project uses `Taskfile` to simplify complex operations across environments (`dev`, `prod-local`).
 
-- **Prometheus:** Metrics Storage (`29.2.1`, scraped from Alloy).
-...
-| **Full Setup** | `task all` | Builds the app and deploys the entire LGTM stack + App to K8s. |
-| **Infra Only** | `task infra` | Deploys Prometheus, Loki, Tempo, Grafana, and Alloy. |
-| **App Build** | `task app:build` | Builds the Spring Boot app and Docker image using Jib. |
-| **App Load** | `task app:load` | Builds and sideloads the image into local K8s. |
-| **App Deploy** | `task app:deploy` | Deploys the application to the `monitoring` namespace. |
+| Category | Task | Description |
+| :--- | :--- | :--- |
+| **Setup** | `task all` | Builds the app and deploys the entire LGTM stack + App. |
+| **Infrastructure** | `task infra` | Deploys Prometheus, Loki, Tempo, Grafana, and Alloy. |
+| **Application** | `task app:load` | Builds and sideloads the image into local K8s. |
+| **Application** | `task app:deploy` | Deploys the application to the `monitoring` namespace. |
 | **Verification** | `task verify` | Runs automated health checks for all components. |
 | **E2E Test** | `task test:e2e` | Runs deterministic data-pipeline verification. |
-| **Port Forward** | `task pf:all` | Forwards all UIs (Grafana, Prom, Alloy, App). |
-| **Clean All** | `task clean` | Wipes all ConfigMaps and the monitoring namespace. |
-| **Clean Config** | `task clean:configmap` | Surgically removes only Prometheus/Grafana ConfigMaps. |
-
+| **Surgical Swap** | `task swap:loki` | Upgrades Loki from Dev to Prod-Local HA for validation. |
+| **Surgical Swap** | `task swap:tempo`| Upgrades Tempo from Dev to Prod-Local HA for validation. |
+| **Surgical Swap** | `task swap:alloy`| Upgrades Alloy from Dev to Prod-Local HA for validation. |
+| **Surgical Swap** | `task swap:mimir`| Swaps Prometheus for Mimir Monolithic HA. |
+| **Config Sync** | `task sync:loki` | Promotes verified `prod-local` architectural keys to `prod`. |
+| **Utilities** | `task pf:all` | Forwards all UIs (Grafana, Prom, Alloy, App). |
+| **Cleanup** | `task clean` | Wipes all ConfigMaps and the monitoring namespace. |
 
 ## Development Conventions
 
 ### Instrumentation
-- **Micrometer Observation API:** Use `@Observed` annotation or `Observation.createNotStarted(...)` for manual instrumentation.
-- **Security Correlation:** `SecurityObservationHandler` automatically extracts `userId` from Spring Security and injects it into observations and baggage.
-- **MDC Correlation:** Trace IDs and Span IDs are included in logs via the pattern defined in `application.yaml`: `[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{userId:-}]`.
-- **Trace-to-Log Correlation:** 
-  - App logs use camelCase (`traceId`, `spanId`).
-  - Grafana Alloy extracts these via regex and maps them to snake_case (`trace_id`, `span_id`) in Loki Structured Metadata.
+- **Micrometer Observation API:** Use `@Observed` annotation or `Observation.createNotStarted(...)`.
+- **Security Correlation:** `SecurityObservationHandler` extracts `userId` and injects it into baggage.
+- **MDC Correlation:** Trace IDs and Span IDs are included in logs via the pattern: `[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{userId:-}]`.
+- **Trace-to-Log Correlation:** App logs use camelCase (`traceId`); Grafana Alloy maps these to snake_case (`trace_id`) in Loki Structured Metadata.
 
 ### Observability Patterns
-- **Exemplars:** Enabled via `management.prometheus.metrics.export.exemplars.enabled: true`. This allows linking Prometheus metric spikes directly to Tempo traces in Grafana.
-- **Baggage Propagation:** Custom attributes like `userId` travel across service boundaries using W3C Baggage.
-- **JMX Bridge:** Debezium Embedded metrics are bridged from JMX MBeans to Micrometer Gauges via a custom `MeterBinder` (`DebeziumMetricsBinder`).
-- **K8s Enrichment:** Grafana Alloy automatically enriches traces with Pod and Node metadata based on the source IP.
-
-### Kubernetes Deployment
-- All components are deployed to the `monitoring` namespace.
-- Deployment manifests and Helm values are located in the `deployment/` directory.
+- **Exemplars:** Enabled via `management.prometheus.metrics.export.exemplars.enabled: true`.
+- **Baggage Propagation:** Custom attributes travel via W3C Baggage headers.
+- **JMX Bridge:** Debezium Embedded metrics are bridged to Micrometer via `DebeziumMetricsBinder`.
+- **K8s Enrichment:** Grafana Alloy enriches traces with Pod/Node metadata based on source IP.
 
 ## Key Files
 - `Taskfile.yml`: Central task runner for all operations.
-- `pom.xml`: Maven configuration with version alignment for OTEL (1.59.0) and MongoDB (5.6.2).
-- `src/main/resources/application.yaml`: Spring Boot application configuration.
+- `ARCHITECTURE.md`: High-level roadmap and logical data flow diagrams.
 - `RESOURCES.md`: Detailed CPU and Memory allocation for all deployments.
 - `IMAGES.md`: Software Bill of Materials (SBOM) and container image inventory.
-- `deployment/values-alloy.yaml`: Configuration for Grafana Alloy enrichment and log processing.
-- `JMX_METRICS.md`: Documentation for Debezium monitoring.
+- `TROUBLESHOOT.md`: Known issues and resolutions for the local HA stack.
 - `CUSTOM_ATTRIBUTES.md`: Documentation for cross-stack attribute mapping.

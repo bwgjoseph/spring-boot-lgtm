@@ -3,7 +3,7 @@
 This document serves as the high-level roadmap for the production observability stack, explaining how the components interact and where to find detailed decision rationales.
 
 ## 1. Stack Overview
-We follow a **"Decoupled Ingestion & Storage"** pattern. Data enters through a decentralized **Alloy DaemonSet** layer, is processed for correlation (metadata enrichment) and cost management (tail-sampling), and is then routed to specialized backend stores.
+We follow a **"Decoupled Ingestion & Storage"** pattern. Data enters through a decentralized **Alloy** layer, is processed for correlation (metadata enrichment) and cost management (tail-sampling), and is then routed to specialized backend stores.
 
 ## 1. Environment Architecture
 
@@ -17,10 +17,10 @@ Optimized for resource efficiency and rapid feedback loops.
 
 ### B. Production / HA (Prod)
 Optimized for durability, high-availability, and long-term retention.
-- **Loki:** `SimpleScalable` mode. Distributed read/write/backend components, Memcached caching for queries/chunks, and replication factor of 3 (min 2 for sandbox HA validation).
-- **Tempo:** `Scalable Monolithic` mode with 3 replicas (min 2 for sandbox HA validation), Memberlist gossip coordination, and Memcached-backed search.
-- **Mimir:** Monolithic HA-ready deployment using S3 block storage.
-- **Alloy:** Clustered Deployment (2+ replicas, designed to transition to DaemonSet in multi-node clusters) with Gossip protocol and Tail-based sampling enabled for trace affinity.
+- **Loki:** `SimpleScalable` mode. Distributed read/write/backend components, Memcached caching for queries/chunks, and replication factor of 2 (Optimized for HA validation).
+- **Tempo:** `Scalable Monolithic` mode with 2 replicas, Memberlist gossip coordination, and Memcached-backed search.
+- **Mimir:** Monolithic HA-ready deployment (2 replicas) using S3 block storage.
+- **Alloy:** Clustered Deployment (2 replicas) with Gossip protocol and Tail-based sampling enabled for trace affinity.
 - **Persistence:** S3-native object storage (MinIO/AWS S3) with compactor-enforced physical retention.
 
 ## 2. Integrated Data Flow

@@ -11,7 +11,11 @@ The following table lists the `requests` (guaranteed) and `limits` (maximum) for
 | Deployment / Pod | CPU Request | CPU Limit | RAM Request | RAM Limit | Config File |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **spring-boot-app** | 100m | 500m | 512Mi | 1Gi | `deployment.yaml` |
-| **loki** (Single Binary) | 100m | 500m | 256Mi | 512Mi | `values-loki-singlebinary.yaml` |
+| **loki-write** (Ingester) | 50m | 1 | 128Mi | 2Gi | `values-loki.yaml` |
+| **loki-read** (Querier) | 50m | 2 | 128Mi | 4Gi | `values-loki.yaml` |
+| **loki-backend** | 50m | 500m | 128Mi | 512Mi | `values-loki.yaml` |
+| **loki-gateway** | 50m | Unset | 128Mi | Unset | `values-loki.yaml` |
+| **loki-cache** (Memcached) | 50m | 200m | 128Mi | 256Mi | `values-loki.yaml` |
 | **mongodb** (Node x2) | 100m | 500m | 256Mi | 512Mi | `values-mongodb.yaml` |
 | **mongodb-arbiter** | 100m | 100m | 128Mi | 256Mi | `values-mongodb.yaml` |
 | **tempo** | 10m | 500m | 256Mi | 1Gi | `values-tempo.yaml` |

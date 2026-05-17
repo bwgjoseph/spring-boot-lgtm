@@ -4,27 +4,35 @@
 Proposed
 
 ## Context
-Grafana serves as the central control plane for the LGTM stack. It must provide high-availability visualization while ensuring that dashboard definitions are version-controlled and resistant to pod-level volatility.
+Grafana serves as the central control plane for the LGTM stack. It must provide high-availability visualization, seamless cross-telemetry correlation, and reliable alerting while ensuring dashboard definitions are version-controlled and resistant to pod-level volatility.
+
 ## Decision
-1.  **Deployment:** Single replica (for efficiency), designed to be scale-ready to 3+ replicas.
-2.  **Dashboard Management:** Use the **Grafana Sidecar** pattern to provision dashboards as code from Git.
-3.  **State Management:** Use an **external PostgreSQL database** to persist user state, alert definitions, and folder structures.
-4.  **Alerting:** Rely on external **Alertmanager** for alert dispatching and Mattermost routing.
+1.  **Deployment:** Baseline set to 1 replica, designed for horizontal scaling to 3+ replicas.
+2.  **Dashboard Management:** Use the **Grafana Sidecar** pattern to provision dashboards as code from ConfigMaps, ensuring reproducibility.
+3.  **State Management:** Use an **external, HA-capable database (PostgreSQL)** for user sessions, preferences, and dashboard state to ensure survival across pod restarts.
+4.  **Alerting:** 
+    *   **Dispatch:** Centralized via **Alertmanager**, routing to Mattermost.
+    *   **Logic:** Alerting rules must use `absent()` to detect missing metrics (service dead-man switch).
+5.  **Correlation:** All dashboards must support "drill-down" (Metric -> Trace -> Log) navigation using **Structured Metadata**.
 
 ## Rationale
-- **Resilient Single-Instance Pattern:** By using PostgreSQL and Sidecar provisioning, we gain 99% of HA benefits (no data loss) without the operational tax of replica synchronization and locking management. 
-- **Scale-Ready:** Moving to 3 replicas is a simple configuration change (as all state is externalized to Postgres/Sidecar) when team traffic increases.
+- **Resilient Single-Instance Pattern:** Externalizing state to PostgreSQL and using Sidecar provisioning provides HA-like data persistence without the operational overhead of replica synchronization.
+- **Service Graphs:** Automates dependency mapping, a key requirement for debugging microservice latency.
+- **Reliable Alerting:** Using Alertmanager and `absent()` logic ensures the stack remains actionable even when components are entirely offline.
 
-...
+## Implementation Source of Truth
+- **Provisioning:** `sidecar.dashboards.enabled: true`
+- **Database:** `grafana.ini [database] type = postgres`
+- **Dashboard Label:** `grafana_dashboard=1`
 
 ## Technical Specification & Mapping
-This table maps the production implementation in `deployment/prod/values-grafana.yaml` to the architectural decisions and requirements.
 
 | YAML Path / Component | Logic / Value | Purpose | Requirement Link |
 | :--- | :--- | :--- | :--- |
 | `replicas` | `1` | Efficient baseline; scale-ready. | `req/grafana.md` Sec 2.0 |
 | `sidecar.dashboards` | `enabled: true` | Automates dashboard deployment via Git/CMs. | `req/grafana.md` Sec 3.0 |
 | `database.type` | `postgres` | Persists user state across pod restarts. | `req/grafana.md` Sec 2.0 |
+| `alerting` | `Alertmanager` | Centralized notification hub. | `req/grafana.md` Sec 4.0 |
 
 ## Consequences
 - **Positive:** GitOps-ready dashboard management and consistent user state.

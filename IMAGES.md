@@ -7,9 +7,10 @@ This document tracks all container images currently deployed in the `monitoring`
 | **Spring Boot App** | `spring-boot-app` | `spring-boot-app:demo` |
 | **Grafana Alloy** | `alloy` | `docker.io/grafana/alloy:v1.16.0` |
 | **Alloy Config Reloader** | `config-reloader` | `quay.io/prometheus-operator/prometheus-config-reloader:v0.81.0` |
-| **Loki** | `loki` | `docker.io/grafana/loki:3.7.1` |
-| **Loki Canary** | `loki-canary` | `docker.io/grafana/loki-canary:3.7.1` |
+| **Loki** | `loki` | `docker.io/grafana/loki:3.7.2` |
+| **Loki Canary** | `loki-canary` | `docker.io/grafana/loki-canary:3.7.2` |
 | **Loki Gateway** | `nginx` | `docker.io/nginxinc/nginx-unprivileged:1.30-alpine` |
+| **Loki Cache** | `memcached` | `docker.io/library/memcached:1.6.29-alpine` |
 | **Loki Access Log** | `access-log-exporter` | `ghcr.io/jkroepke/access-log-exporter:0.3.11` |
 | **Tempo** | `tempo` | `docker.io/grafana-community/tempo:2.10.1` |
 | **Prometheus** | `prometheus` | `quay.io/prometheus/prometheus:v3.11.2` |
