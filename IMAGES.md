@@ -13,7 +13,7 @@ This document tracks all container images currently deployed in the `monitoring`
 | **Loki Cache** | `memcached` | `docker.io/library/memcached:1.6.29-alpine` |
 | **Loki Access Log** | `access-log-exporter` | `ghcr.io/jkroepke/access-log-exporter:0.3.11` |
 | **Tempo** | `tempo` | `docker.io/grafana-community/tempo:2.10.1` |
-| **Prometheus** | `prometheus` | `quay.io/prometheus/prometheus:v3.11.2` |
+| **Prometheus** | `prometheus` | `quay.io/prometheus/prometheus:v3.13.2` |
 | **Alertmanager** | `alertmanager` | `quay.io/prometheus/alertmanager:v0.32.0` |
 | **Kube-State-Metrics** | `kube-state-metrics` | `registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.18.0` |
 | **Node Exporter** | `node-exporter` | `quay.io/prometheus/node-exporter:v1.11.1` |
