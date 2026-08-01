@@ -2,6 +2,11 @@
 
 - [x] In tempo, able to click and zoom into logs (trace-to-log) - see [Trace-to-Log: No results found (Zero-width time range)](./TROUBLESHOOT.md#trace-to-log-no-results-found-zero-width-time-range)
 - [x] Review https://grafana.com/docs/loki/latest/send-data/k8s-monitoring-helm/
+- [ ] Migrate collection tier to `grafana/k8s-monitoring` Helm chart (replaces current Alloy/Grafana setup)
+  - References:
+    - https://github.com/QuantumDancer/idp-argocd-platform-apps/blob/main/charts/k8s-monitoring/values.yaml
+    - https://github.com/Cloud-Architect-Emma/opentelemetry-collector-examples
+- [ ] Setup https://github.com/grafana/gcx (Grafana Cloud Experience)
 - [x] Enable alerting (Configured Alertmanager with Mattermost support and production-grade grouping)
 - [ ] Figure out what are the more commonly used alerts and defined it
   - Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
@@ -43,7 +48,6 @@
 - [ ] Configure git-sync
 - [ ] Integrate with Keycloak SSO
 - [ ] Ensure both tempo and loki are storing in s3
-- [ ] Setup https://github.com/grafana/gcx
 - [ ] Figure out all configs to disable anonymous usage data. e.g. tempo has `reportingEnabled:true`
 - [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
 - [ ] Ensure `examplars` is setup correctly
@@ -55,3 +59,6 @@
 - [ ] Try out https://grafana.com/docs/grafana/latest/as-code/observability-as-code/grafana-cli/
 - [ ] Configure [tempo monitoring](https://grafana.com/docs/tempo/latest/operations/monitor/set-up-monitoring/)
 - [ ] Configure [loki monitoring](https://grafana.com/docs/loki/latest/operations/meta-monitoring/)
+- [ ] Configure mcp server
+  - https://github.com/pab1it0/prometheus-mcp-server
+  - https://github.com/grafana/mcp-grafana
