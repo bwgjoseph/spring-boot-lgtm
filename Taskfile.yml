@@ -11,7 +11,7 @@ vars:
   VER_LOKI: "15.0.1"
   VER_TEMPO: "2.1.2"
   VER_MIMIR: "6.0.6"
-  VER_PROMETHEUS: "29.7.0"
+  VER_PROMETHEUS: "29.20.1"
   VER_MINIO: "5.4.0"
   VER_MONGODB: "18.6.31"
 
@@ -496,7 +496,6 @@ tasks:
     desc: Get the MinIO root password
     cmds:
       - pwsh -File ./verification/get-secret.ps1 -secretName minio -keyName rootPassword
-
 
   # --- UNINSTALL TASKS ---
   uninstall:minio:
