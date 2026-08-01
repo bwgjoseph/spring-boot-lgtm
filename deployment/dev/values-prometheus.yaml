@@ -1,4 +1,7 @@
 server:
+  image:
+    tag: "v3.13.2"
+
   # Setting to true might help the chart correctly manage the flags
   remoteWriteReceiver: true
   

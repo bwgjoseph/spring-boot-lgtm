@@ -1,4 +1,7 @@
 server:
+  image:
+    tag: "v3.13.2"
+
   persistentVolume:
     enabled: true
     size: 50Gi
