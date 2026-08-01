@@ -45,11 +45,18 @@ tasks:
     cmds:
       - kubectl create secret generic grafana-admin-credentials -n {{.NAMESPACE}} --from-literal=admin-user=admin --from-literal=admin-password=password --dry-run=client -o yaml | kubectl apply -f -
 
+  secret:minio:
+    desc: Create Minio admin credentials secret
+    deps: [namespace]
+    cmds:
+      - kubectl create secret generic minio-secret -n {{.NAMESPACE}} --from-literal=rootUser=admin --from-literal=rootPassword=password123 --dry-run=client -o yaml | kubectl apply -f -
+
   secret:
-    desc: Deploy all secrets (MongoDB, Grafana)
+    desc: Deploy all secrets (MongoDB, Grafana, Minio)
     cmds:
       - task: secret:mongodb
       - task: secret:grafana
+      - task: secret:minio
 
   configmap:prometheus-alert:
     desc: Deploy Prometheus alerting rules ConfigMap
