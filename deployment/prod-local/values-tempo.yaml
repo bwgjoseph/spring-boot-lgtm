@@ -16,7 +16,8 @@ ingest:
 blockBuilder:
   enabled: true
   replicas: 3
-  affinity: {}
+  affinity:
+    nodeAffinity: {}
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -30,7 +31,8 @@ blockBuilder:
 liveStore:
   enabled: true
   replicas: 3
-  affinity: {}
+  affinity:
+    nodeAffinity: {}
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -65,7 +67,8 @@ globalExtraEnv:
 # Resource allocations & replicas for HA components
 distributor:
   replicas: 2
-  affinity: {}
+  affinity:
+    nodeAffinity: {}
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -83,7 +86,8 @@ distributor:
 
 querier:
   replicas: 2
-  affinity: {}
+  affinity:
+    nodeAffinity: {}
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -96,24 +100,28 @@ querier:
 
 queryFrontend:
   replicas: 2
-  affinity: {}
+  affinity:
+    nodeAffinity: {}
   extraArgs:
     - -config.expand-env=true
 
 backendScheduler:
-  affinity: {}
+  affinity:
+    nodeAffinity: {}
   extraArgs:
     - -config.expand-env=true
 
 backendWorker:
-  affinity: {}
+  affinity:
+    nodeAffinity: {}
   extraArgs:
     - -config.expand-env=true
 
 # Metrics generator configuration
 metricsGenerator:
   enabled: true
-  affinity: {}
+  affinity:
+    nodeAffinity: {}
   extraArgs:
     - -config.expand-env=true
   config:
