@@ -20,8 +20,7 @@ ingest:
 blockBuilder:
   enabled: true
   replicas: 3
-  affinity:
-    nodeAffinity: {}
+  affinity: ""
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -35,8 +34,7 @@ blockBuilder:
 liveStore:
   enabled: true
   replicas: 3
-  affinity:
-    nodeAffinity: {}
+  affinity: ""
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -90,8 +88,7 @@ globalExtraEnv:
 # 6. Minimal resource limits & 1 replica per component
 distributor:
   replicas: 1
-  affinity:
-    nodeAffinity: {}
+  affinity: ""
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -104,8 +101,7 @@ distributor:
 
 querier:
   replicas: 1
-  affinity:
-    nodeAffinity: {}
+  affinity: ""
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -118,8 +114,7 @@ querier:
 
 queryFrontend:
   replicas: 1
-  affinity:
-    nodeAffinity: {}
+  affinity: ""
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -132,8 +127,7 @@ queryFrontend:
 
 backendScheduler:
   replicas: 1
-  affinity:
-    nodeAffinity: {}
+  affinity: ""
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -146,8 +140,7 @@ backendScheduler:
 
 backendWorker:
   replicas: 1
-  affinity:
-    nodeAffinity: {}
+  affinity: ""
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -162,8 +155,7 @@ backendWorker:
 metricsGenerator:
   enabled: true
   replicas: 1
-  affinity:
-    nodeAffinity: {}
+  affinity: ""
   extraArgs:
     - -config.expand-env=true
   resources:
