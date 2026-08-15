@@ -10,7 +10,7 @@ reportingEnabled: false
 # 1. Redpanda Kafka Streaming Ingestion
 ingest:
   kafka:
-    address: redpanda.monitoring.svc.cluster.local:9093
+    address: redpanda.monitoring.svc.cluster.local:9092
     topic: tempo-traces
     consumer_group: tempo-block-builder
     auto_create_topic_enabled: true

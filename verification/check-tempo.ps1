@@ -1,5 +1,9 @@
-# Validates the Tempo pod readiness using K8s native probes
-$tempoPod = (kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo,app.kubernetes.io/instance=tempo -o name | Select-Object -First 1).Split('/')[-1]
+# Validates the Tempo distributor pod readiness using K8s native probes
+$tempoPod = (kubectl get pods -n monitoring -l app.kubernetes.io/instance=tempo,app.kubernetes.io/component=distributor -o name | Select-Object -First 1).Split('/')[-1]
+if (-not $tempoPod) {
+    # Fallback to any tempo instance pod
+    $tempoPod = (kubectl get pods -n monitoring -l app.kubernetes.io/instance=tempo -o name | Select-Object -First 1).Split('/')[-1]
+}
 if (-not $tempoPod) {
     Write-Error "Could not find Tempo pod."
     exit 1
