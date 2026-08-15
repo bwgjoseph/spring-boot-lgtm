@@ -7,7 +7,7 @@ reportingEnabled: false
 # 1. Redpanda Kafka Streaming Ingestion
 ingest:
   kafka:
-    address: redpanda.monitoring.svc.cluster.local:9092
+    address: redpanda.monitoring.svc.cluster.local:9093
     topic: tempo-traces
     auto_create_topic_enabled: true
     auto_create_topic_default_partitions: 3
@@ -16,6 +16,7 @@ ingest:
 blockBuilder:
   enabled: true
   replicas: 3
+  affinity: {}
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -29,6 +30,7 @@ blockBuilder:
 liveStore:
   enabled: true
   replicas: 3
+  affinity: {}
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -63,6 +65,7 @@ globalExtraEnv:
 # Resource allocations & replicas for HA components
 distributor:
   replicas: 2
+  affinity: {}
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -80,6 +83,7 @@ distributor:
 
 querier:
   replicas: 2
+  affinity: {}
   extraArgs:
     - -config.expand-env=true
   resources:
@@ -92,20 +96,24 @@ querier:
 
 queryFrontend:
   replicas: 2
+  affinity: {}
   extraArgs:
     - -config.expand-env=true
 
 backendScheduler:
+  affinity: {}
   extraArgs:
     - -config.expand-env=true
 
 backendWorker:
+  affinity: {}
   extraArgs:
     - -config.expand-env=true
 
 # Metrics generator configuration
 metricsGenerator:
   enabled: true
+  affinity: {}
   extraArgs:
     - -config.expand-env=true
   config:

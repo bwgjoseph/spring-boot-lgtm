@@ -129,7 +129,7 @@ tasks:
 
   tempo:
     desc: Install or Upgrade Tempo
-    deps: [repos, namespace, redpanda]
+    deps: [repos, namespace]
     cmds:
       - helm upgrade --install tempo grafana-community/tempo-distributed -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f deployment/{{.ENV}}/values-tempo.yaml
 
@@ -216,6 +216,7 @@ tasks:
       - task: configmap
       - task: validate:minio
       - task: validate:mongodb
+      - task: validate:redpanda
       - task: validate:app
       - task: validate:prometheus
       - task: validate:loki
@@ -230,6 +231,13 @@ tasks:
       - task: minio
       - task: init:minio
       - kubectl rollout status deployment/minio -n {{.NAMESPACE}} --timeout=120s
+
+  validate:redpanda:
+    desc: Run full lint, apply, and verify for Redpanda
+    cmds:
+      - task: lint:redpanda
+      - task: redpanda
+      - kubectl rollout status statefulset/redpanda -n {{.NAMESPACE}} --timeout=180s
 
   validate:app:
     desc: Build, load, deploy, and verify the app

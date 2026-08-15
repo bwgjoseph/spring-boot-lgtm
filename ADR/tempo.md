@@ -36,7 +36,7 @@ Traces are critical for debugging latency and understanding service dependencies
 - **Live Searchability:** Ensuring that "hot" data in the WAL is searchable eliminates the delay typically caused by S3 compaction cycles.
 
 ## Implementation Source of Truth
-- **Kafka Ingest:** `ingest.kafka.address: redpanda.monitoring.svc.cluster.local:9092`, `topic: tempo-traces`
+- **Kafka Ingest:** `ingest.kafka.address: redpanda.monitoring.svc.cluster.local:9093`, `topic: tempo-traces`
 - **Partitions:** `auto_create_topic_default_partitions: 3` (matches `blockBuilder.replicas` and `liveStore.replicas`)
 - **blockBuilder Replicas:** `replicas: 3`
 - **liveStore Replicas:** `replicas: 3`
