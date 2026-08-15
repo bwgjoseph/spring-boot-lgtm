@@ -10,7 +10,7 @@ We follow a **"Decoupled Ingestion & Storage"** pattern. Data enters through a d
 ### A. Development Sandbox (Dev)
 Optimized for resource efficiency and rapid feedback loops.
 - **Loki:** `SingleBinary` mode. No caching, minimal resource footprint.
-- **Tempo:** `SingleBinary` mode (1 replica).
+- **Tempo:** `Microservices` mode (distributor, querier, query-frontend, block-builder, live-store, backend-scheduler, backend-worker) backed by **Redpanda** Kafka streaming buffer. gRPC-only OTLP ingestion.
 - **Mimir:** Standalone Prometheus instance (metrics).
 - **Alloy:** Standalone deployment.
 - **Persistence:** Local SSD PVCs (MinIO).
@@ -18,7 +18,7 @@ Optimized for resource efficiency and rapid feedback loops.
 ### B. Production / HA (Prod)
 Optimized for durability, high-availability, and long-term retention.
 - **Loki:** `SimpleScalable` mode. Distributed read/write/backend components, Memcached caching for queries/chunks, and replication factor of 2 (Optimized for HA validation).
-- **Tempo:** `Scalable Monolithic` mode with 2 replicas, Memberlist gossip coordination, and Memcached-backed search.
+- **Tempo:** `Microservices` mode (tempo-distributed, Tempo 3.x) with 2 replicas per component (distributor, querier, query-frontend), Memberlist gossip coordination, gRPC-only OTLP ingestion. **Redpanda** (3 replicas, 3 partitions) as the Kafka-compatible streaming buffer for `blockBuilder` and `liveStore`.
 - **Mimir:** Monolithic HA-ready deployment (2 replicas) using S3 block storage.
 - **Alloy:** Clustered Deployment (2 replicas) with Gossip protocol and Tail-based sampling enabled for trace affinity.
 - **Persistence:** S3-native object storage (MinIO/AWS S3) with compactor-enforced physical retention.
@@ -38,7 +38,8 @@ graph TD
 
     subgraph Storage [Storage Layer]
         LokiDev[Loki - Single Binary]
-        TempoDev[Tempo - Single Binary]
+        RedpandaDev[Redpanda - Single Node]
+        TempoDev["Tempo 3.x - Microservices\n(distributor / querier / query-frontend\nblock-builder x3 / live-store x3\nbackend-scheduler / backend-worker)"]
         MimirDev[Prometheus - Standalone]
     end
 
@@ -51,14 +52,18 @@ graph TD
     AlloyDev -- "Scrape (Pull)" --> App1
     
     AlloyDev -- "Forwarding" --> LokiDev
-    AlloyDev -- "Forwarding" --> TempoDev
+    AlloyDev -- "OTLP/gRPC" --> TempoDev
     AlloyDev -- "Scrape" --> MimirDev
+
+    TempoDev -- "Produce" --> RedpandaDev
+    RedpandaDev -- "Consume" --> TempoDev
 
     LokiDev --> S3
     TempoDev --> S3
     MimirDev --> PVC
 
     style AlloyDev fill:#eee,stroke:#333
+    style RedpandaDev fill:#ffecb3,stroke:#f9a825
     style S3 fill:#bbf,stroke:#333,stroke-dasharray: 5 5
     style PVC fill:#ddd,stroke:#333,stroke-dasharray: 3 3
 ```
@@ -77,7 +82,7 @@ graph TD
 
     subgraph Storage [Storage Layer - HA/Scalable]
         LokiProd[Loki - SimpleScalable]
-        TempoProd[Tempo - Scalable Monolithic]
+        TempoProd["Tempo 3.x - Microservices HA\n(distributor x2 / querier x2\nquery-frontend x2 / backend-scheduler / backend-worker)"]
         MimirProd[Mimir - Monolithic HA]
     end
 

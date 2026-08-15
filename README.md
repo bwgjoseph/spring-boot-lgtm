@@ -89,19 +89,20 @@ graph TD
 - **Correlation:** Data sources use standardized UIDs (`prometheus`, `loki`, `tempo`) to enable seamless cross-linking (Metric -> Trace -> Log).
 - **Alloy:** Acts as the entry point, processing traces (sampling, batching) and extracting structured metadata before forwarding to Tempo and Loki.
 - **Service Graph:** Generated natively by Tempo's internal `metricsGenerator` and pushed to Prometheus.
-- **Scalability:** Loki runs in **Single Binary Mode** for resource efficiency in this sandbox. Tempo runs as a Single Binary as well.
-- **Storage:** A local **MinIO** instance provides S3-compatible shared storage for **Loki**, while **Tempo** uses local Persistent Volumes (PVC) for simplicity and stability. **MongoDB** is deployed as a 3-node ReplicaSet (Primary, Secondary, Arbiter) with CDC enabled.
+- **Scalability:** Loki runs in **SimpleScalable** mode. Tempo runs in **Microservices Mode** (`tempo-distributed` 3.0.6) with **Redpanda** as the streaming ingestion log.
+- **Storage:** MinIO provides S3-compatible shared storage for **Loki**, **Tempo**, and **Mimir**. **MongoDB** is deployed as a 3-node ReplicaSet with CDC enabled.
 
 ## 🛠️ Tech Stack & Versions
 
 | Component           | Role              | Helm Chart                        | Version   |
 |---------------------|-------------------|-----------------------------------|-----------|
 | **Spring Boot 3.5** | Application       | -                                 | -         |
-| **Grafana Alloy**   | Collector/Gateway | `grafana/alloy`                   | `1.8.0`   |
+| **Grafana Alloy**   | Collector/Gateway | `grafana/alloy`                   | `1.8.1`   |
 | **Grafana**         | Visualization     | `grafana-community/grafana`       | `12.1.1`  |
-| **Loki**            | Log Storage       | `grafana-community/loki`          | `13.2.3`  |
-| **Tempo**           | Trace Storage     | `grafana-community/tempo`         | `2.0.0`   |
-| **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `29.2.1`  |
+| **Loki**            | Log Storage       | `grafana-community/loki`          | `15.0.1`  |
+| **Tempo**           | Trace Storage     | `grafana-community/tempo-distributed` | `3.0.6` |
+| **Redpanda**        | Streaming Log     | `redpanda/redpanda`               | `26.2.1`  |
+| **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `29.20.1` |
 | **MinIO**           | Object Storage    | `minio/minio`                     | `5.4.0`   |
 | **MongoDB**         | DB / CDC Source   | `bitnami/mongodb` (OCI)           | `18.6.31` |
 

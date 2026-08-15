@@ -14,7 +14,8 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
   - **Grafana Alloy (1.8.1):** Features `loki.process` metadata extraction and `otelcol.processor.tail_sampling`.
 - **Storage:** 
   - **Loki (15.0.1):** Log Storage (SimpleScalable mode with Index Gateway).
-  - **Tempo (2.1.2):** Trace Storage and Service Graph generation (Scalable Monolithic mode).
+  - **Tempo (3.0.6):** Trace Storage and Service Graph generation (tempo-distributed / Tempo 3.x microservices mode).
+  - **Redpanda (26.2.1):** High-performance Kafka-compatible streaming log for Tempo trace ingestion.
   - **Prometheus (29.7.0):** Metrics scraper and Alerting engine.
   - **Mimir (6.0.6):** Metrics Long-term Storage (Monolithic HA mode).
   - **MinIO (5.4.0):** Internal Object Storage for Loki, Tempo, and Mimir.
@@ -50,7 +51,8 @@ The project uses `Taskfile` to simplify complex operations across environments (
 | **Surgical Swap** | `task swap:alloy`| Upgrades Alloy from Dev to Prod-Local HA for validation. |
 | **Surgical Swap** | `task swap:mimir`| Swaps Prometheus for Mimir Monolithic HA. |
 | **Config Sync** | `task sync:loki` | Promotes verified `prod-local` architectural keys to `prod`. |
-| **Utilities** | `task pf:all` | Forwards all UIs (Grafana, Prom, Alloy, App). |
+| **Utilities** | `task pf:redpanda`| Port-forwards Redpanda Console UI (http://localhost:8081). |
+| **Utilities** | `task pf:all` | Forwards all UIs (Grafana, Prom, Redpanda, Alloy, App). |
 | **Cleanup** | `task clean` | Wipes all ConfigMaps and the monitoring namespace. |
 
 ## Development Conventions

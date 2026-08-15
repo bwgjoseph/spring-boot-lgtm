@@ -1,20 +1,23 @@
-# Tempo Deployment: Scalable Monolithic (Single Binary) with 3 replicas for HA
-replicas: 3
+# Tempo Distributed (Chart v3.0.6, Tempo 3.x) - Production Configuration
+fullnameOverride: tempo
 
-tempo:
-  # Configuration expansion to support environment variables in values
+streamOverHTTPEnabled: true
+reportingEnabled: false
+
+# 1. Redpanda Kafka Streaming Ingestion
+ingest:
+  kafka:
+    address: redpanda.monitoring.svc.cluster.local:9092
+    topic: tempo-traces
+    auto_create_topic_enabled: true
+    auto_create_topic_default_partitions: 3
+
+# 2. Ingestion components connected to Kafka (3 replicas matching partition count)
+blockBuilder:
+  enabled: true
+  replicas: 3
   extraArgs:
-    config.expand-env: "true"
-
-  # Secret injection for S3 bucket credentials
-  extraEnv:
-    - name: S3_SECRET_KEY
-      valueFrom:
-        secretKeyRef:
-          name: minio
-          key: rootPassword
-
-  # Resource allocations sized for high-throughput ingestion and metrics generation
+    - -config.expand-env=true
   resources:
     requests:
       cpu: 500m
@@ -23,57 +26,101 @@ tempo:
       cpu: 2
       memory: 4Gi
 
-  # Termination grace period for reliable WAL flushing to S3
-  terminationGracePeriodSeconds: 60
+liveStore:
+  enabled: true
+  replicas: 3
+  extraArgs:
+    - -config.expand-env=true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
 
-# Core Tempo server and storage configuration
-config: |
-  server:
-    http_listen_port: 3200
-    grpc_server_max_recv_msg_size: 16777216
-  storage:
-    trace:
-      backend: s3
-      s3:
-        endpoint: minio.monitoring.svc.cluster.local:9000
-        bucket: tempo
-        access_key: admin
-        secret_key: ${S3_SECRET_KEY}
-        insecure: true
-        forcepathstyle: true
-      wal:
-        path: /var/tempo/wal
-  compactor:
-    compaction:
-      block_retention: 168h # 7 days
-  distributor:
-    receivers:
-      otlp:
-        protocols:
-          grpc:
-            endpoint: "0.0.0.0:4317"
-          http:
-            endpoint: "0.0.0.0:4318"
-  ingester:
-    lifecycler:
-      ring:
-        kvstore:
-          store: memberlist # Transition to memberlist for HA resilience
-        replication_factor: 3
+# 3. Storage configuration for MinIO S3 backend
+storage:
+  trace:
+    backend: s3
+    blocklist_poll: 1m
+    s3:
+      endpoint: minio.monitoring.svc.cluster.local:9000
+      bucket: tempo
+      access_key: admin
+      secret_key: ${S3_SECRET_KEY}
+      insecure: true
+      forcepathstyle: true
 
-  metrics_generator:
+# Secret injection for S3 bucket credentials
+globalExtraEnv:
+  - name: S3_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: minio
+        key: rootPassword
+
+# High-throughput production resource allocations & replicas
+distributor:
+  replicas: 2
+  extraArgs:
+    - -config.expand-env=true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+
+querier:
+  replicas: 2
+  extraArgs:
+    - -config.expand-env=true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+queryFrontend:
+  replicas: 2
+  extraArgs:
+    - -config.expand-env=true
+
+backendScheduler:
+  extraArgs:
+    - -config.expand-env=true
+
+backendWorker:
+  extraArgs:
+    - -config.expand-env=true
+
+# Metrics generator configuration
+metricsGenerator:
+  enabled: true
+  extraArgs:
+    - -config.expand-env=true
+  config:
     storage:
-      path: /var/tempo/wal
+      path: /var/tempo/generator/wal
       remote_write:
         - url: http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/write
-    traces_storage:
-      path: /var/tempo/traces
-    processor:
-      service_graphs: {}
-      span_metrics: {}
-      local_blocks: {}
+          send_exemplars: true
+  processor:
+    service_graphs: {}
+    span_metrics: {}
+    local_blocks: {}
 
-# Persistence: High-IOPS SSD volume for WAL durability
-persistence:
-  enabled: true
-  size: 20Gi
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [span-metrics, service-graphs]
+      generate_native_histograms: both

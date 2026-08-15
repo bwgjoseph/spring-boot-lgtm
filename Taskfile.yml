@@ -9,11 +9,12 @@ vars:
   VER_ALLOY: "1.8.1"
   VER_GRAFANA: "12.1.1"
   VER_LOKI: "15.0.1"
-  VER_TEMPO: "2.1.2"
+  VER_TEMPO: "3.0.6"
   VER_MIMIR: "6.0.6"
   VER_PROMETHEUS: "29.20.1"
   VER_MINIO: "5.4.0"
   VER_MONGODB: "18.6.31"
+  VER_REDPANDA: "26.2.1"
 
 tasks:
   # --- 📦 SETUP & FOUNDATION ---
@@ -25,6 +26,7 @@ tasks:
       - helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
       - helm repo add minio https://charts.min.io/
       - helm repo add bitnami https://charts.bitnami.com/bitnami
+      - helm repo add redpanda https://charts.redpanda.com
       - helm repo update
 
   namespace:
@@ -119,11 +121,17 @@ tasks:
     cmds:
       - helm upgrade --install loki grafana-community/loki -n {{.NAMESPACE}} --version {{.VER_LOKI}} -f deployment/{{.ENV}}/values-loki.yaml
 
-  tempo:
-    desc: Install or Upgrade Tempo
+  redpanda:
+    desc: Install or Upgrade Redpanda (Kafka streaming backend for Tempo)
     deps: [repos, namespace]
     cmds:
-      - helm upgrade --install tempo grafana-community/tempo -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f deployment/{{.ENV}}/values-tempo.yaml
+      - helm upgrade --install redpanda redpanda/redpanda -n {{.NAMESPACE}} --version {{.VER_REDPANDA}} -f deployment/{{.ENV}}/values-redpanda.yaml
+
+  tempo:
+    desc: Install or Upgrade Tempo
+    deps: [repos, namespace, redpanda]
+    cmds:
+      - helm upgrade --install tempo grafana-community/tempo-distributed -n {{.NAMESPACE}} --version {{.VER_TEMPO}} -f deployment/{{.ENV}}/values-tempo.yaml
 
   grafana:
     desc: Install or Upgrade Grafana
@@ -161,11 +169,17 @@ tasks:
   lint:
     desc: Dry-run all observability component Helm charts
     cmds:
+      - task: lint:redpanda
       - task: lint:alloy
       - task: lint:loki
       - task: lint:tempo
       - task: lint:prometheus
       - task: lint:grafana
+
+  lint:redpanda:
+    desc: Dry-run Redpanda Helm chart
+    cmds:
+      - pwsh -Command "helm template redpanda redpanda/redpanda -n monitoring -f deployment/{{.ENV}}/values-redpanda.yaml | Out-Null"
 
   lint:alloy:
     desc: Dry-run Alloy Helm chart
@@ -180,7 +194,7 @@ tasks:
   lint:tempo:
     desc: Dry-run Tempo Helm chart
     cmds:
-      - pwsh -Command "helm template tempo grafana-community/tempo -n monitoring -f deployment/{{.ENV}}/values-tempo.yaml | Out-Null"
+      - pwsh -Command "helm template tempo grafana-community/tempo-distributed -n monitoring -f deployment/{{.ENV}}/values-tempo.yaml | Out-Null"
 
   lint:prometheus:
     desc: Dry-run Prometheus Helm chart
@@ -406,6 +420,12 @@ tasks:
       - echo MinIO API http://localhost:9000
       - echo MinIO Console http://localhost:9001
 
+  pf:redpanda:
+    desc: Port-forward Redpanda Console (8081)
+    cmds:
+      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward service/redpanda-console 8081:8080 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - echo Redpanda Console UI http://localhost:8081
+
   pf:all:
     desc: Port-forward all observability UIs
     cmds:
@@ -414,6 +434,7 @@ tasks:
       - task: pf:prometheus
       - task: pf:alertmanager
       - task: pf:alloy
+      - task: pf:redpanda
       - task: pf:spring-app
       - echo "All port-forwards started in background."
 
@@ -439,6 +460,8 @@ tasks:
         vars: { PORT: 12345 }
       - task: pf:kill
         vars: { PORT: 8080 }
+      - task: pf:kill
+        vars: { PORT: 8081 }
 
   # --- 🛠️ UTILITIES & LIFECYCLE ---
   infra:
@@ -448,6 +471,7 @@ tasks:
       - task: configmap
       - task: minio
       - task: mongodb
+      - task: redpanda
       - task: prometheus
       - task: loki
       - task: tempo
@@ -523,6 +547,12 @@ tasks:
       - helm uninstall loki -n {{.NAMESPACE}} --ignore-not-found
       - kubectl delete pvc -l app.kubernetes.io/instance=loki -n {{.NAMESPACE}} --ignore-not-found
 
+  uninstall:redpanda:
+    desc: Uninstall Redpanda and its storage
+    cmds:
+      - helm uninstall redpanda -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete pvc -l app.kubernetes.io/instance=redpanda -n {{.NAMESPACE}} --ignore-not-found
+
   uninstall:tempo:
     desc: Uninstall Tempo and its storage
     cmds:
@@ -548,6 +578,7 @@ tasks:
     cmds:
       - task: uninstall:minio
       - task: uninstall:mongodb
+      - task: uninstall:redpanda
       - task: uninstall:prometheus
       - task: uninstall:loki
       - task: uninstall:tempo

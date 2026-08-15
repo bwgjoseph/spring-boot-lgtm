@@ -18,7 +18,15 @@ The following table lists the `requests` (guaranteed) and `limits` (maximum) for
 | **loki-cache** (Memcached) | 50m | 200m | 128Mi | 256Mi | `values-loki.yaml` |
 | **mongodb** (Node x2) | 100m | 500m | 256Mi | 512Mi | `values-mongodb.yaml` |
 | **mongodb-arbiter** | 100m | 100m | 128Mi | 256Mi | `values-mongodb.yaml` |
-| **tempo** | 10m | 500m | 256Mi | 1Gi | `values-tempo.yaml` |
+| **redpanda** | 100m | Unset | 2Gi | 2Gi | `values-redpanda.yaml` |
+| **tempo-distributor** | 10m | 200m | 64Mi | 256Mi | `values-tempo.yaml` |
+| **tempo-querier** | 10m | 200m | 64Mi | 256Mi | `values-tempo.yaml` |
+| **tempo-query-frontend** | 10m | 100m | 32Mi | 128Mi | `values-tempo.yaml` |
+| **tempo-block-builder** (x3) | 10m | 200m | 64Mi | 256Mi | `values-tempo.yaml` |
+| **tempo-live-store** (x3) | 10m | 200m | 64Mi | 256Mi | `values-tempo.yaml` |
+| **tempo-backend-scheduler** | 10m | 200m | 64Mi | 256Mi | `values-tempo.yaml` |
+| **tempo-backend-worker** | 10m | 200m | 64Mi | 256Mi | `values-tempo.yaml` |
+| **tempo-metrics-generator** | 10m | 200m | 64Mi | 256Mi | `values-tempo.yaml` |
 | **minio** | 100m | Unset | 256Mi | Unset | `values-minio.yaml` |
 | **alloy** (DaemonSet) | Unset | Unset | Unset | Unset | `values-alloy.yaml` |
 | **prometheus-server** | Unset | Unset | Unset | Unset | `values-prometheus.yaml` |
@@ -42,6 +50,7 @@ Components like Alloy, Prometheus, and Grafana are running without specific limi
 If you see a pod with the status `CrashLoopBackOff` and a reason of `OOMKilled`, it means the process tried to use more than its **Limit**.
 *   **Fix:** Increase the `limits.memory` in the corresponding `values-xxx.yaml` file.
 *   **Startup Headroom:** Spring Boot and MongoDB 8.x require significant memory during the JVM/Engine startup phase. We recommend at least **1Gi** for the application pod.
+*   **Redpanda Seastar Minimum:** Redpanda's Seastar runtime allocates `--memory` (80% of container limit) + `--reserve-memory` at startup. A container limit of `1Gi` leaves only ~800MB physically available after OS overhead, but Seastar requires at least ~858MB. Always set `resources.memory.container.max: 2Gi` for Redpanda, and explicitly pin `resources.memory.redpanda.memory: 1536M` / `reserveMemory: 200M` to avoid `insufficient physical memory` crashes.
 
 ### 4. CPU Throttling
 If CPU usage hits the **Limit**, Kubernetes will "throttle" the pod (slow it down) rather than killing it. If the application feels sluggish or health checks time out, consider increasing the `limits.cpu`.

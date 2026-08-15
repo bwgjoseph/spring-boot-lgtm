@@ -62,3 +62,6 @@
 - [ ] Configure mcp server
   - https://github.com/pab1it0/prometheus-mcp-server
   - https://github.com/grafana/mcp-grafana
+
+- As of 15th Aug, setup redpanda in order to work with tempo-distributed in tempo 3.x. But while configuring tempo chart, token used up all.
+- To resume configuring tempo such that it can be spinned up all and working.

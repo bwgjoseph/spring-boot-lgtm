@@ -12,7 +12,17 @@ This document tracks all container images currently deployed in the `monitoring`
 | **Loki Gateway** | `nginx` | `docker.io/nginxinc/nginx-unprivileged:1.30-alpine` |
 | **Loki Cache** | `memcached` | `docker.io/library/memcached:1.6.29-alpine` |
 | **Loki Access Log** | `access-log-exporter` | `ghcr.io/jkroepke/access-log-exporter:0.3.11` |
-| **Tempo** | `tempo` | `docker.io/grafana-community/tempo:2.10.1` |
+| **Redpanda Broker** | `redpanda` | `docker.io/redpandadata/redpanda:v26.2.1` |
+| **Redpanda Console** | `console` | `docker.io/redpandadata/console:v3.9.0` |
+| **Redpanda Operator** | `redpanda-operator` | `docker.io/redpandadata/redpanda-operator:v26.2.1` |
+| **Tempo Distributor** | `tempo` | `docker.io/grafana/tempo:3.0.2` |
+| **Tempo Block Builder** | `tempo` | `docker.io/grafana/tempo:3.0.2` |
+| **Tempo Live Store** | `tempo` | `docker.io/grafana/tempo:3.0.2` |
+| **Tempo Querier** | `tempo` | `docker.io/grafana/tempo:3.0.2` |
+| **Tempo Query Frontend** | `tempo` | `docker.io/grafana/tempo:3.0.2` |
+| **Tempo Backend Scheduler** | `tempo` | `docker.io/grafana/tempo:3.0.2` |
+| **Tempo Backend Worker** | `tempo` | `docker.io/grafana/tempo:3.0.2` |
+| **Tempo Metrics Generator** | `tempo` | `docker.io/grafana/tempo:3.0.2` |
 | **Prometheus** | `prometheus` | `quay.io/prometheus/prometheus:v3.11.2` |
 | **Alertmanager** | `alertmanager` | `quay.io/prometheus/alertmanager:v0.32.0` |
 | **Kube-State-Metrics** | `kube-state-metrics` | `registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.18.0` |

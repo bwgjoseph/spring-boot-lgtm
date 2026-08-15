@@ -1,7 +1,7 @@
 # ADR: Grafana Tempo Distributed Tracing
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 Traces are critical for debugging latency and understanding service dependencies. High cardinality and high volume make trace storage challenging. We require a setup that:
@@ -11,22 +11,24 @@ Traces are critical for debugging latency and understanding service dependencies
 - **Stable:** Immune to resource exhaustion from runaway services.
 
 ## Decision
-1.  **Deployment Mode:** Use **Scalable Monolithic** (via the Single Binary chart with replicas=2).
-2.  **Cluster Coordination:** Use **Memberlist (Gossip)** for the hash ring store (switching from in-memory) to ensure consistent data distribution that survives restarts.
-3.  **Storage Architecture:**
+1.  **Deployment Mode:** Use **Tempo 3.x Microservices Architecture** (via `grafana-community/tempo-distributed` chart 3.0.6) with **Redpanda** (Kafka-compatible) as the streaming ingestion log.
+2.  **Streaming Ingestion:** `tempo-distributor` ingests OTLP traces and writes to Redpanda topic (`tempo-traces`). `tempo-block-builder` (3 replicas) consumes from Redpanda and flushes Parquet blocks to MinIO S3 object storage. `tempo-live-store` (3 replicas) serves low-latency recent trace queries.
+3.  **Cluster Coordination:** Use **Memberlist (Gossip)** for ring store distribution across microservices.
+4.  **Storage Architecture:**
     *   **Backend:** Use S3-compatible object storage (MinIO/S3) for long-term trace blocks.
-    *   **WAL Persistence:** Use high-performance **Local SSD (20Gi)** for the Write-Ahead Log (WAL) to prevent data loss or corruption during pod restarts.
-4.  **Data Format:** Explicitly use **Parquet** for backend trace blocks to ensure high-performance columnar searching.
-5.  **Metrics-from-Traces:**
+    *   **WAL Persistence:** Use high-performance Local SSD storage for Write-Ahead Log (WAL).
+5.  **Data Format:** Explicitly use **Parquet** for backend trace blocks to ensure high-performance columnar searching.
+6.  **Metrics-from-Traces:**
     *   Enable the **Metrics Generator** for `service-graphs` and `span-metrics`.
     *   Export these metrics via **Prometheus Remote Write** to the central metrics sink.
-6.  **Retention:** Maintain a **7-day** retention period on S3 to balance debugging utility with storage costs.
+7.  **Retention:** Maintain a **7-day** retention period on S3 to balance debugging utility with storage costs.
 7.  **Ingestion Guardrails:** Implement mandatory limits of **10MB** and **20,000 spans** per trace to protect cluster memory.
 8.  **Hot Data Discovery:** Configure the querier to search the active WAL to make traces searchable within seconds of ingestion.
 9.  **Graceful Termination:** Configured with a minimum **60s termination grace period** to ensure the WAL is flushed to S3.
 
 ## Rationale
-- **Scalable Monolithic:** Provides High Availability (HA) without the operational complexity of the full Microservices architecture.
+- **Microservices Architecture:** Provides fine-grained horizontal scaling per component (distributor, block-builder, live-store) without requiring a monolithic ingester cluster.
+- **Kafka Streaming Buffer (Redpanda):** Decouples ingestion from storage. The `distributor` writes to Redpanda topic `tempo-traces` (3 partitions), allowing `block-builder` to consume and flush Parquet blocks to MinIO asynchronously without back-pressure on the ingestion path.
 - **Memberlist Resilience:** Unlike in-memory rings, Memberlist ensures that the cluster state is shared and stable across the replicas even during rolling updates.
 - **WAL Durability:** As documented in `SERVICE_GRAPH_ISSUE.md`, a stable WAL is essential for the Metrics Generator to consistently produce Service Graphs. SSD storage ensures the high IOPS required for concurrent ingestion and metrics processing.
 - **Parquet Performance:** Parquet is the modern standard for Tempo, allowing much faster TraceQL queries and smaller storage footprint compared to older formats.
@@ -34,12 +36,15 @@ Traces are critical for debugging latency and understanding service dependencies
 - **Live Searchability:** Ensuring that "hot" data in the WAL is searchable eliminates the delay typically caused by S3 compaction cycles.
 
 ## Implementation Source of Truth
-- **Replicas:** `replicas: 2`
-- **Gossip:** `ingester.lifecycler.ring.kvstore.store: memberlist`
-- **Replication:** `ingester.lifecycler.ring.replication_factor: 2`
+- **Kafka Ingest:** `ingest.kafka.address: redpanda.monitoring.svc.cluster.local:9092`, `topic: tempo-traces`
+- **Partitions:** `auto_create_topic_default_partitions: 3` (matches `blockBuilder.replicas` and `liveStore.replicas`)
+- **blockBuilder Replicas:** `replicas: 3`
+- **liveStore Replicas:** `replicas: 3`
+- **Gossip:** `memberlist` kvstore across all microservice components
 - **WAL Mount:** `/var/tempo/wal`
 - **Graceful Termination:** `terminationGracePeriodSeconds: 60`
 - **Search Logic:** `querier.search_finished_blocks: true`
+- **Env Expansion:** `extraArgs: ["-config.expand-env=true"]` on all components (required for MinIO S3 credentials)
 
 ## Technical Specification & Mapping
 This table maps the production implementation in `deployment/prod/values-tempo.yaml` to the architectural decisions and requirements.

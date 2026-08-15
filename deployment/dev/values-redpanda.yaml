@@ -1,0 +1,42 @@
+# Redpanda Dev Configuration (Lightweight single-node for local dev - Chart 26.2.1)
+image:
+  repository: redpandadata/redpanda
+
+statefulset:
+  replicas: 1
+  sideCars:
+    image:
+      repository: redpandadata/redpanda-operator
+
+resources:
+  cpu:
+    cores: 100m
+  memory:
+    container:
+      max: 2Gi
+    redpanda:
+      memory: 1536M
+      reserveMemory: 200M
+
+storage:
+  persistentVolume:
+    enabled: false
+
+tls:
+  enabled: false
+
+external:
+  enabled: false
+
+console:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: redpandadata/console
+
+config:
+  cluster:
+    auto_create_topics_enabled: true
+
+monitoring:
+  enabled: false

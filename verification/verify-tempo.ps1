@@ -5,40 +5,40 @@ param (
 
 Write-Host "--- Verifying Tempo ($Env Mode: $Mode) ---" -ForegroundColor Cyan
 
-# Detection
-# In the current dev setup, the statefulset is named 'tempo'. 
-# In scalable mode, we expect separate read/write components.
-# Detection
-$tempoPods = kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo -o name
-$isScalable = ($tempoPods.Length -gt 1)
-$mode = if ($isScalable) { "scalable-monolithic" } else { "single-binary" }
+# Tempo 3.x (tempo-distributed) runs as separate Deployments and StatefulSets.
+# We verify the core components: distributor (ingestion), querier (search), and query-frontend (API).
+$components = @(
+    "deployment/tempo-distributor",
+    "deployment/tempo-querier",
+    "deployment/tempo-query-frontend",
+    "statefulset/tempo-backend-scheduler",
+    "statefulset/tempo-backend-worker",
+    "statefulset/tempo-block-builder",
+    "statefulset/tempo-live-store"
+)
 
-Write-Host "  - Detected Topology: $mode"
+foreach ($comp in $components) {
+    Write-Host "  - Checking rollout: $comp"
+    kubectl rollout status $comp -n monitoring --timeout=120s
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "  - [$comp] failed to reach ready state."
+        exit 1
+    }
+    Write-Host "  - [✓] $comp is ready."
+}
 
-# 1. Health
-$comp = if ($isScalable) { "statefulset/tempo" } else { "statefulset/tempo" }
-kubectl rollout status $comp -n monitoring --timeout=60s
-
-# 2. Traffic Simulation
+# Traffic Simulation
 if ($Mode -eq "full") {
     Write-Host "  - Triggering Traffic..."
     & ./verification/trigger-api.ps1
     Start-Sleep -Seconds 5
 }
 
-# 3. Memberlist / Ring check
-if ($isScalable) {
-    $pod = kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo -o name | Select-Object -First 1
-    # Check ring status using wget if available, or just check pod readiness
-    $ring = kubectl exec -n monitoring $pod -- wget -qO- http://localhost:3200/ring 2>$null | Select-String "HEALTHY"
-    if ($ring) { Write-Host "  - [✓] Memberlist Ring: Healthy." } else { Write-Warning "  - Memberlist Ring: Unhealthy (check manually)." }
-}
-
-# 4. S3 check
+# S3 check
 $minioPod = (kubectl get pods -n monitoring -l release=minio -o name | Select-Object -First 1)
 $bucketExists = kubectl exec -n monitoring $minioPod -- mc ls local/tempo --quiet
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "  - [✓] S3 Backend healthy."
+    Write-Host "  - [✓] S3 Backend (tempo bucket) healthy."
 } else {
     Write-Warning "  - S3 Backend check failed."
 }

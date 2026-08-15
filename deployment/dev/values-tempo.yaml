@@ -1,72 +1,176 @@
-tempo:
-  replicas: 1
+# Tempo Distributed (Chart v3.0.6, Tempo 3.x) - Dev Minimal Resource Configuration
+fullnameOverride: tempo
+
+# Enable HTTP streaming for trace queries to lower memory overhead on queryFrontend
+streamOverHTTPEnabled: true
+
+# Disable anonymous usage reporting
+reportingEnabled: false
+
+# 1. Redpanda Kafka Streaming Ingestion
+ingest:
+  kafka:
+    address: redpanda.monitoring.svc.cluster.local:9093
+    topic: tempo-traces
+    consumer_group: tempo-block-builder
+    auto_create_topic_enabled: true
+    auto_create_topic_default_partitions: 3
+
+# 2. Ingestion components connected to Kafka (3 replicas matching partition count)
+blockBuilder:
+  enabled: true
+  replicas: 3
+  extraArgs:
+    - -config.expand-env=true
   resources:
     requests:
       cpu: 10m
-      memory: 128Mi
+      memory: 64Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 200m
+      memory: 256Mi
 
-  livenessProbe:
-    initialDelaySeconds: 60
-    timeoutSeconds: 10
-  readinessProbe:
-    initialDelaySeconds: 30
-    timeoutSeconds: 10
-
+liveStore:
+  enabled: true
+  replicas: 3
   extraArgs:
-    mem-ballast-size-mbs: 16
-    config.expand-env: "true"
+    - -config.expand-env=true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
 
-  extraEnv:
-    - name: S3_SECRET_KEY
-      valueFrom:
-        secretKeyRef:
-          name: minio
-          key: rootPassword
+# 3. Disable Memcached & caching exporters to save RAM/CPU in dev
+# Also clear cache.caches to prevent the chart from injecting default memcached cache config
+memcached:
+  enabled: false
 
-# Manually define the config to ensure correct field names and structure
-config: |
-  server:
-    http_listen_port: 3200
-  storage:
-    trace:
-      backend: s3
-      s3:
-        endpoint: minio.monitoring.svc:9000
-        bucket: tempo
-        access_key: admin
-        secret_key: ${S3_SECRET_KEY}
-        insecure: true
-        forcepathstyle: true
-      wal:
-        path: /var/tempo/wal
-  compactor:
-    compaction:
-      block_retention: 24h # 1 day
-  distributor:
-    receivers:
-      otlp:
-        protocols:
-          grpc:
-            endpoint: "0.0.0.0:4317"
-  ingester:
-    lifecycler:
-      ring:
-        kvstore:
-          store: inmemory
-        replication_factor: 1
-  metrics_generator:
+memcachedExporter:
+  enabled: false
+
+cache:
+  caches: []
+
+# 4. OTLP Ingestion Protocol: gRPC only on port 4317 (HTTP receiver disabled)
+traces:
+  otlp:
+    grpc:
+      enabled: true
+    http:
+      enabled: false
+
+# 5. Storage configuration for MinIO S3 backend
+storage:
+  trace:
+    backend: s3
+    blocklist_poll: 1m
+    s3:
+      endpoint: minio.monitoring.svc.cluster.local:9000
+      bucket: tempo
+      access_key: admin
+      secret_key: ${S3_SECRET_KEY}
+      insecure: true
+      forcepathstyle: true
+
+# Secret injection for S3 bucket credentials
+globalExtraEnv:
+  - name: S3_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: minio
+        key: rootPassword
+
+# 6. Minimal resource limits & 1 replica per component
+distributor:
+  replicas: 1
+  extraArgs:
+    - -config.expand-env=true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+querier:
+  replicas: 1
+  extraArgs:
+    - -config.expand-env=true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+queryFrontend:
+  replicas: 1
+  extraArgs:
+    - -config.expand-env=true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+backendScheduler:
+  replicas: 1
+  extraArgs:
+    - -config.expand-env=true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+backendWorker:
+  replicas: 1
+  extraArgs:
+    - -config.expand-env=true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# 7. Metrics generator configuration with custom WAL path and Exemplars
+metricsGenerator:
+  enabled: true
+  replicas: 1
+  extraArgs:
+    - -config.expand-env=true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  config:
     storage:
-      path: /var/tempo/wal
+      path: /var/tempo/generator/wal
       remote_write:
         - url: http://prometheus-server.monitoring.svc/api/v1/write
-    traces_storage:
-      path: /var/tempo/traces
-  overrides:
-    metrics_generator_processors: [service-graphs, span-metrics, local-blocks]
+          send_exemplars: true
+  processor:
+    service_graphs: {}
+    span_metrics: {}
+    local_blocks: {}
 
-persistence:
-  enabled: true
-  size: 10Gi
+# 8. Global overrides: Enable native histograms and processors
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [span-metrics, service-graphs]
+      generate_native_histograms: both

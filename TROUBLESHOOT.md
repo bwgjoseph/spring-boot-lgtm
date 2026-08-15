@@ -94,6 +94,80 @@ If you cannot login to Grafana:
 
 ---
 
+## 🔴 Redpanda Issues
+
+### Redpanda: Helm Schema Error — `additional properties 'redpanda' not allowed`
+**Symptom:** `helm upgrade --install redpanda ... --version 26.2.1` fails with:
+```
+Error: values don't meet the specifications of the schema(s) in the following chart(s):
+redpanda:
+- at '/config': additional properties 'redpanda' not allowed
+```
+**Cause:** In Redpanda chart `26.2.1`, the cluster configuration structure was renamed. In older chart versions (5.x), cluster properties were under `config.redpanda`. In `26.x`, they moved to `config.cluster`.
+**Resolution:** Update your values file:
+```yaml
+# ❌ Old schema (chart 5.x)
+config:
+  redpanda:
+    auto_create_topics_enabled: true
+
+# ✅ New schema (chart 26.x)
+config:
+  cluster:
+    auto_create_topics_enabled: true
+```
+
+### Redpanda: `redpanda-0` CrashLoopBackOff — `insufficient physical memory`
+**Symptom:** `redpanda-0` crashes repeatedly. Logs show:
+```
+Could not initialize seastar: std::runtime_error (insufficient physical memory: needed 858783744 available 838860800)
+```
+**Cause:** Redpanda's Seastar runtime requires `--memory` (80% of container limit) plus `--reserve-memory`. With a `1Gi` container limit, only ~800MB is physically available after OS overhead, but Seastar needs ~858MB minimum. This is a hard failure, not an OOMKill.
+**Resolution:** Set the container limit to `2Gi` and explicitly pin Redpanda's internal memory values:
+```yaml
+resources:
+  memory:
+    container:
+      max: 2Gi
+    redpanda:
+      memory: 1536M
+      reserveMemory: 200M
+```
+
+### Redpanda: `redpanda-configuration` Job keeps failing — `Bad Request`
+**Symptom:** Multiple `redpanda-configuration-*` pods appear in `Error` state. Logs show:
+```
+request PUT http://redpanda-0....:9644/v1/cluster_config failed: Bad Request
+```
+With API response: `{"disallowed": "developer_mode"}`.
+**Cause:** `developer_mode` is a **node-level bootstrap property** (set via `redpanda.yaml` at startup), not a cluster configuration property. The chart's post-install Job uses the Admin API `/v1/cluster_config` to push `config.cluster` settings, and the API explicitly rejects `developer_mode`.
+**Resolution:** Remove `developer_mode` from `config.cluster`. The chart automatically handles overprovisioning by injecting `--overprovisioned` at startup when `resources.cpu.cores < 1`:
+```yaml
+# ❌ Wrong — causes 400 Bad Request
+config:
+  cluster:
+    developer_mode: true
+
+# ✅ Correct — just omit it
+config:
+  cluster:
+    auto_create_topics_enabled: true
+```
+
+### Redpanda Console: Pulling from `docker.redpanda.com` instead of Docker Hub
+**Symptom:** The `redpanda-console` deployment pulls `docker.redpanda.com/redpandadata/console:vX.Y.Z` instead of Docker Hub.
+**Cause:** The Redpanda chart uses a separate `image.registry` key for the embedded Console sub-chart. Setting `console.image.repository` alone does not override the registry — the registry prefix must be set explicitly.
+**Resolution:**
+```yaml
+console:
+  enabled: true
+  image:
+    registry: docker.io          # ← must be set explicitly
+    repository: redpandadata/console
+```
+
+---
+
 ## ☕ Application Issues
 
 ### Application Crashes during Startup

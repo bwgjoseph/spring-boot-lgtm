@@ -1,0 +1,40 @@
+# Redpanda Prod-Local HA Configuration (Chart 26.2.1)
+image:
+  repository: redpandadata/redpanda
+
+statefulset:
+  replicas: 3
+  sideCars:
+    image:
+      repository: redpandadata/redpanda-operator
+
+resources:
+  cpu:
+    cores: 250m
+  memory:
+    container:
+      max: 1Gi
+
+storage:
+  persistentVolume:
+    enabled: true
+    size: 5Gi
+
+tls:
+  enabled: false
+
+external:
+  enabled: false
+
+console:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: redpandadata/console
+
+config:
+  cluster:
+    auto_create_topics_enabled: true
+
+monitoring:
+  enabled: false

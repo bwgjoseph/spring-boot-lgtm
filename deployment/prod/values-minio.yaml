@@ -1,18 +1,32 @@
-mode: distributed
-replicas: 4
+# MinIO Production Configuration: Standalone mode with SSD persistence
+mode: standalone
 
+# High Availability: Single replica with persistent storage
+replicas: 1
+
+# Resource allocations sized for high-volume S3 metadata caching
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2
+    memory: 4Gi
+
+# Credential management using existing Kubernetes Secret for security
+existingSecret: minio-secret
+
+# Persistence: High-performance SSD volume for object storage durability
 persistence:
   enabled: true
   size: 50Gi
+  # storageClass: "ssd" # Ensure SSD/NVMe storage class is used
 
-resources:
-  requests:
-    cpu: 250m
-    memory: 512Mi
-  limits:
-    cpu: 1
-    memory: 2Gi
-
-auth:
-  rootUser: admin
-  rootPassword: password123
+# Create buckets on startup for LGTM stack
+buckets:
+  - name: loki
+    policy: public
+  - name: tempo
+    policy: public
+  - name: mimir
+    policy: public
