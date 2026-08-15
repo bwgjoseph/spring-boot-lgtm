@@ -1,11 +1,15 @@
 deploymentMode: SingleBinary
 
-# Disable memory-heavy caches
+# Disable memory-heavy caches — dev is resource-constrained
 chunksCache:
   enabled: false
 
 resultsCache:
   enabled: false
+
+# 18.x: metric label changed from `cluster` to `app_instance`
+monitoring:
+  appInstanceLabelName: "app_instance"
 
 # Keep the gateway for standard routing
 gateway:

@@ -8,7 +8,7 @@ vars:
   # HELM CHART VERSIONS (Stable as of March 2026)
   VER_ALLOY: "1.8.1"
   VER_GRAFANA: "12.1.1"
-  VER_LOKI: "15.0.1"
+  VER_LOKI: "18.9.0"
   VER_TEMPO: "3.0.6"
   VER_MIMIR: "6.0.6"
   VER_PROMETHEUS: "29.20.1"

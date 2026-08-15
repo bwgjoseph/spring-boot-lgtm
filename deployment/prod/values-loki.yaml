@@ -1,6 +1,11 @@
 # Loki Deployment Mode: SimpleScalable separates read/write/backend for independent scaling
 deploymentMode: SimpleScalable
 
+# 18.x: metric label changed from `cluster` to `app_instance`
+monitoring:
+  appInstanceLabelName: "app_instance"
+
+
 chunksCache:
   enabled: true
   memcached:

@@ -1,6 +1,11 @@
 # Loki Deployment Mode: SimpleScalable separates read/write/backend for independent scaling
 deploymentMode: SimpleScalable
 
+# 18.x: metric label changed from `cluster` to `app_instance`
+monitoring:
+  appInstanceLabelName: "app_instance"
+
+
 # Caching disabled to fit local resource constraints.
 # TO_RESOLVE: Re-enable and correctly map resources for Memcached sub-chart.
 chunksCache:
