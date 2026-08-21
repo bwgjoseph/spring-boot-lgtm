@@ -9,6 +9,7 @@ ingest:
   kafka:
     address: redpanda.monitoring.svc.cluster.local:9093
     topic: tempo-traces
+    consumer_group: tempo-block-builder
     auto_create_topic_enabled: true
     auto_create_topic_default_partitions: 3
 
