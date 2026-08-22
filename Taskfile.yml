@@ -7,6 +7,7 @@ vars:
   COMMON_DIR: 'deployment/common'
   # HELM CHART VERSIONS (Stable as of March 2026)
   VER_ALLOY: "1.11.1"
+  VER_K8S_MONITORING: "4.4.0"
   VER_GRAFANA: "12.11.1"
   VER_LOKI: "18.9.0"
   VER_TEMPO: "3.0.6"
