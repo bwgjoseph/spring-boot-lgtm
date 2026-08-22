@@ -45,6 +45,8 @@
 - [ ] Prepare production grade loki/tempo in scable-mode by scaling down unncessary stuff to verify
 - [ ] Make all the dashboard support filter by namespace
 - [ ] Find suitable grafana plugins to install
+  - [ ] Setup Grafana Assistant
+  - [ ] Setup Grafana LLM
 - [ ] Configure git-sync
 - [ ] Integrate with Keycloak SSO
 - [ ] Ensure both tempo and loki are storing in s3
@@ -62,6 +64,23 @@
 - [ ] Configure mcp server
   - https://github.com/pab1it0/prometheus-mcp-server
   - https://github.com/grafana/mcp-grafana
+- [ ] Setup gcx cli
+
 
 - As of 15th Aug, setup redpanda in order to work with tempo-distributed in tempo 3.x. But while configuring tempo chart, token used up all.
 - To resume configuring tempo such that it can be spinned up all and working.
+
+- As of 16th Aug, redpanda, tempo, loki has been verified.
+- While trying to upgrade Alloy to 1.11.1, no more free usage. When coming back next wek, restart from Desktop.
+- After Alloy, it will be Grafana > Prometheus > Mimir
+- After which, it would be nice to see if we can rely on minio alternative, or in work, use HCP
+  - Currently, I evaluated to either SeaweedFS or rustFS
+  - Thing about rustFS is that it isn't GA yet, but it seem like for my use case, rustFS should be good enough; it's more lightweight.
+  - rustFS is a drop-in replacement for minio (see github/rustfs/discussions/2213)
+  - Looks like this [vaults3](https://github.com/Kodiqa-Solutions/VaultS3) also seem lightweight and good
+
+- As of 23 Aug, have upgraded all components except Mimir
+- Moved on to swing to k8s-monitoring at a branch
+- Last working halfway on Laptop got no more tokens to proceed, to resume from Laptop which has more context than Desktop
+
+- As of 30 Aug, have migrated to k8s-monitoring and verified
