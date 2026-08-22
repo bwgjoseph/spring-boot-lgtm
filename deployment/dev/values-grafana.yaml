@@ -4,6 +4,11 @@ admin:
   passwordKey: admin-password
 
 sidecar:
+  datasources:
+    enabled: true
+    label: grafana_datasource
+    labelValue: "1"
+    searchNamespace: ALL
   dashboards:
     enabled: true
     label: grafana_dashboard

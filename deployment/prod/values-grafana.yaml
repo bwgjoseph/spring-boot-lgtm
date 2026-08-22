@@ -18,13 +18,13 @@ resources:
     memory: 1Gi
 
 sidecar:
-  dashboards:
-    enabled: true
-    label: grafana_dashboard
-    labelValue: "1"
-    searchNamespace: ALL
   datasources:
     enabled: true
     label: grafana_datasource
+    labelValue: "1"
+    searchNamespace: ALL
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
     labelValue: "1"
     searchNamespace: ALL

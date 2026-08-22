@@ -7,7 +7,7 @@ vars:
   COMMON_DIR: 'deployment/common'
   # HELM CHART VERSIONS (Stable as of March 2026)
   VER_ALLOY: "1.11.1"
-  VER_GRAFANA: "12.1.1"
+  VER_GRAFANA: "12.11.1"
   VER_LOKI: "18.9.0"
   VER_TEMPO: "3.0.6"
   VER_MIMIR: "6.0.6"
@@ -204,7 +204,7 @@ tasks:
   lint:grafana:
     desc: Dry-run Grafana Helm chart
     cmds:
-      - pwsh -Command "helm template grafana grafana/grafana -n monitoring -f deployment/{{.ENV}}/values-grafana.yaml | Out-Null"
+      - pwsh -Command "helm template grafana grafana-community/grafana -n monitoring -f deployment/{{.ENV}}/values-grafana.yaml | Out-Null"
 
   # --- 🧪 VALIDATION PIPELINE ---
   validate:dev:
