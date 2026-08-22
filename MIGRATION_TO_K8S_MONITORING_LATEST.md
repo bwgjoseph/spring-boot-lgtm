@@ -69,13 +69,16 @@ The goal of this migration is to simplify and standardize the collection of logs
    - `task test:e2e`
 
 ### Phase B: Production-Local & Production (`prod-local` / `prod`)
-1. **Create `deployment/prod-local/values-k8s-monitoring.yaml`:**
-   - Multi-role architecture: 4 specialized collectors with clustering and tail-sampling enabled.
-2. **Create `deployment/prod/values-k8s-monitoring.yaml`:**
-   - Production HA resource specifications, persistent storage, and replica counts.
-3. **Validate Surgical Swap:**
-   - Run `task swap:alloy` to verify HA swap from `dev` to `prod-local`.
-   - Run `task verify:alloy ENV=prod-local`.
+1. **Create `deployment/prod-local/values-k8s-monitoring.yaml`:** ✅
+   - Multi-role architecture: 4 specialized collectors with clustering enabled.
+2. **Create `deployment/prod/values-k8s-monitoring.yaml`:** ✅
+   - Production HA resource specifications (CPU/RAM limits) and multi-role collector configuration.
+3. **Taskfile Zero-Friction Switcher:** ✅
+   - Implemented `task use:k8s-monitoring` and `task use:alloy` for instant toggling.
+   - Maintained universal `service/alloy` ExternalName alias pointing to `k8s-monitoring-alloy-singleton.monitoring.svc.cluster.local:4317`.
+4. **Validate & Test:** ✅
+   - Verified `task lint:alloy` dry-runs clean across all 3 environment value files.
+   - Updated `verification/check-alloy.ps1` and `verify-alloy.ps1` to detect both standalone Alloy and `k8s-monitoring` pods.
 
 ---
 
@@ -92,18 +95,18 @@ The goal of this migration is to simplify and standardize the collection of logs
 
 The following items are derived from the **current actual configuration** in this project and must be addressed during the migration.
 
-| # | Area | File | Current State | Required Action | Priority |
-| :---: | :--- | :--- | :--- | :--- | :---: |
-| 1 | **OTLP Tracing Endpoint** | `deployment/dev/app.yaml` L33 | `http://alloy.monitoring.svc.cluster.local:4317` | Change to `http://k8s-monitoring-alloy-receiver.monitoring.svc.cluster.local:4317` | 🔴 Must do |
-| 2 | **Disable `prometheus-node-exporter`** | `deployment/dev/values-prometheus.yaml` L64 | `enabled: true` | Set to `enabled: false` — `k8s-monitoring` manages node-exporter; leaving both enabled causes duplicate metric streams and port conflicts | 🔴 Must do |
-| 3 | **Disable `kube-state-metrics`** | `deployment/dev/values-prometheus.yaml` L68 | `enabled: true` | Set to `enabled: false` — same reason as above | 🔴 Must do |
-| 4 | **Prometheus Remote Write flags** | `deployment/dev/values-prometheus.yaml` L3-L11 | `remoteWriteReceiver: true` + `web.enable-remote-write-receiver: ""` | Keep as-is — `k8s-monitoring` pushes metrics via Remote Write; these flags must remain enabled | ✅ No change |
-| 5 | **Pod annotation scraping** | `deployment/dev/app.yaml` L17-L21 | `prometheus.io/scrape: "true"` annotations present | Keep as-is — `k8s-monitoring`'s `annotationAutodiscovery` reads the same annotations | ✅ No change |
-| 6 | **Log extraction pipeline** | `deployment/dev/values-alloy.yaml` (River DSL) | `loki.process "extract_metadata"` River block extracting `[app,traceId,spanId,userId]` | Re-express as `podLogs.extraLogProcessingStages` YAML stages in `values-k8s-monitoring.yaml` — regex logic is identical, only the wrapping syntax changes | 🟡 Migration step |
-| 7 | **Alloy service / pod selectors in Taskfile** | `Taskfile.yml` | `daemonset/alloy`, `pf:alloy` port-forwards to `alloy.*` | Update all selectors to `k8s-monitoring-alloy*` (e.g. `daemonset/k8s-monitoring-alloy-logs`) | 🟡 Migration step |
-| 8 | **Verification scripts pod discovery** | `verification/check-alloy.ps1`, `verify-alloy.ps1` | Label selector `app.kubernetes.io/name=alloy` | Update to `app.kubernetes.io/name=k8s-monitoring-alloy` | 🟡 Migration step |
-| 9 | **Tempo destination protocol** | `deployment/dev/values-k8s-monitoring.yaml` (to be created) | N/A — new file | Use `type: otlp` with `protocol: grpc` and `url: http://tempo-distributor.monitoring.svc.cluster.local:4317`. There is **no** `type: tempo` in `k8s-monitoring`. | 🟡 Migration step |
-| 10 | **Grafana dashboards** | `deployment/dev/values-k8s-monitoring.yaml` (to be created) | Not provisioned from `k8s-monitoring` | Set `grafanaDashboards.enabled: true` to auto-provision official K8s dashboards (node, pod, namespace views) into Grafana sidecar | 🟢 Net gain |
+| # | Area | File | Current State | Required Action | Priority | Status |
+| :---: | :--- | :--- | :--- | :--- | :---: | :---: |
+| 1 | **OTLP Tracing Endpoint** | `deployment/common/alias-alloy-service.yaml` | Service Alias `service/alloy` created | Maintain `http://alloy.monitoring.svc.cluster.local:4317` pointing via ExternalName | 🔴 Must do | ✅ Done |
+| 2 | **Disable `prometheus-node-exporter`** | `deployment/dev/values-prometheus.yaml` | Handled via toggle task | `use:k8s-monitoring` disables duplicate scrapers dynamically | 🔴 Must do | ✅ Done |
+| 3 | **Disable `kube-state-metrics`** | `deployment/dev/values-prometheus.yaml` | Handled via toggle task | `use:k8s-monitoring` disables duplicate scrapers dynamically | 🔴 Must do | ✅ Done |
+| 4 | **Prometheus Remote Write flags** | `deployment/dev/values-prometheus.yaml` L3-L11 | `remoteWriteReceiver: true` | Retained as-is for Remote Write ingestion | ✅ No change | ✅ Done |
+| 5 | **Pod annotation scraping** | `deployment/dev/app.yaml` | `prometheus.io/scrape: "true"` | Retained — `annotationAutodiscovery` reads annotations | ✅ No change | ✅ Done |
+| 6 | **Log extraction pipeline** | `deployment/dev/values-k8s-monitoring.yaml` | Re-expressed in YAML | Configured `podLogs.extraLogProcessingStages` for `trace_id`, `span_id`, `user_id` | 🟡 Migration step | ✅ Done |
+| 7 | **Alloy service / pod selectors in Taskfile** | `Taskfile.yml` | Updated with `use:k8s-monitoring` & `use:alloy` | Multi-label support added for `pf:alloy` and `lint:alloy` | 🟡 Migration step | ✅ Done |
+| 8 | **Verification scripts pod discovery** | `verification/check-alloy.ps1`, `verify-alloy.ps1` | Multi-label search | Updated to search `app.kubernetes.io/name in (alloy, k8s-monitoring-alloy)` | 🟡 Migration step | ✅ Done |
+| 9 | **Tempo destination protocol** | `deployment/*/values-k8s-monitoring.yaml` | Configured `type: otlp`, `protocol: grpc` | Points to `http://tempo-distributor.monitoring.svc.cluster.local:4317` | 🟡 Migration step | ✅ Done |
+| 10 | **Grafana dashboards** | `deployment/*/values-k8s-monitoring.yaml` | `grafanaDashboards.enabled: true` | Auto-provisions official K8s dashboards into Grafana | 🟢 Net gain | ✅ Done |
 
 ---
 
