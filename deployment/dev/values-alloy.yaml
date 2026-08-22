@@ -139,6 +139,7 @@ alloy:
         endpoint {
           url = "http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/write"
           send_exemplars = true
+          enable_http2 = true
         }
       }
 

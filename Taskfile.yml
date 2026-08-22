@@ -6,7 +6,7 @@ vars:
   DEPLOY_DIR: 'deployment/{{.ENV}}'
   COMMON_DIR: 'deployment/common'
   # HELM CHART VERSIONS (Stable as of March 2026)
-  VER_ALLOY: "1.8.1"
+  VER_ALLOY: "1.11.1"
   VER_GRAFANA: "12.1.1"
   VER_LOKI: "18.9.0"
   VER_TEMPO: "3.0.6"
