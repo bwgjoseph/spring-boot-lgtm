@@ -50,6 +50,13 @@ If you cannot login to Grafana:
 
 ## 📈 Observability Issues
 
+### Tempo: "error querying live-stores in Querier.SearchTags: error finding partition ring replicas: empty ring"
+**Symptom:** Grafana Trace search or TraceQL query fails with `error querying live-stores in Querier.SearchTags: error finding partition ring replicas: empty ring`.
+**Cause:** In Tempo 3.x microservices (`tempo-distributed`), the `querier` attempts to query recent in-memory trace spans from `liveStore` pods via the `live-store` hash ring. When `liveStore` pods are `Pending` (or failing due to memory constraints on single-node local clusters), the `live-store` ring has 0 active replicas.
+**Resolution:**
+- **Development (`dev`):** Set `liveStore.enabled: false` in `deployment/dev/values-tempo.yaml`. In dev mode, `blockBuilder` consumes trace streams from Redpanda Kafka (`tempo-traces`) and flushes blocks straight to MinIO S3 storage, while `querier` reads blocks from S3. Disabling `liveStore` in dev eliminates the live-store ring lookup, frees node RAM, and resolves the error.
+- **Production (`prod-local` / `prod`):** Ensure sufficient cluster RAM is allocated so `tempo-live-store` pods reach `Running` and `Ready` status.
+
 ### Loki: Transitional Mode (SimpleScalable<->Distributed)
 **Symptom:** `helm upgrade` fails with `You have more than zero replicas configured for scalable targets... change the deploymentMode to the transitional 'SimpleScalable<->Distributed' mode`.
 **Cause:** In Loki v15+, enabling "Distributed" components like the **Index Gateway** while using "SimpleScalable" targets (Read/Write/Backend) requires an explicit transitional mode.
