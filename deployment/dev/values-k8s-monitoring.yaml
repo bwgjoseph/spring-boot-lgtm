@@ -83,6 +83,9 @@ grafanaDashboards:
 collectors:
   alloy-singleton:
     enabled: true
+    presets:
+      - daemonset
+      - filesystem-log-reader
     alloy:
       clustering:
         enabled: true

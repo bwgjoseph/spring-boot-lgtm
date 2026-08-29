@@ -10,6 +10,14 @@ resultsCache:
 # 18.x: metric label changed from `cluster` to `app_instance`
 monitoring:
   appInstanceLabelName: "app_instance"
+  dashboards:
+    enabled: true
+    annotations:
+      grafana_folder: "Loki"
+    labels:
+      grafana_dashboard: "1"
+  rules:
+    enabled: false
 
 # Keep the gateway for standard routing
 gateway:

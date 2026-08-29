@@ -17,7 +17,7 @@ sidecar:
     folder: /tmp/dashboards
     folderAnnotation: grafana_folder
     provider:
-      foldersFromFilesStructure: false
+      foldersFromFilesStructure: true
 
 dashboardProviders:
   dashboardproviders.yaml:

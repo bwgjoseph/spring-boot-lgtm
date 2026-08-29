@@ -63,7 +63,7 @@ podLogsViaLoki:
 
 applicationObservability:
   enabled: true
-  collectors: [alloy-receiver]
+  collector: alloy-receiver
   receivers:
     otlp:
       grpc:
@@ -96,6 +96,8 @@ grafanaDashboards:
 collectors:
   alloy-metrics:
     enabled: true
+    presets:
+      - clustered
     alloy:
       clustering:
         enabled: true
@@ -110,8 +112,8 @@ collectors:
   alloy-logs:
     enabled: true
     presets:
-      logs:
-        enabled: true
+      - daemonset
+      - filesystem-log-reader
     alloy:
       clustering:
         enabled: true
@@ -127,6 +129,8 @@ collectors:
 
   alloy-receiver:
     enabled: true
+    presets:
+      - deployment
     alloy:
       clustering:
         enabled: true

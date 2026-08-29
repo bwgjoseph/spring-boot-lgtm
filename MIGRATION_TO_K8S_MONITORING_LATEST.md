@@ -7,15 +7,26 @@ The goal of this migration is to simplify and standardize the collection of logs
 
 ---
 
-## 2. What `grafana/k8s-monitoring` Replaces in the Current Setup
+## 2. Why Migrate to `grafana/k8s-monitoring`: Core Analysis & Benefits
 
-| Current Component / Mechanism | Replaced By `grafana/k8s-monitoring` | Benefits & Architecture Improvements |
-| :--- | :--- | :--- |
-| **Standalone `grafana/alloy` Chart** | Unified `k8s-monitoring` collector management | Eliminates hundreds of lines of hand-crafted River DSL configurations (`configMap.content`). |
-| **Manual River Pipeline Wiring** | Declarative `destinations` syntax (`prometheus`, `loki`, `tempo`) | Native routing, batching, and exporter creation directly from simple YAML keys. |
-| **Prometheus Sub-charts (`kube-state-metrics`, `node-exporter`)** | `k8s-monitoring` integrated telemetry services | Standardizes K8s metrics scraping (cluster events, node metrics, pod states) without duplicate scrapers. |
-| **Manual K8s Dashboard ConfigMaps** | `grafanaDashboards.enabled: true` | Automatically provisions official Grafana dashboards for K8s nodes, pods, and workloads into Grafana via sidecar. |
-| **Manual Log Relabeling & Regex Pipelines** | `podLogsViaLoki` + `extraLogProcessingStages` | Declarative log ingestion with regex promotion for trace correlation (`trace_id`, `span_id`, `user_id` in Loki structured metadata). |
+The migration from standalone **`grafana/alloy`** to **`grafana/k8s-monitoring`** is **not replacing Alloy** — it is **upgrading how Alloy is configured and managed**.
+
+Under the hood, `grafana/k8s-monitoring` uses Grafana Alloy as its execution engine, but wraps it in Grafana's official, production-grade Kubernetes monitoring framework.
+
+### The Core Difference
+- **Standalone `grafana/alloy`:** Provides an empty collector container. You must hand-craft and maintain **200+ lines of custom River DSL code** inside `configMap.content` to manually wire up Kubernetes pod discovery, relabeling rules, log file tailing, journald system logs, OTLP receivers, batching, and export pipelines.
+- **`grafana/k8s-monitoring`:** Grafana's official batteries-included Helm chart. It replaces custom River DSL code with **simple, declarative YAML toggles** (`annotationAutodiscovery`, `podLogsViaLoki`, `hostMetrics`, `clusterEvents`, `destinations`).
+
+### Detailed Feature & Benefit Comparison
+
+| Feature / Area | Standalone `grafana/alloy` | `grafana/k8s-monitoring` (v4.4.0) | Net Gain / Architectural Benefit |
+| :--- | :--- | :--- | :--- |
+| **Configuration DSL** | Manual ~200+ lines of hand-crafted River DSL (`discovery.kubernetes`, `prometheus.scrape`, `loki.source.file`, `otelcol.exporter.otlp`). | Declarative YAML flags (`destinations`, `annotationAutodiscovery.enabled: true`). | **Zero fragile River DSL code to maintain.** Eliminates configuration syntax bugs. |
+| **Pod Annotation Scraping** | ~40 lines of complex relabeling regex rules for `prometheus.io/*` annotations. | `annotationAutodiscovery.enabled: true`. | **1-line toggle** for automatic Pod and Service metric scraping. |
+| **Multi-Workload Topology** | Required creating multiple custom Helm values files and manually configuring workload types. | Built-in **Preset arrays** (`presets: ["clustered"]`, `presets: ["daemonset", "filesystem-log-reader"]`). | Easily split collector work into **4 specialized HA roles** (`metrics`, `logs`, `receiver`, `singleton`). |
+| **Destination Wiring** | Manual `prometheus.remote_write`, `loki.write`, and `otelcol.exporter.otlp` pipeline definitions. | Declarative `destinations` map (`type: prometheus`, `type: loki`, `type: otlp`). | Native routing, batching, and exporter generation directly from backend URLs. |
+| **Cluster & Node Telemetry** | Required managing separate `kube-state-metrics` and `prometheus-node-exporter` releases. | Managed `telemetryServices.kube-state-metrics` and `node-exporter`. | Standardized cluster and host metric collection with zero port collisions or duplicate scrapers. |
+| **Cluster Events & Host Logs** | Required hand-written K8s Event watchers and `/var/log/journal` mount configs. | `clusterEvents.enabled: true` and `nodeLogs.enabled: true`. | **Out-of-the-box K8s warning events** and host system log ingestion into Loki. |
 
 > **What does NOT change:**
 > Backend storage engines (**Loki**, **Tempo**, **Prometheus/Mimir**, and **MinIO**) remain completely intact as destinations.
@@ -202,3 +213,69 @@ task use:alloy
 # 3. Deterministic verification for whichever collector is active
 task test:e2e
 ```
+
+---
+
+## 8. Latest Technical Learnings & Schema Breakthroughs (`grafana/k8s-monitoring` v4.4.0)
+
+During Helm template linting and deployment validation of `grafana/k8s-monitoring` chart version **`4.4.0`**, the following critical architectural and syntax findings were identified:
+
+### 8.1 Preset Schema Breaking Change (Map vs. Array/List Syntax)
+- **Validation Failure Hit:**
+  ```text
+  Error: template: k8s-monitoring/templates/validations.yaml:1:4: executing "k8s-monitoring/templates/validations.yaml" at <include "validations" .>:
+  error calling include: template: k8s-monitoring/templates/_validations.tpl:10:6: executing "validations" at <include "collectors.validate.deprecatedPrivilegedPreset" .>:
+  error calling include: template: k8s-monitoring/templates/collectors/_collector_validations.tpl:142:16: executing "collectors.validate.deprecatedPrivilegedPreset" at <has "privileged" $presets>:
+  error calling has: Cannot find has on type map
+  ```
+- **Root Cause:** In chart version `4.4.0`, the `collectors.<collector_name>.presets` field expects an **array/list of strings**, NOT a nested map.
+- **Legacy (Incorrect) Syntax:**
+  ```yaml
+  collectors:
+    alloy-logs:
+      presets:
+        logs:
+          enabled: true
+  ```
+- **v4.4.0 (Correct) List Syntax:**
+  ```yaml
+  collectors:
+    alloy-logs:
+      presets:
+        - daemonset
+        - filesystem-log-reader
+  ```
+
+### 8.2 Standard Preset Names in Chart 4.4.0
+The chart defines standardized collector presets:
+* `daemonset`: Configures Alloy as a DaemonSet (one pod per node).
+* `deployment`: Configures Alloy as a Deployment.
+* `singleton`: Configures Alloy as a single-replica Deployment.
+* `clustered`: Enables Alloy clustering to distribute telemetry scraping across replicas.
+* `filesystem-log-reader`: Mounts node filesystem `/var/log` for log parsing.
+* `linux-host-monitor`: Grants node access privileges for Linux node metric collection.
+
+### 8.3 Feature-to-Collector Assignment in v4.4.0
+Features assign to collector instances using singular string keys (`collector: <name>`) or `collectors: [<names>]` for receivers:
+* `annotationAutodiscovery.collector: alloy-metrics`
+* `hostMetrics.collector: alloy-metrics`
+* `clusterEvents.collector: alloy-logs`
+* `podLogsViaLoki.collector: alloy-logs`
+* `applicationObservability.collectors: [alloy-receiver]`
+
+### 8.4 Corrected Values Structure Across Environments
+1. **`deployment/dev/values-k8s-monitoring.yaml` (Monolithic):**
+   Uses `collectors.alloy-singleton` with `presets: ["daemonset", "filesystem-log-reader"]`.
+2. **`deployment/prod-local/values-k8s-monitoring.yaml` & `deployment/prod/values-k8s-monitoring.yaml` (Multi-Role HA):**
+   Uses 4 specialized collectors (`alloy-metrics`, `alloy-logs`, `alloy-receiver`, `alloy-singleton`) with array `presets`.
+
+### 8.5 Annotation Autodiscovery: `k8s.grafana.com/*` vs `prometheus.io/*`
+- **Chart Message:** Helm displays `Scrape metrics from pods and services with the "k8s.grafana.com/scrape: true" annotation and send data to prometheus.`
+- **Explanation:** `k8s.grafana.com/*` is the official Grafana `k8s-monitoring` annotation schema.
+- **Backward Compatibility:** `annotationAutodiscovery.enabled: true` natively parses standard community `prometheus.io/*` annotations (`prometheus.io/scrape`, `prometheus.io/path`, `prometheus.io/port`) out of the box.
+- **Spring Boot Compatibility:** Existing application manifests (`deployment/dev/app.yaml`) using `prometheus.io/scrape: "true"` are fully supported without modification.
+- **When to use `k8s.grafana.com/*`:**
+  - For new workloads adopting Grafana standard conventions.
+  - When requiring per-workload Grafana scrape controls (`k8s.grafana.com/metrics-scrape-interval`, `k8s.grafana.com/job`, `k8s.grafana.com/metrics-container`).
+
+
