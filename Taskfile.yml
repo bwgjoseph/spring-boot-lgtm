@@ -7,6 +7,7 @@ vars:
   COMMON_DIR: 'deployment/common'
   # HELM CHART VERSIONS (Stable as of March 2026)
   VER_ALLOY: "1.11.1"
+  VER_K8S_MONITORING: "4.4.0"
   VER_GRAFANA: "12.11.1"
   VER_LOKI: "18.9.0"
   VER_TEMPO: "3.0.6"
@@ -140,9 +141,25 @@ tasks:
       - helm upgrade --install grafana grafana-community/grafana -n {{.NAMESPACE}} --version {{.VER_GRAFANA}} -f deployment/{{.ENV}}/values-grafana.yaml
 
   alloy:
-    desc: Install or Upgrade Alloy
+    desc: Install or Upgrade Alloy (Standalone or k8s-monitoring)
     deps: [repos, namespace]
     cmds:
+      - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f deployment/{{.ENV}}/values-alloy.yaml
+
+  use:k8s-monitoring:
+    desc: Switch telemetry collector layer to grafana/k8s-monitoring Helm chart
+    deps: [repos, namespace]
+    cmds:
+      - helm uninstall alloy -n {{.NAMESPACE}} --ignore-not-found
+      - helm upgrade --install k8s-monitoring grafana/k8s-monitoring -n {{.NAMESPACE}} --version {{.VER_K8S_MONITORING}} -f deployment/{{.ENV}}/values-k8s-monitoring.yaml
+      - kubectl apply -f deployment/common/alias-alloy-service.yaml
+
+  use:alloy:
+    desc: Switch telemetry collector layer back to Standalone Grafana Alloy
+    deps: [repos, namespace]
+    cmds:
+      - helm uninstall k8s-monitoring -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete service alloy -n {{.NAMESPACE}} --ignore-not-found
       - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f deployment/{{.ENV}}/values-alloy.yaml
 
 
@@ -182,9 +199,9 @@ tasks:
       - pwsh -Command "helm template redpanda redpanda/redpanda -n monitoring -f deployment/{{.ENV}}/values-redpanda.yaml | Out-Null"
 
   lint:alloy:
-    desc: Dry-run Alloy Helm chart
+    desc: Dry-run Alloy / k8s-monitoring Helm chart
     cmds:
-      - pwsh -Command "helm template alloy grafana/alloy -n monitoring -f deployment/{{.ENV}}/values-alloy.yaml | Out-Null"
+      - pwsh -Command "if (Test-Path deployment/{{.ENV}}/values-k8s-monitoring.yaml) { helm template k8s-monitoring grafana/k8s-monitoring -n monitoring -f deployment/{{.ENV}}/values-k8s-monitoring.yaml | Out-Null } else { helm template alloy grafana/alloy -n monitoring -f deployment/{{.ENV}}/values-alloy.yaml | Out-Null }"
 
   lint:loki:
     desc: Dry-run Loki Helm chart
@@ -409,9 +426,9 @@ tasks:
       - echo Alertmanager UI http://localhost:9093
 
   pf:alloy:
-    desc: Port-forward Alloy (12345)
+    desc: Port-forward Alloy UI (12345)
     cmds:
-      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward daemonset/alloy 12345:12345 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - pwsh -Command "if (kubectl get pod -n {{.NAMESPACE}} -l app.kubernetes.io/name=k8s-monitoring-alloy -o name 2>`$null) { `$pod = (kubectl get pod -n {{.NAMESPACE}} -l app.kubernetes.io/name=k8s-monitoring-alloy -o name | Select-Object -First 1).Split('/')[-1]; Start-Process kubectl -ArgumentList \"port-forward pod/`$pod 12345:12345 -n {{.NAMESPACE}}\" -WindowStyle Hidden } else { Start-Process kubectl -ArgumentList 'port-forward daemonset/alloy 12345:12345 -n {{.NAMESPACE}}' -WindowStyle Hidden }"
       - echo Grafana Alloy UI http://localhost:12345
 
   pf:spring-app:
@@ -577,9 +594,11 @@ tasks:
       - kubectl delete pvc -l app.kubernetes.io/instance=grafana -n {{.NAMESPACE}} --ignore-not-found
 
   uninstall:alloy:
-    desc: Uninstall Grafana Alloy
+    desc: Uninstall Grafana Alloy / k8s-monitoring
     cmds:
       - helm uninstall alloy -n {{.NAMESPACE}} --ignore-not-found
+      - helm uninstall k8s-monitoring -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete service alloy -n {{.NAMESPACE}} --ignore-not-found
 
   uninstall:infra:
     desc: Uninstall all infrastructure components

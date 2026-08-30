@@ -16,10 +16,10 @@ ingest:
     auto_create_topic_enabled: true
     auto_create_topic_default_partitions: 3
 
-# 2. Ingestion components connected to Kafka (3 replicas matching partition count)
+# 2. Ingestion components connected to Kafka (1 replica for local dev RAM constraints)
 blockBuilder:
   enabled: true
-  replicas: 3
+  replicas: 1
   affinity: ""
   extraArgs:
     - -config.expand-env=true
@@ -33,7 +33,7 @@ blockBuilder:
 
 liveStore:
   enabled: true
-  replicas: 3
+  replicas: 1
   affinity: ""
   extraArgs:
     - -config.expand-env=true

@@ -1,0 +1,296 @@
+# Grafana K8s Monitoring Chart Configuration
+# This chart uses Grafana Alloy for unified observability (metrics, logs, traces)
+
+# Configure with upstream k8s-monitoring chart values
+k8s-monitoring:
+  # Teardown ordering relies on ArgoCD sync-waves instead of the chart's helm
+  # hooks: every Alloy CR below carries sync-wave "1", so on app deletion ArgoCD
+  # removes the Alloys first and waits until the alloy-operator (wave 0, still
+  # running) has processed their uninstall-release finalizers before deleting
+  # the operator and the namespace.
+  #
+  # waitForAlloyRemoval is the chart's hook-based variant of the same ordering,
+  # but it deadlocks under ArgoCD: its post-install hook pins a
+  # k8s.grafana.com/finalizer on the operator Deployment that only its
+  # pre-delete hook removes, and ArgoCD v3.4's PreDelete hook execution can
+  # skip that hook under a stale cluster cache (hook creation hits
+  # AlreadyExists and is miscounted as completed), wedging the namespace.
+  alloy-operator:
+    waitForAlloyRemoval:
+      enabled: false
+  # Local destinations (Prometheus and Loki running in the cluster).
+  destinations:
+    local-prometheus:
+      type: prometheus
+      url: http://kube-prometheus-stack-prometheus.kube-prometheus-stack.svc.cluster.local:9090/api/v1/write
+      # No auth required (yet)
+
+    local-loki:
+      type: loki
+      url: http://loki-gateway.loki.svc.cluster.local/loki/api/v1/push
+      tenantId: "1" # Loki multi-tenant org ID
+      # No auth required (yet)
+
+    local-tempo:
+      type: otlp
+      url: http://tempo.tempo.svc.cluster.local:4317
+      protocol: grpc
+      tls:
+        insecure: true
+      metrics:
+        enabled: false
+      logs:
+        enabled: false
+      traces:
+        enabled: true
+
+  # Collectors (Alloy instances). Every feature below is assigned to one of these.
+  # The names must match the self-monitoring labelSelectors below and the
+  # alloy-mixin dashboards/ServiceMonitor, which select by app.kubernetes.io/name.
+  collectors:
+    # Scrapes metrics; clustered for target sharing across replicas.
+    alloy-metrics:
+      # Deleted before the alloy-operator on teardown (see note above).
+      annotations:
+        argocd.argoproj.io/sync-wave: "1"
+      presets:
+        - clustered
+        - statefulset
+      alloy:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+
+    # Single-replica collector for cluster events.
+    alloy-singleton:
+      annotations:
+        argocd.argoproj.io/sync-wave: "1"
+      presets:
+        - singleton
+      alloy:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+
+    # DaemonSet reading pod and node logs from the host filesystem.
+    alloy-logs:
+      annotations:
+        argocd.argoproj.io/sync-wave: "1"
+      presets:
+        - filesystem-log-reader
+        - daemonset
+      controller:
+        priorityClassName: monitoring-daemonset
+      alloy:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+
+    # Deployment receiving OTLP traces (from in-cluster apps) and Faro web
+    # telemetry (from browsers) and forwarding both to Tempo/Loki.
+    alloy-receiver:
+      annotations:
+        argocd.argoproj.io/sync-wave: "1"
+      presets:
+        - deployment
+      alloy:
+        # All three receiver ports must be listed explicitly here. The
+        # applicationObservability feature only auto-injects the OTLP ports when
+        # extraPorts is unset; once we set it (for Faro), its sprig `merge` keeps
+        # our list verbatim and skips that injection — so OTLP must be repeated or
+        # the feature's own port validation fails. The faro port has no built-in
+        # feature and must match the faro.receiver listen_port in extraConfig
+        # below. Exposing these on the collector Service is what lets the OTLP
+        # senders and the Faro HTTPRoute reach the receiver.
+        extraPorts:
+          - name: otlp-grpc
+            port: 4317
+            targetPort: 4317
+            protocol: TCP
+            appProtocol: grpc
+          - name: otlp-http
+            port: 4318
+            targetPort: 4318
+            protocol: TCP
+            appProtocol: http
+          - name: faro
+            port: 12347
+            targetPort: 12347
+            protocol: TCP
+            appProtocol: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+      # Grafana Faro receiver for browser (RUM) telemetry from frontend SPAs.
+      # k8s-monitoring exposes no Faro feature, so the receiver is wired by hand:
+      #   - logs   -> the local Loki destination (loki.write adds the cluster label)
+      #   - traces -> the local Tempo destination's processing pipeline
+      # Both destination components (local_loki, local_tempo) are rendered at the
+      # top level of this collector's config by applicationObservability above, so
+      # they are in scope for this appended snippet.
+      #
+      # The endpoint is browser-facing (exposed via the Faro HTTPRoute), so CORS
+      # must allow-list the SPA origins permitted to post telemetry. The receiver
+      # answers preflight (OPTIONS) itself, so no Gateway-level CORS filter is
+      # needed. Origins are environment-specific and live in global.faro (set per
+      # environments/<env>.yaml); global is the only scope visible to both this
+      # subchart's `tpl` and the parent chart's HTTPRoute. toJson renders the YAML
+      # list as an Alloy string array (e.g. ["https://*.example.com"]).
+      extraConfig: |-
+        faro.receiver "frontend" {
+          server {
+            listen_address       = "0.0.0.0"
+            listen_port          = 12347
+            cors_allowed_origins = {{ .Values.global.faro.allowedOrigins | toJson }}
+          }
+
+          output {
+            // Browser logs/events/measurements go through a labeling stage (below)
+            // before Loki; traces go straight to the Tempo pipeline.
+            logs   = [loki.process.faro_labels.receiver]
+            traces = [otelcol.processor.attributes.local_tempo.input]
+          }
+        }
+
+        // faro.receiver emits logfmt lines but attaches no Loki stream labels, so every
+        // SPA's telemetry collapses into one stream that Loki backfills as
+        // service_name="unknown_service" — undiscoverable per app and colliding across
+        // apps. Promote app_name and the signal kind (log|event|measurement|exception)
+        // to labels. The label NAMES match the upstream Grafana Faro dashboard
+        // (grafana/faro-web-sdk frontend-application.json), which keys on {kind, app}
+        // (e.g. {kind="measurement", app="$app"} | logfmt | unwrap ttfb) and a $app
+        // variable of label_values(app); service_name is set too so the SPA also shows
+        // as a proper service in Loki's native views. All low cardinality (a few SPAs
+        // x 4 kinds), so this stays index-safe.
+        loki.process "faro_labels" {
+          forward_to = [loki.write.local_loki.receiver]
+
+          stage.logfmt {
+            mapping = {
+              "app_name" = "",
+              "kind"     = "",
+            }
+          }
+          stage.labels {
+            values = {
+              "app"          = "app_name",
+              "service_name" = "app_name",
+              "kind"         = "kind",
+            }
+          }
+        }
+
+  # Backing services scraped for cluster and host metrics. kepler, opencost and
+  # windows-exporter stay off (chart default).
+  telemetryServices:
+    kube-state-metrics:
+      deploy: true
+    node-exporter:
+      deploy: true
+      priorityClassName: monitoring-daemonset
+
+  # Kubernetes cluster metrics (kube-state-metrics, kubelet, cAdvisor).
+  clusterMetrics:
+    enabled: true
+    collector: alloy-metrics
+
+  # Host/node metrics (node-exporter). linuxHosts must be enabled explicitly;
+  # hostMetrics.enabled alone renders an empty module that scrapes nothing.
+  # labelMatchers/namespace auto-populate from the node-exporter deployed under
+  # telemetryServices above.
+  hostMetrics:
+    enabled: true
+    collector: alloy-metrics
+    linuxHosts:
+      enabled: true
+
+  # Enables Alloy to discover and scrape ServiceMonitors, PodMonitors, and Probes.
+  # Without this, no metrics from Prometheus Operator objects are collected. The
+  # CRDs themselves are owned by kube-prometheus-stack (sync wave 1).
+  prometheusOperatorObjects:
+    enabled: true
+    collector: alloy-metrics
+
+  # Cluster events collection.
+  clusterEvents:
+    enabled: true
+    collector: alloy-singleton
+
+  # Node logs collection (journald).
+  nodeLogs:
+    enabled: true
+    collector: alloy-logs
+
+  # Pod logs collection via the Loki processing pipeline.
+  podLogsViaLoki:
+    enabled: true
+    collector: alloy-logs
+
+  # Application observability (OTLP receivers for traces) via alloy-receiver.
+  # The browser-facing Faro receiver is not part of this feature; it is declared
+  # via collectors.alloy-receiver.extraConfig above and exposed by the faro block.
+  applicationObservability:
+    enabled: true
+    collector: alloy-receiver
+    receivers:
+      otlp:
+        grpc:
+          enabled: true
+        http:
+          enabled: true
+
+  # Alloy integrations (self-monitoring)
+  integrations:
+    collector: alloy-metrics
+    alloy:
+      instances:
+        - name: alloy
+          labelSelectors:
+            app.kubernetes.io/name:
+              - alloy-metrics
+              - alloy-singleton
+              - alloy-logs
+              - alloy-receiver
+
+# Grafana Faro receiver exposure. Kept under `global` so a single source of truth
+# is visible to both the parent chart (the HTTPRoute template below reads
+# .Values.global.faro) and the k8s-monitoring subchart (its extraConfig `tpl`
+# reads .Values.global.faro.allowedOrigins) — non-global parent values are not in
+# the subchart's scope. Browsers cannot reach the in-cluster collector Service
+# directly, so the receiver is published through the external Cilium Gateway; the
+# resulting hostname becomes the FARO_URL injected into each frontend app.
+#
+# hostname and allowedOrigins are environment-specific and set in
+# environments/<env>.yaml. Enabled by default; set enabled: false for any
+# environment that hosts no browser apps.
+global:
+  faro:
+    enabled: true
+    hostname: "" # set per environment (e.g. faro.k8s.home.rottlr.de)
+    allowedOrigins: [] # set per environment (e.g. ["https://*.k8s.home.rottlr.de"])
+    # Must match the faro.receiver listen_port / collector extraPort above.
+    servicePort: 12347
+    gateway:
+      name: external
+      namespace: gateway
+
+alloy-mixin:
+  grafanaDashboard:
+    enabled: true
+    folder: Observability
+    grafanaOperator:
+      enabled: true
+  monitor:
+    enabled: true

@@ -1,4 +1,9 @@
-$alloyPod = (kubectl get pods -n monitoring -l app.kubernetes.io/name=alloy -o name | Select-Object -First 1).Split('/')[-1]
+$alloyPod = (kubectl get pods -n monitoring -l "app.kubernetes.io/name in (alloy, k8s-monitoring-alloy)" -o name 2>$null | Select-Object -First 1)
+if (-not $alloyPod) {
+    # Fallback to checking any pod with alloy in name
+    $alloyPod = (kubectl get pods -n monitoring -o name | Select-String "alloy" | Select-Object -First 1)
+}
+if ($alloyPod) { $alloyPod = $alloyPod.Split('/')[-1] }
 if (-not $alloyPod) {
     Write-Error "Could not find Alloy pod."
     exit 1

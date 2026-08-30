@@ -12,7 +12,7 @@ Traces are critical for debugging latency and understanding service dependencies
 
 ## Decision
 1.  **Deployment Mode:** Use **Tempo 3.x Microservices Architecture** (via `grafana-community/tempo-distributed` chart 3.0.6) with **Redpanda** (Kafka-compatible) as the streaming ingestion log.
-2.  **Streaming Ingestion:** `tempo-distributor` ingests OTLP traces and writes to Redpanda topic (`tempo-traces`). `tempo-block-builder` (3 replicas) consumes from Redpanda and flushes Parquet blocks to MinIO S3 object storage. `tempo-live-store` (3 replicas) serves low-latency recent trace queries.
+2.  **Streaming Ingestion:** `tempo-distributor` ingests OTLP traces and writes to Redpanda topic (`tempo-traces`). `tempo-block-builder` consumes from Redpanda and flushes Parquet blocks to MinIO S3 object storage. `tempo-live-store` serves low-latency recent trace queries from memory (enabled in `prod-local`/`prod` with replicas, disabled in `dev` via `liveStore.enabled: false` to conserve single-node RAM).
 3.  **Cluster Coordination:** Use **Memberlist (Gossip)** for ring store distribution across microservices.
 4.  **Storage Architecture:**
     *   **Backend:** Use S3-compatible object storage (MinIO/S3) for long-term trace blocks.

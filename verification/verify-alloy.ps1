@@ -7,10 +7,12 @@ Write-Host "--- Verifying Alloy Pipeline ($Env Mode: $Mode) ---"
 
 # 1. Detect Topology & Resources
 Write-Host "[1/4] Checking Pod Status..."
-# Try finding as deployment, then daemonset
-$resource = kubectl get deployment -n monitoring -l app.kubernetes.io/name=alloy -o name 2>$null
+$resource = kubectl get deployment -n monitoring -l "app.kubernetes.io/name in (alloy, k8s-monitoring-alloy)" -o name 2>$null | Select-Object -First 1
 if (-not $resource) {
-    $resource = kubectl get daemonset -n monitoring -l app.kubernetes.io/name=alloy -o name 2>$null
+    $resource = kubectl get daemonset -n monitoring -l "app.kubernetes.io/name in (alloy, k8s-monitoring-alloy)" -o name 2>$null | Select-Object -First 1
+}
+if (-not $resource) {
+    $resource = kubectl get statefulset -n monitoring -l "app.kubernetes.io/name in (alloy, k8s-monitoring-alloy)" -o name 2>$null | Select-Object -First 1
 }
 
 if ($resource) {
@@ -31,7 +33,10 @@ if ($Mode -eq "full") {
 
 # 3. Pipeline Metrics Validation (Backend-Agnostic)
 Write-Host "[3/4] Validating Pipeline Metrics..."
-$alloyPod = kubectl get pods -n monitoring -l app.kubernetes.io/name=alloy -o name | Select-Object -First 1
+$alloyPod = kubectl get pods -n monitoring -l "app.kubernetes.io/name in (alloy, k8s-monitoring-alloy)" -o name 2>$null | Select-Object -First 1
+if (-not $alloyPod) {
+    $alloyPod = kubectl get pods -n monitoring -o name | Select-String "alloy" | Select-Object -First 1
+}
 $job = Start-Job -ScriptBlock { 
     param($pod)
     kubectl port-forward $pod 12345:12345 -n monitoring

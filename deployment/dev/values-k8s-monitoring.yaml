@@ -1,0 +1,105 @@
+cluster:
+  name: k8s-local
+
+destinations:
+  prometheus:
+    type: prometheus
+    url: http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/write
+    metrics:
+      sendExemplars: true
+
+  loki:
+    type: loki
+    url: http://loki-gateway.monitoring.svc.cluster.local:80/loki/api/v1/push
+
+  tempo:
+    type: otlp
+    protocol: grpc
+    url: http://tempo-distributor.monitoring.svc.cluster.local:4317
+    tls:
+      insecure: true
+    traces:
+      enabled: true
+    metrics:
+      enabled: false
+    logs:
+      enabled: false
+
+# Feature Exclusions to conserve resources
+beyla:
+  enabled: false
+costMetrics:
+  enabled: false
+kepler:
+  enabled: false
+prometheusOperatorObjects:
+  enabled: false
+
+# Telemetry Services (managed scrapers)
+telemetryServices:
+  node-exporter:
+    deploy: true
+  kube-state-metrics:
+    deploy: true
+
+# Telemetry Features
+annotationAutodiscovery:
+  enabled: true
+
+hostMetrics:
+  enabled: true
+  linuxHosts:
+    enabled: true
+
+clusterEvents:
+  enabled: true
+
+podLogsViaLoki:
+  enabled: true
+
+podLogs:
+  extraLogProcessingStages: |-
+    stage.regex {
+      expression = ".*\\[(?P<app>[^,]*),(?P<traceId>[^,]*),(?P<spanId>[^,]*),(?P<userId>[^,]*)\\].*"
+    }
+    stage.structured_metadata {
+      values = {
+        "trace_id" = "traceId",
+        "span_id"  = "spanId",
+        "user_id"  = "userId",
+      }
+    }
+    stage.label_drop {
+      values = ["app", "traceId", "spanId", "userId"]
+    }
+
+grafanaDashboards:
+  enabled: true
+  labelKey: grafana_dashboard
+  labelValue: "1"
+  namespace: monitoring
+
+# Monolithic Single Collector for Dev
+collectors:
+  alloy-singleton:
+    enabled: true
+    presets:
+      - daemonset
+      - filesystem-log-reader
+    alloy:
+      clustering:
+        enabled: true
+      mounts:
+        varlog: true
+      extraPorts:
+        - name: "otlp-grpc"
+          port: 4317
+          targetPort: 4317
+          protocol: TCP
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 250m
+          memory: 512Mi
