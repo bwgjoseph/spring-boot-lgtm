@@ -7,9 +7,14 @@ Write-Host "--- Syncing Dashboard Folders to K8s ---" -ForegroundColor Cyan
 Get-ChildItem -Path "$dashboardsDir" -Directory | ForEach-Object {
     $folderName = $_.Name
     $displayFolder = switch ($folderName.ToLower()) {
-        "k8s"   { "K8s" }
-        "tempo" { "Tempo" }
-        default { (Get-Culture).TextInfo.ToTitleCase($folderName) }
+        "k8s"        { "K8s" }
+        "tempo"      { "Tempo" }
+        "kafka"      { "Kafka" }
+        "mongodb"    { "MongoDB" }
+        "prometheus" { "Prometheus" }
+        "spring"     { "Spring" }
+        "uptime"     { "Uptime" }
+        default      { (Get-Culture).TextInfo.ToTitleCase($folderName) }
     }
     $cmName = "grafana-dash-" + $folderName.ToLower().Replace(" ", "-")
     
