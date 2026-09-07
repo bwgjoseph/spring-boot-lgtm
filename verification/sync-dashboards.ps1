@@ -9,11 +9,13 @@ Get-ChildItem -Path "$dashboardsDir" -Directory | ForEach-Object {
     $displayFolder = switch ($folderName.ToLower()) {
         "k8s"        { "K8s" }
         "tempo"      { "Tempo" }
+        "loki"       { "Loki" }
         "kafka"      { "Kafka" }
         "mongodb"    { "MongoDB" }
         "prometheus" { "Prometheus" }
         "spring"     { "Spring" }
         "uptime"     { "Uptime" }
+
         default      { (Get-Culture).TextInfo.ToTitleCase($folderName) }
     }
     $cmName = "grafana-dash-" + $folderName.ToLower().Replace(" ", "-")

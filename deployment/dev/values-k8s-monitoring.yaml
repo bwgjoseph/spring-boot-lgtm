@@ -59,6 +59,19 @@ integrations:
           enabled: true
         labelSelectors:
           app.kubernetes.io/name: tempo
+  loki:
+    instances:
+      - name: "loki"
+        namespaces:
+          - monitoring
+        metrics:
+          enabled: true
+          portName: http-metrics
+        logs:
+          enabled: true
+        labelSelectors:
+          app.kubernetes.io/name: loki
+
 
 
 # Telemetry Features

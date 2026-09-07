@@ -60,7 +60,7 @@
 - [x] To sync up the values-*-local with values-* to ensure the config is updated
 - [ ] Try out https://grafana.com/docs/grafana/latest/as-code/observability-as-code/grafana-cli/
 - [x] Configure [tempo monitoring](https://grafana.com/docs/tempo/latest/operations/monitor/set-up-monitoring/)
-- [ ] Configure [loki monitoring](https://grafana.com/docs/loki/latest/operations/meta-monitoring/)
+- [x] Configure [loki monitoring](https://grafana.com/docs/loki/latest/operations/meta-monitoring/)
 - [ ] Configure mcp server
   - https://github.com/pab1it0/prometheus-mcp-server
   - https://github.com/grafana/mcp-grafana

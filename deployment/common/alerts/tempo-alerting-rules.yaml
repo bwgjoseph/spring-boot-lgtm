@@ -1,0 +1,47 @@
+groups:
+  - name: tempo_alerts
+    rules:
+      - alert: TempoDistributorUnhealthy
+        expr: max by (namespace) (tempo_ring_members{state="Unhealthy", name="distributor"}) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tempo Distributor Unhealthy"
+          description: "There are unhealthy Tempo distributor(s) in namespace {{ $labels.namespace }}."
+
+      - alert: TempoLiveStoreUnhealthy
+        expr: max by (namespace) (tempo_ring_members{state="Unhealthy", name="live-store"}) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tempo LiveStore Unhealthy"
+          description: "There are unhealthy Tempo LiveStore component(s) in namespace {{ $labels.namespace }}."
+
+      - alert: TempoMetricsGeneratorUnhealthy
+        expr: max by (namespace) (tempo_ring_members{state="Unhealthy", name="metrics-generator"}) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tempo Metrics Generator Unhealthy"
+          description: "There are unhealthy Tempo metrics generator(s) in namespace {{ $labels.namespace }}."
+
+      - alert: TempoCompactionsFailing
+        expr: sum by (namespace) (increase(tempodb_compaction_errors_total[1h])) > 2
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tempo Compactions Failing"
+          description: "More than 2 compactions failed in the past hour in namespace {{ $labels.namespace }}."
+
+      - alert: TempoPollsFailing
+        expr: sum by (namespace) (increase(tempodb_blocklist_poll_errors_total[1h])) > 2
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tempo Blocklist Polls Failing"
+          description: "More than 2 blocklist poll requests failed in the past hour in namespace {{ $labels.namespace }}."
