@@ -23,7 +23,7 @@ alloy:
     clusterIP: None
   
   # Path for Write-Ahead Log to enable durability across pod restarts
-  storagePath: /var/lib/alloy/data 
+  storagePath: /var/lib/alloy/data
   
   # Log Collection: Mount host logs for node-local tailing
   extraVolumes:

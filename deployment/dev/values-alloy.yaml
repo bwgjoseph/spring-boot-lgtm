@@ -16,10 +16,10 @@ alloy:
   # Headless service for reliable discovery
   service:
     enabled: true
-    clusterIP: None 
+    clusterIP: None
   
   # Path for WAL/Persistence
-  storagePath: /var/lib/alloy/data 
+  storagePath: /var/lib/alloy/data
   
   # Add hostPath volume mount for /var/log/pods to enable Alloy log tailing
   extraVolumes:
