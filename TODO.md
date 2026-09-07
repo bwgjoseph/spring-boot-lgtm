@@ -57,7 +57,7 @@
   - and/or also useful ootb solution - https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/set-up-collector/grafana-alloy/automatic-logging/
 - [ ] Scan through https://grafana.com/docs/tempo/latest/metrics-from-traces/
 - [x] Enable [service-graph](https://grafana.com/docs/tempo/latest/metrics-from-traces/service_graphs/enable-service-graphs/)
-- [ ] To sync up the values-*-local with values-* to ensure the config is updated
+- [x] To sync up the values-*-local with values-* to ensure the config is updated
 - [ ] Try out https://grafana.com/docs/grafana/latest/as-code/observability-as-code/grafana-cli/
 - [ ] Configure [tempo monitoring](https://grafana.com/docs/tempo/latest/operations/monitor/set-up-monitoring/)
 - [ ] Configure [loki monitoring](https://grafana.com/docs/loki/latest/operations/meta-monitoring/)

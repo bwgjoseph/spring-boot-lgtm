@@ -34,9 +34,9 @@ spec:
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: "deployment.environment=production,service.version=1.0.0"
         - name: DEBEZIUM_MONGODB_CONNECTION_STRING
-          value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
+          value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-2.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
         - name: SPRING_DATA_MONGODB_URI
-          value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
+          value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-2.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
         - name: SPRING_APPLICATION_NAME
           value: "spring-boot-app"
         resources:
