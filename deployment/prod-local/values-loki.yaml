@@ -13,7 +13,6 @@ monitoring:
   rules:
     enabled: false
 
-
 # Caching disabled to fit local resource constraints.
 # TO_RESOLVE: Re-enable and correctly map resources for Memcached sub-chart.
 chunksCache:

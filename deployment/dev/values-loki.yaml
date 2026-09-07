@@ -1,12 +1,5 @@
 deploymentMode: SingleBinary
 
-# Disable memory-heavy caches — dev is resource-constrained
-chunksCache:
-  enabled: false
-
-resultsCache:
-  enabled: false
-
 # 18.x: metric label changed from `cluster` to `app_instance`
 monitoring:
   appInstanceLabelName: "app_instance"
@@ -18,6 +11,13 @@ monitoring:
       grafana_dashboard: "1"
   rules:
     enabled: false
+
+# Disable memory-heavy caches — dev is resource-constrained
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
 
 # Keep the gateway for standard routing
 gateway:
@@ -32,7 +32,7 @@ loki:
 
   commonConfig:
     replication_factor: 1
-  
+
   limits_config:
     retention_period: 72h # 3 days
 

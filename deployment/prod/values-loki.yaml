@@ -13,7 +13,6 @@ monitoring:
   rules:
     enabled: false
 
-
 chunksCache:
   enabled: true
   memcached:
@@ -30,7 +29,7 @@ loki:
   # Disable usage statistics reporting
   analytics:
     reporting_enabled: false
-  
+
   # HA configuration: 2 replicas provide a balance between HA and resource efficiency
   commonConfig:
     replication_factor: 2
