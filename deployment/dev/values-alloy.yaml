@@ -86,7 +86,7 @@ alloy:
       }
 
       loki.write "local" {
-        endpoint { url = "http://loki-gateway.monitoring.svc.cluster.local:80/loki/api/v1/push" }
+        endpoint { url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push" }
       }
 
       // --- METRICS: PROMETHEUS SCRAPING (ANNOTATION BASED) ---
@@ -140,7 +140,7 @@ alloy:
 
       prometheus.remote_write "prom" {
         endpoint {
-          url = "http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/write"
+          url = "http://prometheus-server.monitoring.svc.cluster.local/api/v1/write"
           send_exemplars = true
           enable_http2 = true
         }

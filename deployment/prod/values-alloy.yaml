@@ -39,7 +39,7 @@ alloy:
   configMap:
     create: true
     content: |-
-      // --- SHARED DISCOVERY (The Rafdar + Firewall) ---
+      // --- SHARED DISCOVERY (The Radar + Firewall) ---
       discovery.kubernetes "all_pods" { role = "pod" }
 
       // --- LOGS: DISCOVERY & RELABELING ---
