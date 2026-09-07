@@ -2,7 +2,7 @@
 
 - [x] In tempo, able to click and zoom into logs (trace-to-log) - see [Trace-to-Log: No results found (Zero-width time range)](./TROUBLESHOOT.md#trace-to-log-no-results-found-zero-width-time-range)
 - [x] Review https://grafana.com/docs/loki/latest/send-data/k8s-monitoring-helm/
-- [ ] Migrate collection tier to `grafana/k8s-monitoring` Helm chart (replaces current Alloy/Grafana setup)
+- [x] Migrate collection tier to `grafana/k8s-monitoring` Helm chart (replaces current Alloy/Grafana setup)
   - References:
     - https://github.com/QuantumDancer/idp-argocd-platform-apps/blob/main/charts/k8s-monitoring/values.yaml
     - https://github.com/Cloud-Architect-Emma/opentelemetry-collector-examples
@@ -49,14 +49,14 @@
   - [ ] Setup Grafana LLM
 - [ ] Configure git-sync
 - [ ] Integrate with Keycloak SSO
-- [ ] Ensure both tempo and loki are storing in s3
-- [ ] Figure out all configs to disable anonymous usage data. e.g. tempo has `reportingEnabled:true`
+- [x] Ensure both tempo and loki are storing in s3
+- [x] Figure out all configs to disable anonymous usage data. e.g. tempo has `reportingEnabled:true`
 - [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
 - [ ] Ensure `examplars` is setup correctly
 - [ ] Create spring-boot-starter to inject span and/or resource attributes that can be [useful](https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/best-practices/) 
   - and/or also useful ootb solution - https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/set-up-collector/grafana-alloy/automatic-logging/
 - [ ] Scan through https://grafana.com/docs/tempo/latest/metrics-from-traces/
-- [ ] Enable [service-graph](https://grafana.com/docs/tempo/latest/metrics-from-traces/service_graphs/enable-service-graphs/)
+- [x] Enable [service-graph](https://grafana.com/docs/tempo/latest/metrics-from-traces/service_graphs/enable-service-graphs/)
 - [ ] To sync up the values-*-local with values-* to ensure the config is updated
 - [ ] Try out https://grafana.com/docs/grafana/latest/as-code/observability-as-code/grafana-cli/
 - [ ] Configure [tempo monitoring](https://grafana.com/docs/tempo/latest/operations/monitor/set-up-monitoring/)

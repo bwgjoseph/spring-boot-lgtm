@@ -1,4 +1,9 @@
 server:
+  # Enable remote-write receiver for Tempo metrics generator (Service Graphs / Span Metrics)
+  remoteWriteReceiver: true
+  extraArgs:
+    web.enable-remote-write-receiver: ""
+
   persistentVolume:
     enabled: true
     size: 50Gi
