@@ -1,4 +1,7 @@
 alloy:
+  # Disable anonymous usage reporting
+  enableReporting: false
+
   # Clustering disabled for dev/sandbox to save resources
   clustering:
     enabled: false

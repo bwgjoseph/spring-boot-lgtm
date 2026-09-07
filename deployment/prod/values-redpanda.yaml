@@ -35,6 +35,13 @@ console:
 config:
   cluster:
     auto_create_topics_enabled: true
+  rpk:
+    enable_usage_stats: false
+
+# Disable phone-home usage stats
+logging:
+  usageStats:
+    enabled: false
 
 monitoring:
   enabled: false

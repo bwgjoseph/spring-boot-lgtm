@@ -3,6 +3,12 @@ admin:
   userKey: admin-user
   passwordKey: admin-password
 
+# Disable anonymous usage stats and update checks
+grafana.ini:
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+
 sidecar:
   datasources:
     enabled: true

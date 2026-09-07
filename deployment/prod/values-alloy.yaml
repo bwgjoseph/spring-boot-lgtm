@@ -1,4 +1,7 @@
 alloy:
+  # Disable anonymous usage reporting
+  enableReporting: false
+
   # Enables gossip protocol for clustered trace tail-sampling
   clustering:
     enabled: true

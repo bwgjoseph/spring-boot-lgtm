@@ -25,6 +25,11 @@ gateway:
 
 loki:
   auth_enabled: false
+
+  # Disable usage statistics reporting
+  analytics:
+    reporting_enabled: false
+
   commonConfig:
     replication_factor: 1
   

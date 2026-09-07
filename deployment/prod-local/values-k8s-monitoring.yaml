@@ -25,6 +25,10 @@ destinations:
     logs:
       enabled: false
 
+# Disable self-reporting
+selfReporting:
+  enabled: false
+
 # Feature Exclusions to conserve resources
 beyla:
   enabled: false
