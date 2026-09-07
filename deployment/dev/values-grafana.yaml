@@ -24,12 +24,14 @@ sidecar:
     folderAnnotation: grafana_folder
     provider:
       foldersFromFilesStructure: true
+
 readinessProbe:
   httpGet:
     path: /api/health
     port: 3000
   initialDelaySeconds: 60
   timeoutSeconds: 5
+
 livenessProbe:
   httpGet:
     path: /api/health
