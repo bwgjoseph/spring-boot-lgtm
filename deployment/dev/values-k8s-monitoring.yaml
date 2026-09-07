@@ -46,6 +46,21 @@ telemetryServices:
   kube-state-metrics:
     deploy: true
 
+integrations:
+  tempo:
+    instances:
+      - name: "tempo"
+        namespaces:
+          - monitoring
+        metrics:
+          enabled: true
+          portName: prom-metrics
+        logs:
+          enabled: true
+        labelSelectors:
+          app.kubernetes.io/name: tempo
+
+
 # Telemetry Features
 annotationAutodiscovery:
   enabled: true

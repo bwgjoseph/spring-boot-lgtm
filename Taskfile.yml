@@ -65,7 +65,8 @@ tasks:
     desc: Deploy Prometheus alerting rules ConfigMap
     deps: [namespace]
     cmds:
-      - kubectl create configmap prometheus-alert-rules --from-file={{.COMMON_DIR}}/alerts/prometheus-alerting-rules.yaml -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl create configmap prometheus-alert-rules --from-file={{.COMMON_DIR}}/alerts/ -n {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+
 
   configmap:grafana-datasource:
     desc: Create ConfigMap for local datasources

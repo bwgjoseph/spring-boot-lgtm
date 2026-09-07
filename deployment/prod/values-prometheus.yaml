@@ -27,7 +27,7 @@ server:
   # Prometheus configuration file contents
   config:
     rule_files:
-      - /etc/config/alerting_rules.yml
+      - /etc/config/rules/*.yaml
     alerting:
       alertmanagers:
         - kubernetes_sd_configs:
@@ -50,9 +50,9 @@ extraVolumes:
 
 extraVolumeMounts:
   - name: extra-rules
-    mountPath: /etc/config/alerting_rules.yml
-    subPath: prometheus-alerting-rules.yaml
+    mountPath: /etc/config/rules
     readOnly: true
+
 
 # Enable/Disable components
 alertmanager:
