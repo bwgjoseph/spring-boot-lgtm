@@ -1,7 +1,10 @@
 # Tempo Distributed (Chart v3.0.6, Tempo 3.x) - Prod-Local Configuration
 fullnameOverride: tempo
 
+# Enable HTTP streaming for trace queries to lower memory overhead on queryFrontend
 streamOverHTTPEnabled: true
+
+# Disable anonymous usage reporting
 reportingEnabled: false
 
 # 1. Redpanda Kafka Streaming Ingestion
@@ -63,7 +66,7 @@ globalExtraEnv:
         name: minio
         key: rootPassword
 
-# Resource allocations & replicas for HA components
+# 4. Resource allocations & replicas for HA components
 distributor:
   replicas: 2
   affinity: ""
@@ -111,7 +114,7 @@ backendWorker:
   extraArgs:
     - -config.expand-env=true
 
-# Metrics generator configuration
+# 5. Metrics generator configuration with custom WAL path and Exemplars
 metricsGenerator:
   enabled: true
   affinity: ""
@@ -128,6 +131,7 @@ metricsGenerator:
     span_metrics: {}
     local_blocks: {}
 
+# 6. Global overrides: Enable native histograms and processors
 overrides:
   defaults:
     metrics_generator:
