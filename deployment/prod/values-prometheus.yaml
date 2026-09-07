@@ -1,12 +1,19 @@
 server:
   # Enable remote-write receiver for Tempo metrics generator (Service Graphs / Span Metrics)
   remoteWriteReceiver: true
+
+  # Prometheus server command-line flags
+  # Leave empty to let the chart manage mandatory flags and avoid duplicates
   extraArgs:
     web.enable-remote-write-receiver: ""
+
+  # Set retention period
+  retention: "14d"
 
   persistentVolume:
     enabled: true
     size: 50Gi
+
   resources:
     requests:
       cpu: 500m
@@ -14,7 +21,8 @@ server:
     limits:
       cpu: 2
       memory: 4Gi
-  retention: "14d"
+
+  # Prometheus configuration file contents
   config:
     rule_files:
       - /etc/config/alerting_rules.yml
@@ -44,6 +52,7 @@ extraVolumeMounts:
     subPath: prometheus-alerting-rules.yaml
     readOnly: true
 
+# Enable/Disable components
 alertmanager:
   enabled: true
   persistentVolume:
@@ -60,3 +69,14 @@ alertmanager:
       receiver: 'null-receiver'
     receivers:
       - name: 'null-receiver'
+
+prometheus-pushgateway:
+  enabled: false
+
+prometheus-node-exporter:
+  enabled: true
+  hostRootFsMount:
+    enabled: false
+
+kube-state-metrics:
+  enabled: true

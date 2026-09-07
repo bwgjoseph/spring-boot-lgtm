@@ -1,15 +1,19 @@
 server:
-  # Setting to true might help the chart correctly manage the flags
+  # Enable remote-write receiver for Tempo metrics generator (Service Graphs / Span Metrics)
   remoteWriteReceiver: true
-  
-  # Set retention period
-  retention: "7d"
-  
+
   # Prometheus server command-line flags
   # Leave empty to let the chart manage mandatory flags and avoid duplicates
   extraArgs:
     web.enable-remote-write-receiver: ""
-  
+
+  # Set retention period
+  retention: "7d"
+
+  persistentVolume:
+    enabled: true
+    size: 20Gi
+
   # Prometheus configuration file contents
   config:
     rule_files:
@@ -28,10 +32,6 @@ server:
             - source_labels: [__meta_kubernetes_pod_container_port_number]
               action: keep
               regex: "9093"
-        
-  persistentVolume:
-    enabled: true
-    size: 20Gi
 
 extraVolumes:
   - name: extra-rules
@@ -61,9 +61,11 @@ alertmanager:
 
 prometheus-pushgateway:
   enabled: false
+
 prometheus-node-exporter:
   enabled: true
   hostRootFsMount:
     enabled: false
+
 kube-state-metrics:
   enabled: true
