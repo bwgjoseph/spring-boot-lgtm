@@ -6,6 +6,8 @@ server:
   # Leave empty to let the chart manage mandatory flags and avoid duplicates
   extraArgs:
     web.enable-remote-write-receiver: ""
+    # Enable exemplar storage in TSDB; without this Prometheus silently discards all received exemplars
+    storage.tsdb.max-exemplars: "1000000"
 
   # Set retention period
   retention: "14d"
