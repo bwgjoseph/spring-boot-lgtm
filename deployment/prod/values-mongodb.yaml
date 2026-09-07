@@ -1,11 +1,13 @@
 architecture: replicaset
 replicaCount: 3
 replicaSetName: mgrs
+
 auth:
   enabled: true
   rootUser: admin
   existingSecret: mongodb
   secretPasswordKey: mongodb-root-password
+
 arbiter:
   enabled: false # Use 3 full nodes for prod HA
 

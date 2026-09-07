@@ -1,11 +1,13 @@
 architecture: replicaset
 replicaCount: 2
 replicaSetName: mgrs
+
 auth:
   enabled: true
   rootUser: admin
   existingSecret: mongodb
   secretPasswordKey: mongodb-root-password
+
 arbiter:
   enabled: true
   resources:
@@ -15,6 +17,13 @@ arbiter:
     requests:
       cpu: 100m
       memory: 256Mi
+
+global:
+  resourcesPreset: "none"
+
+persistence:
+  enabled: false
+
 resources:
   limits:
     cpu: 500m
@@ -22,8 +31,3 @@ resources:
   requests:
     cpu: 100m
     memory: 512Mi
-global:
-  resourcesPreset: "none"
-persistence:
-  enabled: false
-
