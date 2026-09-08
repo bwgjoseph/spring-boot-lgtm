@@ -47,7 +47,9 @@ telemetryServices:
     deploy: true
 
 integrations:
+  collector: alloy-metrics
   tempo:
+
     instances:
       - name: "tempo"
         namespaces:

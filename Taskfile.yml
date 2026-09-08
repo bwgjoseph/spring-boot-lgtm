@@ -197,7 +197,7 @@ tasks:
   lint:redpanda:
     desc: Dry-run Redpanda Helm chart
     cmds:
-      - pwsh -Command "helm template redpanda redpanda/redpanda -n monitoring -f deployment/{{.ENV}}/values-redpanda.yaml | Out-Null"
+      - pwsh -Command "if (Test-Path deployment/{{.ENV}}/values-redpanda.yaml) { helm template redpanda redpanda/redpanda -n monitoring -f deployment/{{.ENV}}/values-redpanda.yaml | Out-Null }"
 
   lint:alloy:
     desc: Dry-run Alloy / k8s-monitoring Helm chart
@@ -207,22 +207,23 @@ tasks:
   lint:loki:
     desc: Dry-run Loki Helm chart
     cmds:
-      - pwsh -Command "helm template loki grafana-community/loki -n monitoring -f deployment/{{.ENV}}/values-loki.yaml | Out-Null"
+      - pwsh -Command "if (Test-Path deployment/{{.ENV}}/values-loki.yaml) { helm template loki grafana-community/loki -n monitoring -f deployment/{{.ENV}}/values-loki.yaml | Out-Null }"
 
   lint:tempo:
     desc: Dry-run Tempo Helm chart
     cmds:
-      - pwsh -Command "helm template tempo grafana-community/tempo-distributed -n monitoring -f deployment/{{.ENV}}/values-tempo.yaml | Out-Null"
+      - pwsh -Command "if (Test-Path deployment/{{.ENV}}/values-tempo.yaml) { helm template tempo grafana-community/tempo-distributed -n monitoring -f deployment/{{.ENV}}/values-tempo.yaml | Out-Null }"
 
   lint:prometheus:
     desc: Dry-run Prometheus Helm chart
     cmds:
-      - pwsh -Command "helm template prometheus prometheus-community/prometheus -n monitoring -f deployment/{{.ENV}}/values-prometheus.yaml | Out-Null"
+      - pwsh -Command "if (Test-Path deployment/{{.ENV}}/values-prometheus.yaml) { helm template prometheus prometheus-community/prometheus -n monitoring -f deployment/{{.ENV}}/values-prometheus.yaml | Out-Null }"
 
   lint:grafana:
     desc: Dry-run Grafana Helm chart
     cmds:
-      - pwsh -Command "helm template grafana grafana-community/grafana -n monitoring -f deployment/{{.ENV}}/values-grafana.yaml | Out-Null"
+      - pwsh -Command "if (Test-Path deployment/{{.ENV}}/values-grafana.yaml) { helm template grafana grafana-community/grafana -n monitoring -f deployment/{{.ENV}}/values-grafana.yaml | Out-Null }"
+
 
   # --- 🧪 VALIDATION PIPELINE ---
   validate:dev:

@@ -221,7 +221,7 @@ alloy:
 
 controller:
   type: deployment
-  replicas: 2
+  replicas: 3
   # Ensure tail-sampling decisions are completed
   terminationGracePeriodSeconds: 60
   podDisruptionBudget:
@@ -229,8 +229,8 @@ controller:
     maxUnavailable: 1
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 300m
+      memory: 512Mi
     limits:
       memory: 1Gi
 

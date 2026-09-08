@@ -24,10 +24,13 @@ blockBuilder:
     - -config.expand-env=true
   resources:
     requests:
-      cpu: 150m
-      memory: 512Mi
-    limits:
+      cpu: 300m
       memory: 1Gi
+    limits:
+      memory: 2Gi
+  persistence:
+    enabled: true
+    size: 20Gi
 
 liveStore:
   enabled: true
@@ -36,10 +39,13 @@ liveStore:
     - -config.expand-env=true
   resources:
     requests:
-      cpu: 150m
-      memory: 512Mi
-    limits:
+      cpu: 300m
       memory: 1Gi
+    limits:
+      memory: 2Gi
+  persistence:
+    enabled: true
+    size: 20Gi
 
 
 # 3. Storage configuration for MinIO S3 backend
@@ -65,15 +71,15 @@ globalExtraEnv:
 
 # 4. High-throughput production resource allocations & replicas
 distributor:
-  replicas: 2
+  replicas: 3
   extraArgs:
     - -config.expand-env=true
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
+      cpu: 200m
       memory: 512Mi
+    limits:
+      memory: 1Gi
   receivers:
     otlp:
       protocols:
@@ -86,10 +92,10 @@ querier:
     - -config.expand-env=true
   resources:
     requests:
-      cpu: 150m
-      memory: 256Mi
+      cpu: 300m
+      memory: 512Mi
     limits:
-      memory: 1Gi
+      memory: 1500Mi
 
 
 queryFrontend:
@@ -98,10 +104,10 @@ queryFrontend:
     - -config.expand-env=true
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
+      cpu: 200m
       memory: 256Mi
+    limits:
+      memory: 512Mi
 
 backendScheduler:
   extraArgs:
@@ -119,13 +125,13 @@ metricsGenerator:
     - -config.expand-env=true
   resources:
     requests:
-      cpu: 150m
-      memory: 256Mi
-    limits:
+      cpu: 300m
       memory: 512Mi
+    limits:
+      memory: 1Gi
   persistence:
     enabled: true
-    size: 5Gi
+    size: 10Gi
   config:
     storage:
       path: /var/tempo/generator/wal

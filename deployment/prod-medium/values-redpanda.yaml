@@ -12,18 +12,20 @@ statefulset:
       repository: redpandadata/redpanda-operator
 
 # 3. Resource Allocation & Limits
+# Seastar memory model: container max = Seastar memory (~80%) + reserve. 4Gi limit => ~3.2GiB engine memory.
 resources:
   cpu:
     cores: 1
   memory:
     container:
-      max: 2Gi
+      max: 4Gi
 
 # 4. Storage & Persistence
+# 24h retention @ 3 MB/sec x 3x replication x 30% buffer = 350Gi per broker
 storage:
   persistentVolume:
     enabled: true
-    size: 170Gi
+    size: 350Gi
 
 
 # 5. Security & Connectivity

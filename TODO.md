@@ -84,3 +84,5 @@
 - Last working halfway on Laptop got no more tokens to proceed, to resume from Laptop which has more context than Desktop
 
 - As of 30 Aug, have migrated to k8s-monitoring and verified
+
+- As of 8 Sep, have configured for small and medium sizing setup. While it's reviewing and fixing configuration halfway, ran out of token. Refer to prod_config_review.md and get agent to resume based on that.

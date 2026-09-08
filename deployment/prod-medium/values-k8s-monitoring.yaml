@@ -1,5 +1,5 @@
 cluster:
-  name: k8s-prod
+  name: k8s-prod-medium
 
 destinations:
   prometheus:
@@ -136,10 +136,10 @@ collectors:
         enabled: true
       resources:
         requests:
-          cpu: 200m
-          memory: 256Mi
-        limits:
+          cpu: 300m
           memory: 512Mi
+        limits:
+          memory: 1Gi
 
   alloy-logs:
     enabled: true
@@ -153,10 +153,10 @@ collectors:
         varlog: true
       resources:
         requests:
-          cpu: 200m
-          memory: 256Mi
-        limits:
+          cpu: 300m
           memory: 512Mi
+        limits:
+          memory: 1Gi
 
   alloy-receiver:
     enabled: true
@@ -172,10 +172,10 @@ collectors:
           protocol: TCP
       resources:
         requests:
-          cpu: 150m
-          memory: 256Mi
-        limits:
+          cpu: 250m
           memory: 512Mi
+        limits:
+          memory: 1Gi
 
   alloy-singleton:
     enabled: false
