@@ -1,44 +1,137 @@
-# ADR: MinIO Object Storage Backend
+# ADR: MinIO S3-Compatible Object Storage Backend
 
 ## Status
-Proposed
+Accepted
 
 ## Context
-For on-premise deployments of the LGTM stack, we require an S3-compatible object storage backend. This provides a scalable, durable, and cost-effective home for long-term telemetry data that is independent of the ephemeral compute pods. Key requirements include:
-- **S3 Compatibility:** To serve as a standardized backend for Loki, Tempo, and Mimir.
-- **HA Standards:** Performance and reliability despite the decoupling from compute layers.
-- **Security:** Strict credential and network management to prevent unauthorized access or lockout.
+For on-premise and local Kubernetes deployments of the LGTM stack, an S3-compatible object storage layer is required. Decoupling long-term telemetry storage from compute pods guarantees durability, scalability, and cost efficiency. Key architectural requirements include:
+- **S3 API Compatibility:** Providing a uniform, standardized storage interface for Loki (log chunks & indexes), Tempo (Parquet trace blocks), and Mimir (long-term metric blocks).
+- **High I/O Throughput:** Sustaining concurrent writes and compaction operations without I/O blocking.
+- **Reliable Lifecycle & Credentials:** Preventing credential rotation lockouts and automating bucket provisioning.
+
+---
+
+## Architecture & Storage Integration
+
+### 1. MinIO Storage Topology Diagram
+MinIO operates as the central object store backing all three primary persistence engines in the LGTM stack:
+
+```mermaid
+flowchart TD
+    subgraph ObservabilityConsumers ["LGTM Compute Consumers"]
+        LOKI_W["Loki Ingesters (Write Path)"]
+        LOKI_B["Loki Compactor (Backend)"]
+        TEMPO_B["Tempo Block Builder"]
+        TEMPO_Q["Tempo Querier"]
+        MIMIR_ING["Mimir Ingesters / Compactor"]
+    end
+
+    subgraph MinIOService ["MinIO Object Storage (Port: 9000 API / 9001 Console)"]
+        MINIO_POD["MinIO Standalone Instance<br/><i>Memory: 1Gi Req / 4Gi Limit</i>"]
+        
+        subgraph Buckets ["Automated Buckets"]
+            B_LOKI[("bucket: 'loki'<br/><i>TSDB Chunks & Indexes</i>")]
+            B_TEMPO[("bucket: 'tempo'<br/><i>Parquet Trace Blocks</i>")]
+            B_MIMIR[("bucket: 'mimir'<br/><i>Metric Blocks</i>")]
+        end
+
+        MINIO_POD --- B_LOKI
+        MINIO_POD --- B_TEMPO
+        MINIO_POD --- B_MIMIR
+    end
+
+    subgraph StorageBacking ["Storage Infrastructure"]
+        PV[("PersistentVolume<br/><i>100Gi High-Performance SSD / NVMe</i>")]
+    end
+
+    subgraph Management ["Administration"]
+        ADMIN["Platform Engineer / SRE"]
+    end
+
+    %% Storage Binding
+    MINIO_POD -->|"Local SSD Mount"| PV
+
+    %% S3 API Operations (:9000)
+    LOKI_W -->|"S3 PUT (Flush Chunks)"| MINIO_POD
+    LOKI_B -->|"S3 DELETE / GET (Compaction)"| MINIO_POD
+    TEMPO_B -->|"S3 PUT (Parquet Blocks)"| MINIO_POD
+    TEMPO_Q -->|"S3 GET (Query Historical Spans)"| MINIO_POD
+    MIMIR_ING -->|"S3 PUT / GET (Blocks)"| MINIO_POD
+
+    %% Console (:9001)
+    ADMIN <-->|"Web UI (Port: 9001)"| MINIO_POD
+
+    classDef minio fill:#ffebee,stroke:#c62828,stroke-width:2px;
+    classDef bucket fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px;
+    classDef consumer fill:#e1f5fe,stroke:#0277bd,stroke-width:1px;
+    classDef disk fill:#ede7f6,stroke:#4527a0,stroke-width:2px;
+
+    class MINIO_POD minio;
+    class B_LOKI,B_TEMPO,B_MIMIR bucket;
+    class LOKI_W,LOKI_B,TEMPO_B,TEMPO_Q,MIMIR_ING consumer;
+    class PV disk;
+```
+
+---
 
 ## Decision
-1.  **Deployment Mode:** **Standalone** (relying on underlying high-performance SSD infrastructure for durability).
-2.  **Persistence:** Mandatory use of **SSD/NVMe-backed Persistent Volumes** to avoid I/O bottlenecks.
-3.  **Credential Management:** Use **static Kubernetes Secrets** injected into the Helm chart as an `existingSecret`.
-4.  **Network Isolation:** Network policies must restrict MinIO access to only authorized observability components.
-5.  **Resource Allocation:** Allocate a minimum of **2Gi-4Gi RAM** to optimize S3 metadata caching for high-cardinality telemetry.
 
-## Rationale
-- **Standalone Efficiency:** Reduces management overhead compared to distributed mode, while SSD-backed storage provides the necessary I/O throughput to support high-frequency log/trace flushes.
-- **Credential Stability:** Using static Kubernetes secrets prevents data lockout scenarios that would otherwise occur if passwords were regenerated during Helm upgrades.
-- **Caching Performance:** MinIO relies on RAM for object listing; sizing this adequately prevents timeouts during compaction and index maintenance jobs in Loki/Tempo.
-- **Network Security:** Minimizing exposure via Network Policies ensures only authorized services can interact with the object storage backend.
+1. **Deployment Mode:**
+   - Deploy MinIO in **Standalone mode (`replicas: 1`)** backed by dedicated PersistentVolumes.
+   - For on-premise single-cluster environments, standalone mode minimizes operational overhead while relying on underlying enterprise SSD/NVMe storage classes for disk-level durability.
+   - In future enterprise phases with multi-node failure domains, MinIO can transition to a distributed 4-node deployment with Erasure Coding.
 
-## Implementation Source of Truth
-- **Persistence:** `persistence.size: 50Gi` (minimum recommendation) on SSD storage class.
-- **Credential Strategy:** `existingSecret: minio-secret`.
-- **Resources:** `requests: 1Gi, limits: 4Gi`.
+2. **Automated Bucket Provisioning:**
+   - Configure Helm to automatically provision public/internal buckets on initial startup:
+     - **`loki`:** Chunks, TSDB indexes, and ruler rules.
+     - **`tempo`:** Columnar Parquet trace blocks and meta files.
+     - **`mimir`:** Prometheus/Mimir long-term metric blocks.
+   - Buckets are created idempotently with `purge: false` to prevent accidental deletion of existing telemetry data during chart upgrades.
 
-## Technical Specification & Mapping
-This table maps the production implementation in `deployment/prod/values-minio.yaml` to the architectural decisions and requirements.
+3. **High-Performance SSD Persistence:**
+   - Production instances allocate a minimum of **`100Gi`** PersistentVolumeClaim (`size: 100Gi`) backed by high-IOPS NVMe/SSD storage class (`50Gi` in sandbox dev).
+   - High write throughput is essential to prevent back-pressure during bulk chunk flushes from Loki and Tempo.
 
-| YAML Path | Logic / Value | Purpose | Requirement Link |
+4. **Deterministic Credential Management:**
+   - Bind credentials via `existingSecret: minio-secret` referencing keys `rootUser: admin` and `rootPassword: password123`.
+   - Prevents automated password regeneration during Helm releases which would break consumer authentication across Loki, Tempo, and Mimir.
+
+5. **Resource Sizing for Metadata Caching:**
+   - Allocate **`requests: cpu: 500m, memory: 1Gi`** and **`limits: memory: 4Gi`**.
+   - Generous RAM allocation is required to allow MinIO to maintain S3 object listing caches in memory, preventing query timeouts during heavy background compaction jobs.
+
+6. **Service Networking:**
+   - Expose S3 API via ClusterIP service on port **`9000`** (`service.port: 9000`).
+   - Expose Web Console via ClusterIP service on port **`9001`** (`consoleService.port: 9001`).
+
+---
+
+## Technical Specification & Implementation Mapping
+
+This table maps the production implementation in `deployment/prod/values-minio.yaml` and `deployment/dev/values-minio.yaml` to the architectural decisions:
+
+| Key / Path | Value / Configuration | Purpose | Architectural Role |
 | :--- | :--- | :--- | :--- |
-| `mode` | `standalone` | Simplifies operations on-prem. | `ADR` Sec 1.0 |
-| `persistence` | `enabled: true` | Ensures data survival on restart. | `ADR` Sec 2.0 |
-| `resources` | `1Gi / 4Gi` | Ensures sufficient metadata caching memory. | `ADR` Sec 5.0 |
-| `existingSecret` | `minio-secret` | Prevents password rotation lockout. | `ADR` Sec 3.0 |
+| `mode` | `standalone` | Simple, reliable single-instance object store. | Core Architecture |
+| `replicas` | `1` | Focused footprint relying on underlying storage durability. | Topology |
+| `persistence.enabled` | `true` | Ensures data survival across pod restarts. | Durability |
+| `persistence.size` | `100Gi` (prod) / `50Gi` (dev) | Storage capacity for log, trace, and metric blocks. | Capacity |
+| `existingSecret` | `minio-secret` | Decoupled, stable administrative credentials. | Security |
+| `buckets` | `loki`, `tempo`, `mimir` | Automated bucket provisioning on startup. | Automation |
+| `resources.requests` | `cpu: 500m, memory: 1Gi` | Baseline resources for S3 metadata operations. | Performance |
+| `resources.limits` | `memory: 4Gi` | Headroom for S3 object listing cache. | Performance |
+| `service.port` | `9000` (ClusterIP) | High-speed internal S3 API endpoint. | Ingress |
+| `consoleService.port` | `9001` (ClusterIP) | Web administrative console for storage inspection. | Management |
+
+---
 
 ## Consequences
-- **Positive:** High performance and operational simplicity.
-- **Negative:** Hardware failure on the node hosting MinIO requires manual recovery procedures.
-- **Risk:** High dependency on the SSD performance for all telemetry writes/reads.
-- **Future Considerations:** Transition to a **4-node distributed deployment** with erasure coding as storage volume grows to eliminate single-node failure risk.
+
+- **Positive:**
+  - Standardized S3 API decouples storage maintenance from compute instances.
+  - Zero-maintenance bucket provisioning out of the box.
+  - Consistent credential injection across all stack components via shared Kubernetes secrets.
+- **Negative:**
+  - Standalone mode has a single point of failure if the underlying Kubernetes worker node experiences hardware failure.
+- **Risk:**
+  - If SSD I/O bandwidth is saturated, ingestion workers (Loki Ingesters / Tempo Block Builder) will experience flush timeouts.

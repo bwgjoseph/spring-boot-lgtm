@@ -9,26 +9,17 @@
 - [x] Setup https://github.com/grafana/gcx (Grafana Cloud Experience)
   - After reviewing, it has limited use for airgapped env such as gitops (alert, dashboard, datasource) or query data. As there's no such need at the moment, will not use it.
 - [x] Enable alerting (Configured Alertmanager with Mattermost support and production-grade grouping)
-- [ ] Figure out what are the more commonly used alerts and defined it
-  - Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
 - [x] RED metrics
 - [x] Migrate loki (Effective March 16, 2026, the Grafana Loki Helm chart will be forked to a new repository . The chart in the Loki repository will continue to be maintained for GEL users only. See https://github.com/grafana/loki/issues/20705 for details.)
 - [x] Update configuration to be production ready (See `/production` directory)
     - [x] Ensure retention period is defined (90d for metrics/logs, 14d for traces)
 - [x] Setup grafana-mcp and prometheus-mcp-server (See [mcp/](mcp/README.md))
 - [x] Service graph is not working (See [SERVICE_GRAPH_ISSUE](SERVICE_GRAPH_ISSUE.md))
-- [ ] How to integrate and scape JMX metrics (See https://blog.frankel.ch/tip-opentelemetry-projects/)
-- [ ] Integrate with Pyroscope
-- [ ] Figure out how to publish data from alloy to different sources
 - [x] Figure out production configuration and best practices
   - [x] Retention period (30-90d for logs/metrics, 7-14d for traces)
   - [x] Disk space required (Estimated 15Ti for MinIO)
     - [x] PVC vs S3 (Recommended S3/MinIO for scalability)
-- [ ] How to setup span attributes
-  - To write docs on how the while configuring correlation fields work, that also automatically synced to MDC
 - [x] Implement tail-based sampling in Alloy (See [TAIL_BASED_SAMPLING.md](./notes/TAIL_BASED_SAMPLING.md))
-- [ ] Integrate Grafana with Keycloak SSO
-- [ ] To generate the alloy pipeline configuration as a diagram
 - [x] Left over from 10/4
   - [x] Need to deploy MongoDB then can test metrics from debezium
   - [x] In DebeziumMetricsBinder, should be can revert back to not have `new ObjectName("kafka.connect*:*")`
@@ -41,21 +32,13 @@
     - [x] ensure trace and span are created
   - [x] Ensure loki and tempo gets the dataset 
 - [x] add Jolokia
-- [ ] Figure out if possible to forward logs to syslog directly
-- [ ] Gitlab CI dashboard integration
 - [x] Prepare production grade loki/tempo in scable-mode by scaling down unncessary stuff to verify
-- [ ] Make all the dashboard support filter by namespace
 - [x] Find suitable grafana plugins to install
   - [x] Setup Grafana Assistant (does not work in airgapped)
   - [x] Setup Grafana LLM (See [plugin/grafana-llm.md](plugin/grafana-llm.md))
-- [ ] Configure git-sync
 - [x] Ensure both tempo and loki are storing in s3
 - [x] Figure out all configs to disable anonymous usage data. e.g. tempo has `reportingEnabled:true`
-- [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
 - [x] Ensure `examplars` is setup correctly
-- [ ] Create spring-boot-starter to inject span and/or resource attributes that can be [useful](https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/best-practices/) 
-  - and/or also useful ootb solution - https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/set-up-collector/grafana-alloy/automatic-logging/
-- [ ] Scan through https://grafana.com/docs/tempo/latest/metrics-from-traces/
 - [x] Enable [service-graph](https://grafana.com/docs/tempo/latest/metrics-from-traces/service_graphs/enable-service-graphs/)
 - [x] To sync up the values-*-local with values-* to ensure the config is updated
 - [x] Configure [tempo monitoring](https://grafana.com/docs/tempo/latest/operations/monitor/set-up-monitoring/)
@@ -64,6 +47,35 @@
   - [x] https://github.com/pab1it0/prometheus-mcp-server (See [prometheus.md](mcp/prometheus.md))
   - [x] https://github.com/grafana/mcp-grafana (See [grafana.md](mcp/grafana.md))
   - [x] Kubernetes, MongoDB, Redpanda, MinIO MCP setups (See [mcp/](mcp/README.md))
+- [ ] How to setup span attributes
+  - To write docs on how the while configuring correlation fields work, that also automatically synced to MDC
+- [ ] Scan through https://grafana.com/docs/tempo/latest/metrics-from-traces/
+- [ ] Create spring-boot-starter to inject span and/or resource attributes that can be [useful](https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/best-practices/)
+  - and/or also useful ootb solution - https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/set-up-collector/grafana-alloy/automatic-logging/
+    - automatic logging might not be useful for my case since our logging already set traceId to all logs by default
+- [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
+- [ ] Configure git-sync
+- [ ] Make all the dashboard support filter by namespace
+- [ ] Figure out if possible to forward logs to syslog directly
+- [ ] Gitlab CI dashboard integration
+- [ ] Integrate Grafana with Keycloak SSO
+- [x] Review ADR
+  - [x] [Alloy](./ADR/alloy.md)
+  - [x] [Grafana](./ADR/grafana.md)
+  - [x] [Loki](./ADR/loki.md)
+  - [x] [Minio](./ADR/minio.md)
+  - [x] [Tempo](./ADR/tempo.md)
+  - [x] [Alert Manager](./ADR/alertmanager.md)
+  - [x] [Debezium](./ADR/debezium.md)
+  - [x] [Application](./ADR/application.md)
+  - [x] [Redpanda](./ADR/redpanda.md)
+  - [x] [Mimir (Proposed)](./ADR/mimir.md)
+- [ ] How to integrate and scape JMX metrics (See https://blog.frankel.ch/tip-opentelemetry-projects/)
+- [ ] Integrate with Pyroscope
+- [ ] Figure out how to publish data from alloy to different sources
+- [ ] Figure out what are the more commonly used alerts and defined it
+  - Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
+- [ ] Evaluate Minio replacement
 
 ## 📋 Issues to Resolve & Technical Backlog
 
@@ -106,3 +118,4 @@
 - As of 30 Aug, have migrated to k8s-monitoring and verified
 - As of 8 Sep, have configured for small and medium sizing setup. While it's reviewing and fixing configuration halfway, ran out of token. Refer to prod_config_review.md and get agent to resume based on that.
 - As of 20 Sep, created the /mcp hub with individual setup guides and Claude Code uvx/npx configuration for Grafana, Prometheus, Kubernetes, MongoDB, Redpanda/Kafka, and MinIO/S3.
+- As of 27 Sep, completed the review and update of all ADRs (Alloy, Grafana, Loki, MinIO, Tempo, Alertmanager, Debezium, Application, Redpanda, and Mimir blueprint) with updated Mermaid architecture diagrams and technical specifications.
