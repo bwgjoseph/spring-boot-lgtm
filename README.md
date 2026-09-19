@@ -4,7 +4,7 @@ This project is a production-ready template and sandbox for implementing the **G
 
 It demonstrates a "Scrape & Push" architecture using Spring Boot 3.5+, Micrometer Tracing (OTEL Bridge), and W3C Trace Context.
 
-👉 **[Detailed Feature Guide (feature.md)](FEATURE.md)**
+👉 **[Detailed Feature Guide (FEATURE.md)](./notes/FEATURE.md)**
 👉 **[Troubleshooting Guide (TROUBLESHOOT.md)](./TROUBLESHOOT.md)**
 
 ## 🚀 Key Features (Day 2 Ready)
@@ -97,12 +97,12 @@ graph TD
 | Component           | Role              | Helm Chart                        | Version   |
 |---------------------|-------------------|-----------------------------------|-----------|
 | **Spring Boot 3.5** | Application       | -                                 | -         |
-| **Grafana Alloy**   | Collector/Gateway | `grafana/alloy`                   | `1.8.1`   |
-| **Grafana**         | Visualization     | `grafana-community/grafana`       | `12.1.1`  |
-| **Loki**            | Log Storage       | `grafana-community/loki`          | `15.0.1`  |
+| **Grafana Alloy**   | Collector/Gateway | `grafana/alloy`                   | `1.11.1`  |
+| **Grafana**         | Visualization     | `grafana-community/grafana`       | `12.11.1` |
+| **Loki**            | Log Storage       | `grafana-community/loki`          | `18.9.0`  |
 | **Tempo**           | Trace Storage     | `grafana-community/tempo-distributed` | `3.0.6` |
 | **Redpanda**        | Streaming Log     | `redpanda/redpanda`               | `26.2.1`  |
-| **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `29.20.1` |
+| **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `29.27.0` |
 | **MinIO**           | Object Storage    | `minio/minio`                     | `5.4.0`   |
 | **MongoDB**         | DB / CDC Source   | `bitnami/mongodb` (OCI)           | `18.6.31` |
 
@@ -126,7 +126,7 @@ task infra
 
 This project contains specialized configurations to handle hardware and mount propagation limits in Docker Desktop. 
 
-👉 **[Read the Docker Desktop Configuration Guide (DOCKER_DESKTOP.md)](./DOCKER_DESKTOP.md)**
+👉 **[Read the Docker Desktop Configuration Guide (DOCKER_DESKTOP.md)](./notes/DOCKER_DESKTOP.md)**
 
 ## 🔍 Exploration
 
@@ -168,7 +168,7 @@ This project includes a production-hardened framework. When migrating from the l
 
 👉 **[System Architecture (ARCHITECTURE.md)](./ARCHITECTURE.md)**
 👉 **[Component-Specific Decisions (ADR/)](./ADR/)**
-👉 **[Production Requirements (REQUIREMENTS.md)](./REQUIREMENTS.md)**
+👉 **[Production Requirements (notes/PRODUCTION_READY.md)](./notes/PRODUCTION_READY.md)**
 
 ## Upgrading
 

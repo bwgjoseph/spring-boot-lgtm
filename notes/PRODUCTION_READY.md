@@ -22,7 +22,7 @@ Loki is the log aggregation engine.
 
 ### Tempo
 Tempo is the trace repository.
-*   **Scaling Mode:** Scalable Monolithic (Replicas 2+).
+*   **Scaling Mode:** Microservices Mode (tempo-distributed) with Redpanda streaming buffer.
 *   **Performance:** WAL **must** be hosted on high-performance SSD/NVMe (20Gi).
 *   **Columnar Search:** Must use `vParquet4` and enabled vertical compaction to maintain search speed at scale.
 

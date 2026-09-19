@@ -11,12 +11,12 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
   - **Micrometer Observation API:** For manual instrumentation and context propagation.
   - **Micrometer Prometheus Registry:** For metric scraping via `/actuator/prometheus`.
   - **Jolokia support-spring:** For raw JMX access via `/actuator/jolokia`.
-  - **Grafana Alloy (1.8.1):** Features `loki.process` metadata extraction and `otelcol.processor.tail_sampling`.
+  - **Grafana Alloy (1.11.1):** Features `loki.process` metadata extraction and `otelcol.processor.tail_sampling`.
 - **Storage:** 
-  - **Loki (15.0.1):** Log Storage (SimpleScalable mode with Index Gateway).
+  - **Loki (18.9.0):** Log Storage (SimpleScalable mode with Index Gateway).
   - **Tempo (3.0.6):** Trace Storage and Service Graph generation (tempo-distributed / Tempo 3.x microservices mode).
   - **Redpanda (26.2.1):** High-performance Kafka-compatible streaming log for Tempo trace ingestion.
-  - **Prometheus (29.7.0):** Metrics scraper and Alerting engine.
+  - **Prometheus (29.27.0):** Metrics scraper and Alerting engine.
   - **Mimir (6.0.6):** Metrics Long-term Storage (Monolithic HA mode).
   - **MinIO (5.4.0):** Internal Object Storage for Loki, Tempo, and Mimir.
   - **MongoDB (18.6.31):** 3-node ReplicaSet instrumented for CDC via Debezium.
@@ -29,7 +29,7 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
 ## Development Environment
 - **Operating System:** Windows
 - **Shell:** PowerShell (pwsh)
-- **Docker Desktop:** Special configurations applied for hardware limits. See [DOCKER_DESKTOP.md](./DOCKER_DESKTOP.md).
+- **Docker Desktop:** Special configurations applied for hardware limits. See [DOCKER_DESKTOP.md](./notes/DOCKER_DESKTOP.md).
 - **Command Syntax:** Always use PowerShell syntax for shell commands. 
   - Use `;` instead of `&&` for command chaining.
   - Use `$env:VAR = "val"` for environment variables.
@@ -75,4 +75,4 @@ The project uses `Taskfile` to simplify complex operations across environments (
 - `RESOURCES.md`: Detailed CPU and Memory allocation for all deployments.
 - `IMAGES.md`: Software Bill of Materials (SBOM) and container image inventory.
 - `TROUBLESHOOT.md`: Known issues and resolutions for the local HA stack.
-- `CUSTOM_ATTRIBUTES.md`: Documentation for cross-stack attribute mapping.
+- `notes/CUSTOM_ATTRIBUTES.md`: Documentation for cross-stack attribute mapping.

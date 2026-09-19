@@ -60,6 +60,7 @@ task mongodb
 # 2. Backends
 task prometheus
 task loki
+task redpanda   # Tempo requires Redpanda (Kafka streaming buffer) before starting
 task tempo
 
 # 3. Visualization & Collection

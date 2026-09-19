@@ -66,6 +66,29 @@
   - https://github.com/grafana/mcp-grafana
 - [ ] Setup gcx cli
 
+## 📋 Issues to Resolve & Technical Backlog
+
+- [ ] **Prometheus Alerting Rules Loading:** Current alerting rules (`alerting_rules.yml`) in Prometheus are appearing empty (`{}`) even after configuration changes. Requires further investigation into how `prometheus-community/prometheus` Helm chart processes `serverFiles` vs `extraConfigmapMounts`.
+- [ ] **Loki HA Caching Resource Mapping:** Memcached sub-charts for Loki are currently disabled in `prod-local` due to incorrectly mapped high-resource defaults. Requires proper sub-chart resource configuration to enable in resource-constrained sandboxes.
+- [ ] **Mimir Migration Strategy:** Implement `swap:mimir` to replace local Prometheus storage with Mimir (Monolithic HA-ready mode).
+- [ ] **Prometheus Remote Write Configuration:** Configure existing Prometheus Helm release to act as a pass-through by enabling `remoteWrite` to the Mimir endpoint.
+- [ ] **Grafana Datasource Migration:** Update Grafana to transition from `Prometheus` datasource to `Mimir` datasource upon completion of the Mimir swap.
+- [ ] **Alerting Rules Migration:** Migrate alerting rules from Prometheus `serverFiles` to Mimir's `ruler` configuration.
+- [ ] **Storage - RWX Support:** Check for NFS/shared StorageClass support.
+- [ ] **Storage - Alloy SSD PVCs:** Confirm availability of local SSD PVCs for Alloy WAL.
+- [ ] **Storage - Class Performance:** Identify high-performance SSD/NVMe storage classes.
+- [ ] **Infrastructure - S3 Backend:** Finalize managed cloud S3 vs self-hosted MinIO choice.
+- [ ] **Infrastructure - Mattermost Webhook:** Secure webhook URL for Alertmanager.
+- [ ] **Network - Ingress:** Verify Nginx/Traefik gRPC support for OTLP.
+- [ ] **Network - Internal DNS:** Confirm stability of cluster DNS resolution.
+- [ ] **Workload - Volume Estimates:** Gather daily log/trace/series metrics for capacity planning.
+- [ ] **Lessons Learned - Resource Constraints:** Standardize local sandbox resource requests/limits (10m CPU / 64Mi RAM) in all charts to prevent scheduling deadlocks.
+- [ ] **Lessons Learned - Configuration Schema:** Use explicit `config: |` blocks in Helm values to bypass chart-template version-mismatch issues for Tempo/Loki.
+- [ ] **Lessons Learned - Anti-Affinity:** Ensure `podAntiAffinity` is set to `soft` or `disabled` for gateway/ingress components in single-node environments.
+- [ ] **Lessons Learned - Memberlist DNS:** Always use cluster service DNS (`loki-memberlist`) instead of hardcoded pod names for Gossip/HashRing coordination.
+- [ ] **Lessons Learned - S3 Credentials:** Explicitly configure `extraEnv` for every component (Ingester/Querier/Index Gateway) as they do not inherit from the global scope.
+
+## Journal
 
 - As of 15th Aug, setup redpanda in order to work with tempo-distributed in tempo 3.x. But while configuring tempo chart, token used up all.
 - To resume configuring tempo such that it can be spinned up all and working.
@@ -78,11 +101,8 @@
   - Thing about rustFS is that it isn't GA yet, but it seem like for my use case, rustFS should be good enough; it's more lightweight.
   - rustFS is a drop-in replacement for minio (see github/rustfs/discussions/2213)
   - Looks like this [vaults3](https://github.com/Kodiqa-Solutions/VaultS3) also seem lightweight and good
-
 - As of 23 Aug, have upgraded all components except Mimir
 - Moved on to swing to k8s-monitoring at a branch
 - Last working halfway on Laptop got no more tokens to proceed, to resume from Laptop which has more context than Desktop
-
 - As of 30 Aug, have migrated to k8s-monitoring and verified
-
 - As of 8 Sep, have configured for small and medium sizing setup. While it's reviewing and fixing configuration halfway, ran out of token. Refer to prod_config_review.md and get agent to resume based on that.
