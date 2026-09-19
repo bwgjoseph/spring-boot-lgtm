@@ -26,7 +26,7 @@
     - [x] PVC vs S3 (Recommended S3/MinIO for scalability)
 - [ ] How to setup span attributes
   - To write docs on how the while configuring correlation fields work, that also automatically synced to MDC
-- [ ] Implement tail-based sampling in Alloy (See [TAIL_BASED_SAMPLING.md](./TAIL_BASED_SAMPLING.md))
+- [x] Implement tail-based sampling in Alloy (See [TAIL_BASED_SAMPLING.md](./notes/TAIL_BASED_SAMPLING.md))
 - [ ] Integrate Grafana with Keycloak SSO
 - [ ] To generate the alloy pipeline configuration as a diagram
 - [x] Left over from 10/4

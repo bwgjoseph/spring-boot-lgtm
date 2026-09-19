@@ -56,8 +56,8 @@ otelcol.processor.tail_sampling "sampling" {
 
 ## Implementation Status
 
-- [x] `otelcol.processor.tail_sampling` implemented in `deployment/prod/values-alloy.yaml` and `deployment/prod-medium/values-alloy.yaml`.
+- [x] `otelcol.processor.tail_sampling` implemented in `deployment/prod-local/values-alloy.yaml` and `deployment/prod/values-alloy.yaml`.
 - [x] Trace pipeline wired: `tail_sampling → batch → exporter` (batch after sampling for efficiency).
-- [ ] Add `otelcol.exporter.loadbalancing` for multi-replica Alloy deployments (see `TODO.md`).
+- [x] `otelcol.exporter.loadbalancing` implemented for multi-replica Alloy deployments routing by `traceID` to port `4318`.
 - [ ] Tune `decision_wait` based on application's average request latency once production traffic baselines are established.
 - [ ] Validate trace retention metrics in Tempo to verify cost savings.
