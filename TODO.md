@@ -6,7 +6,8 @@
   - References:
     - https://github.com/QuantumDancer/idp-argocd-platform-apps/blob/main/charts/k8s-monitoring/values.yaml
     - https://github.com/Cloud-Architect-Emma/opentelemetry-collector-examples
-- [ ] Setup https://github.com/grafana/gcx (Grafana Cloud Experience)
+- [x] Setup https://github.com/grafana/gcx (Grafana Cloud Experience)
+  - After reviewing, it has limited use for airgapped env such as gitops (alert, dashboard, datasource) or query data. As there's no such need at the moment, will not use it.
 - [x] Enable alerting (Configured Alertmanager with Mattermost support and production-grade grouping)
 - [ ] Figure out what are the more commonly used alerts and defined it
   - Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
@@ -14,7 +15,7 @@
 - [x] Migrate loki (Effective March 16, 2026, the Grafana Loki Helm chart will be forked to a new repository . The chart in the Loki repository will continue to be maintained for GEL users only. See https://github.com/grafana/loki/issues/20705 for details.)
 - [x] Update configuration to be production ready (See `/production` directory)
     - [x] Ensure retention period is defined (90d for metrics/logs, 14d for traces)
-- [ ] Setup grafana-mcp
+- [x] Setup grafana-mcp and prometheus-mcp-server (See [mcp/](mcp/README.md))
 - [x] Service graph is not working (See [SERVICE_GRAPH_ISSUE](SERVICE_GRAPH_ISSUE.md))
 - [ ] How to integrate and scape JMX metrics (See https://blog.frankel.ch/tip-opentelemetry-projects/)
 - [ ] Integrate with Pyroscope
@@ -58,13 +59,12 @@
 - [ ] Scan through https://grafana.com/docs/tempo/latest/metrics-from-traces/
 - [x] Enable [service-graph](https://grafana.com/docs/tempo/latest/metrics-from-traces/service_graphs/enable-service-graphs/)
 - [x] To sync up the values-*-local with values-* to ensure the config is updated
-- [ ] Try out https://grafana.com/docs/grafana/latest/as-code/observability-as-code/grafana-cli/
 - [x] Configure [tempo monitoring](https://grafana.com/docs/tempo/latest/operations/monitor/set-up-monitoring/)
 - [x] Configure [loki monitoring](https://grafana.com/docs/loki/latest/operations/meta-monitoring/)
-- [ ] Configure mcp server
-  - https://github.com/pab1it0/prometheus-mcp-server
-  - https://github.com/grafana/mcp-grafana
-- [ ] Setup gcx cli
+- [x] Configure mcp server (See [mcp/](mcp/README.md))
+  - [x] https://github.com/pab1it0/prometheus-mcp-server (See [prometheus.md](mcp/prometheus.md))
+  - [x] https://github.com/grafana/mcp-grafana (See [grafana.md](mcp/grafana.md))
+  - [x] Kubernetes, MongoDB, Redpanda, MinIO MCP setups (See [mcp/](mcp/README.md))
 
 ## 📋 Issues to Resolve & Technical Backlog
 
@@ -106,3 +106,4 @@
 - Last working halfway on Laptop got no more tokens to proceed, to resume from Laptop which has more context than Desktop
 - As of 30 Aug, have migrated to k8s-monitoring and verified
 - As of 8 Sep, have configured for small and medium sizing setup. While it's reviewing and fixing configuration halfway, ran out of token. Refer to prod_config_review.md and get agent to resume based on that.
+- As of 20 Sep, created the /mcp hub with individual setup guides and Claude Code uvx/npx configuration for Grafana, Prometheus, Kubernetes, MongoDB, Redpanda/Kafka, and MinIO/S3.

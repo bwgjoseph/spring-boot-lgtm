@@ -6,6 +6,7 @@ It demonstrates a "Scrape & Push" architecture using Spring Boot 3.5+, Micromete
 
 👉 **[Detailed Feature Guide (FEATURE.md)](./notes/FEATURE.md)**
 👉 **[Troubleshooting Guide (TROUBLESHOOT.md)](./TROUBLESHOOT.md)**
+👉 **[Model Context Protocol Hub (mcp/)](./mcp/README.md)**
 
 ## 🚀 Key Features (Day 2 Ready)
 
