@@ -27,7 +27,7 @@
 - [ ] How to setup span attributes
   - To write docs on how the while configuring correlation fields work, that also automatically synced to MDC
 - [ ] Implement tail-based sampling in Alloy (See [TAIL_BASED_SAMPLING.md](./TAIL_BASED_SAMPLING.md))
-- [ ] Integrate Grafana with Keycloak
+- [ ] Integrate Grafana with Keycloak SSO
 - [ ] To generate the alloy pipeline configuration as a diagram
 - [x] Left over from 10/4
   - [x] Need to deploy MongoDB then can test metrics from debezium
@@ -43,13 +43,12 @@
 - [x] add Jolokia
 - [ ] Figure out if possible to forward logs to syslog directly
 - [ ] Gitlab CI dashboard integration
-- [ ] Prepare production grade loki/tempo in scable-mode by scaling down unncessary stuff to verify
+- [x] Prepare production grade loki/tempo in scable-mode by scaling down unncessary stuff to verify
 - [ ] Make all the dashboard support filter by namespace
-- [ ] Find suitable grafana plugins to install
-  - [ ] Setup Grafana Assistant
-  - [ ] Setup Grafana LLM
+- [x] Find suitable grafana plugins to install
+  - [x] Setup Grafana Assistant (does not work in airgapped)
+  - [x] Setup Grafana LLM (See [plugin/grafana-llm.md](plugin/grafana-llm.md))
 - [ ] Configure git-sync
-- [ ] Integrate with Keycloak SSO
 - [x] Ensure both tempo and loki are storing in s3
 - [x] Figure out all configs to disable anonymous usage data. e.g. tempo has `reportingEnabled:true`
 - [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
