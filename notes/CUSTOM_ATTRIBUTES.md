@@ -1,122 +1,244 @@
-# 🏷️ Custom Attributes & Metadata Guide
+# 🏷️ Custom Attributes, Baggage & MDC Correlation Guide
 
-This document tracks how custom infrastructure (Resource) and business (Span) attributes are mapped across the LGTM stack.
-
-## 🏗️ Infrastructure Attributes (Resource Attributes)
-These are added to every Trace/Span.
-
-| Attribute Name | Source | Visible In |
-|----------------|--------|------------|
-| `deployment.environment` | `OTEL_RESOURCE_ATTRIBUTES` (Env Var) | Tempo |
-| `service.version` | `OTEL_RESOURCE_ATTRIBUTES` (Env Var) | Tempo |
-| `k8s.pod.name` | **Grafana Alloy Enrichment** (Source IP lookup) | Tempo |
-| `k8s.namespace.name` | **Grafana Alloy Enrichment** (Source IP lookup) | Tempo |
-| `k8s.node.name` | **Grafana Alloy Enrichment** (Source IP lookup) | Tempo |
-
-### 🔄 Enrichment Flow: K8s Metadata
-1. **App:** Sends OTLP trace via gRPC to Alloy.
-2. **Alloy:** `otelcol.processor.k8sattributes` detects the source IP of the pod.
-3. **Alloy:** Queries K8s API (cached) to find the Pod name, Namespace, and Node.
-4. **Alloy:** Injects these as Resource Attributes into the Span before sending to Tempo.
+This guide explains how **Span Attributes**, **W3C Baggage**, **SLF4J MDC (Mapped Diagnostic Context)**, and **Loki Structured Metadata** work together in this Spring Boot 3.5 observability sandbox to provide end-to-end trace-to-log-to-user correlation without manual boilerplate.
 
 ---
 
-## 👤 Security & Business Attributes
-We follow a "Best of Both Worlds" approach: **camelCase in Java/Logs** and **snake_case in LGTM/Grafana**.
+## 🧭 The Core Problem & Our Strategy
 
-| Java/Log Attribute | LGTM/Metadata Attribute | Source | Correlation Strategy |
-|--------------------|-------------------------|--------|----------------------|
-| `userId` | `user_id` | `SecurityContext` | **Baggage (Remote)** + **MDC Sync** |
-| `traceId` | `trace_id` | Micrometer Tracing | Native MDC + Regex Mapping |
-| `spanId` | `span_id` | Micrometer Tracing | Native MDC + Regex Mapping |
+In distributed microservices, business attributes (e.g. `userId`, `tenantId`, `orderId`) need to be:
+1. **Searchable in Traces** (Tempo Span Attributes).
+2. **Propagated across HTTP/gRPC network hops** (W3C Baggage).
+3. **Injected into every application log line** (SLF4J MDC).
+4. **Searchable in Logs without label cardinality explosion** (Loki Structured Metadata).
 
-### 🔄 Data Flow: `userId` -> `user_id`
-1. **Spring Security:** Authentication provides the username.
-2. **ObservationHandler:** Adds `user_id` to the Observation context (Span Attribute for Tempo).
-3. **Micrometer Tracing:** 
-   - Syncs `userId` to **SLF4J MDC** (configured in `application.yaml`).
-   - Propagates `userId` via HTTP headers (Baggage).
-4. **Log Pattern:** `[%X{userId:-}]` ensures the ID is printed in logs.
-5. **Grafana Alloy:** `loki.process` regex extracts `userId` from the log and promotes it to **Loki Structured Metadata** as `user_id`. A `stage.label_drop` then removes the redundant `userId` capture group.
+We adopt a standard naming convention:
+- **Idiomatic Java / Log pattern:** `camelCase` (e.g. `userId`, `traceId`, `spanId`).
+- **LGTM Observability Standard:** `snake_case` (e.g. `user_id`, `trace_id`, `span_id`).
 
 ---
 
-## 🛠️ Debezium Embedded Attributes
-Debezium metrics are bridged from JMX MBeans. JMX ObjectName properties are automatically promoted to Micrometer tags.
+## 🔄 End-to-End Correlation Architecture
 
-| JMX Property | Micrometer Tag | Description |
-|--------------|----------------|-------------|
-| `context` | `context` | Phase of operation (`streaming` or `snapshot`). |
-| `server` | `server` | The logical name of the connector (e.g., `kx-connector`). |
-| `task` | `task` | The internal task ID (usually `0`). |
-| `type` | `type` | The metric category (e.g., `connector-metrics`). |
-| `db_type` | `db_type` | The database technology (e.g., `mongodb`). Extracted from the domain. |
+```mermaid
+flowchart TD
+    subgraph SpringSecurity ["1. Spring Security Context"]
+        AUTH["Authentication<br/><i>(e.g., username = 'ash.ketchum')</i>"]
+    end
 
-### 🔄 Data Flow: JMX -> Prometheus
-1. **Debezium:** Registers MBeans (e.g., `debezium.mongodb:type=connector-metrics,context=streaming,server=kx-connector`).
-2. **Binder:** `DebeziumMetricsBinder` scans the MBean server every 30s.
-3. **Normalization:** PascalCase attributes are converted to snake_case (e.g., `MilliSecondsBehindSource` -> `debezium_milli_seconds_behind_source`).
-4. **Promotion:** JMX properties are added as tags, allowing you to filter by context or server in Grafana.
+    subgraph Handler ["2. SecurityObservationHandler"]
+        S_ATTR["context.addHighCardinalityKeyValue('user_id', username)<br/><i>Span Attribute for Tempo</i>"]
+        BAGGAGE["tracer.getBaggage('userId').makeCurrent(username)<br/><i>W3C Baggage Header: baggage: userId=ash.ketchum</i>"]
+    end
+
+    subgraph SpringBootApp ["3. Spring Boot Runtime Engine"]
+        MDC["SLF4J MDC<br/><i>Automatically synced via baggage.correlation.fields</i>"]
+        LOGS["Application Logger<br/><i>Pattern: [${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{userId:-}]</i>"]
+        OTLP_OUT["OTLP gRPC Trace Exporter<br/><i>Span includes attribute: user_id='ash.ketchum'</i>"]
+    end
+
+    subgraph AlloyCollector ["4. Grafana Alloy (Collection Tier)"]
+        LOKI_PROCESS["loki.process 'extract_metadata'<br/><i>1. stage.regex: extracts app, traceId, spanId, userId<br/>2. stage.structured_metadata: maps to trace_id, span_id, user_id<br/>3. stage.label_drop: drops capture groups</i>"]
+    end
+
+    subgraph StorageSinks ["5. Storage & Visualization"]
+        TEMPO["Grafana Tempo<br/><i>Trace Explorer: user_id='ash.ketchum'</i>"]
+        LOKI["Grafana Loki<br/><i>Structured Metadata: user_id='ash.ketchum'</i>"]
+    end
+
+    AUTH -->|"On Request Start"| S_ATTR
+    AUTH -->|"On Request Start"| BAGGAGE
+    BAGGAGE -->|"Auto-Sync"| MDC
+    MDC -->|"Formats log line"| LOGS
+    S_ATTR --> OTLP_OUT
+
+    LOGS -->|"stdout"| LOKI_PROCESS
+    LOKI_PROCESS -->|"Pushed with Structured Metadata"| LOKI
+    OTLP_OUT -->|"OTLP Traces"| TEMPO
+
+    classDef java fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px;
+    classDef runtime fill:#fff3e0,stroke:#e65100,stroke-width:1px;
+    classDef collector fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef sink fill:#e1f5fe,stroke:#0277bd,stroke-width:2px;
+
+    class AUTH,S_ATTR,BAGGAGE java;
+    class MDC,LOGS,OTLP_OUT runtime;
+    class LOKI_PROCESS collector;
+    class TEMPO,LOKI sink;
+```
 
 ---
 
-## 💡 Implementation Patterns
+## ⚙️ Configuration Deep-Dive
 
-### 1. Request-Level Attributes (Manual Observation)
-For high-precision business logic where `@Observed` is too rigid, use manual `Observation` blocks:
+### 1. Spring Boot `application.yaml` Configuration
+
+```yaml
+management:
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0 # 100% head-sampling; Alloy tail-sampling reduces in prod
+    propagation:
+      produce: [w3c]   # Emits W3C traceparent and baggage headers
+      consume: [w3c]   # Accepts incoming W3C traceparent and baggage headers
+    baggage:
+      enabled: true
+      remote-fields:
+        - userId       # W3C Baggage header: travels across HTTP service boundaries
+      correlation:
+        enabled: true
+        fields:
+          - userId     # Automatically synchronizes the baggage field to SLF4J MDC!
+
+logging:
+  pattern:
+    # Standard format: [app-name,traceId,spanId,userId]
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{userId:-}]"
+  include-application-name: false
+```
+
+#### How the correlation fields sync to MDC:
+- `management.tracing.baggage.remote-fields`: Declares attributes that will be serialized into outbound HTTP headers (`baggage: userId=...`) and parsed from inbound headers.
+- `management.tracing.baggage.correlation.fields`: Tells Micrometer Tracing to intercept current baggage entries and automatically place them into `org.slf4j.MDC` under the same key name (`userId`). When the request completes, Micrometer automatically cleans up the MDC to prevent thread-pool memory leaks.
+
+---
+
+### 2. Setting Attributes in Code
+
+#### Pattern A: Automatically via `SecurityObservationHandler`
+For authenticated users, `SecurityObservationHandler` runs on every request:
 
 ```java
-public Pokemon getPokemon(String pokemonId, String userId) {
-    Observation observation = Observation.createNotStarted("pokemon.lookup", observationRegistry)
-        .contextualName("fetch-pokemon-for-user")
-        .lowCardinalityKeyValue("pokemon.id", pokemonId) // Added to Metrics
-        .highCardinalityKeyValue("user.id", userId)      // Added to Spans (Tempo)
-        .start();
+@Component
+public class SecurityObservationHandler implements TracingObservationHandler<Observation.Context> {
 
-    try (Observation.Scope scope = observation.openScope()) {
-        return restClient.get().uri("/{id}", pokemonId).retrieve().body(Pokemon.class);
-    } catch (Exception e) {
-        observation.error(e);
-        throw e;
-    } finally {
-        observation.stop();
+    private final Tracer tracer;
+
+    public SecurityObservationHandler(Tracer tracer) {
+        this.tracer = tracer;
+    }
+
+    @Override
+    public void onStart(Observation.Context context) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            String username = authentication.getName();
+
+            // 1. Add as a Span Attribute for Tempo Traces (snake_case)
+            context.addHighCardinalityKeyValue(KeyValue.of("user_id", username));
+
+            // 2. Set as Baggage (W3C header + auto-syncs to SLF4J MDC as 'userId')
+            if (this.tracer != null) {
+                Baggage baggage = this.tracer.getBaggage("userId");
+                if (baggage != null) {
+                    baggage.makeCurrent(username);
+                }
+            }
+        }
     }
 }
 ```
 
-### 2. Global MDC Correlation (`userId`)
-To ensure `userId` appears in **Tempo Spans** (as an attribute) and **Loki Labels**:
-1. **Application:** Ensure `userId` is in your logging pattern (configured in `application.yaml`).
-2. **Alloy:** Use the `loki.process` stage in `values-alloy.yaml` to promote the MDC `userId` to a searchable Loki label:
+#### Pattern B: Manual Business Attributes via `Observation`
+For specific method execution or service boundaries:
 
-```hcl
-stage.regex {
-  // Matches: [spring-boot-app,traceId,spanId,userId] (handles empty fields)
-  expression = ".*\\[(?P<app>[^,]*),(?P<traceId>[^,]*),(?P<spanId>[^,]*),(?P<userId>[^,]*)\\].*"
+```java
+public Pokemon fetchPokemon(String pokemonId) {
+    return Observation.createNotStarted("pokemon.fetch", observationRegistry)
+        .contextualName("fetch-pokemon-by-id")
+        .lowCardinalityKeyValue("pokemon.region", "kanto") // Metrics tag (Prometheus)
+        .highCardinalityKeyValue("pokemon.id", pokemonId)  // Span attribute (Tempo)
+        .observe(() -> restClient.get().uri("/{id}", pokemonId).retrieve().body(Pokemon.class));
 }
-stage.labels {
-  values = { "user_id" = "userId" }
-}
-```
-
-### In Loki (Grafana Logs)
-Look at the **Structured Metadata** panel or query directly:
-```logql
-{service_name="spring-boot-app"} | user_id="user"
-```
-
-### In Tempo (Grafana Traces)
-Search by tag in the Trace Explorer:
-```
-user_id="user"
-deployment.environment="staging"
 ```
 
 ---
 
-## 🛠️ Configuration Checklist
-- [x] `pom.xml`: Dependencies for security and tracing are included.
-- [x] `application.yaml`: `management.tracing.baggage` and MDC correlation configured with idiomatic Java camelCase (`userId`, `traceId`, `spanId`).
-- [x] `deployment.yaml`: `OTEL_RESOURCE_ATTRIBUTES` set for static metadata.
-- [x] `values-alloy.yaml`: `loki.process` regex captures camelCase IDs and maps them to standard observability snake_case (`user_id`, `trace_id`, `span_id`).
-- [x] `values-alloy.yaml`: `stage.label_drop` removes redundant internal capture groups.
+### 3. Log Output Format
+When code logs a message via `log.info(...)`, the correlation pattern renders:
+
+```text
+2026-09-27T14:30:15.123Z INFO [spring-boot-app,4bf92f3577b34da6a3ce929d0e0e4736,00f067aa0ba902b7,ash.ketchum] c.b.o.PokemonController : Fetching pokemon details
+```
+Here:
+- `app` = `spring-boot-app`
+- `traceId` = `4bf92f3577b34da6a3ce929d0e0e4736`
+- `spanId` = `00f067aa0ba902b7`
+- `userId` = `ash.ketchum`
+
+---
+
+### 4. Grafana Alloy Metadata Promotion (`loki.process`)
+Alloy tails the container stdout logs and processes them through the River pipeline:
+
+```alloy
+loki.process "extract_metadata" {
+  forward_to = [loki.write.local.receiver]
+
+  // 1. Regex captures the 4 correlation tokens from the log pattern
+  stage.regex {
+    expression = ".*\\[(?P<app>[^,]*),(?P<traceId>[^,]*),(?P<spanId>[^,]*),(?P<userId>[^,]*)\\].*"
+  }
+
+  // 2. Promotes capture groups to Loki Structured Metadata (snake_case)
+  // Structured Metadata allows high-speed filtering without index memory bloat!
+  stage.structured_metadata {
+    values = {
+      "trace_id" = "traceId",
+      "span_id"  = "spanId",
+      "user_id"  = "userId",
+    }
+  }
+
+  // 3. Drops the temporary regex capture groups so they are not indexed as stream labels
+  stage.label_drop {
+    values = ["app", "traceId", "spanId", "userId"]
+  }
+}
+```
+
+> **Why Structured Metadata instead of Index Labels?**
+> Stream labels in Loki create a separate index entry for every unique value. High-cardinality values like `user_id` or `trace_id` would cause index explosion and OOM errors. **Structured Metadata** attaches these values directly to the log line payload while remaining searchable via LogQL at near-indexed speed!
+
+---
+
+## 🔍 How to Query in Grafana
+
+### In Loki (LogQL)
+Filter logs by `user_id` or `trace_id` using Structured Metadata syntax:
+
+```logql
+{service_name="spring-boot-app"} | user_id="ash.ketchum"
+```
+Or search for logs matching a specific trace:
+```logql
+{service_name="spring-boot-app"} | trace_id="4bf92f3577b34da6a3ce929d0e0e4736"
+```
+
+### In Tempo (TraceQL)
+Filter traces by user tag in the TraceQL query editor:
+
+```traceql
+{ span.user_id = "ash.ketchum" }
+```
+Or combine with latency:
+```traceql
+{ span.user_id = "ash.ketchum" && duration > 500ms }
+```
+
+### In Grafana Trace-to-Log Drill-Down
+Because Tempo's datasource is configured with `tracesToLogsV2` (linking to Loki via `service_name`), clicking **"Logs for this span"** in Tempo automatically queries Loki for the exact `trace_id` within the span's time window (±5s shift).
+
+---
+
+## 📋 Summary Reference Table
+
+| Layer | Attribute Name | Type | How It Is Populated |
+| :--- | :--- | :--- | :--- |
+| **Java Code** | `userId` | SecurityContext | `authentication.getName()` |
+| **Baggage** | `userId` | W3C Header | `tracer.getBaggage("userId").makeCurrent(username)` |
+| **SLF4J MDC** | `userId` | In-Memory Context | Auto-synced via `management.tracing.baggage.correlation.fields` |
+| **Log Output** | `%X{userId:-}` | Raw Text | Formatted via `logging.pattern.correlation` |
+| **Tempo Trace** | `user_id` | Span Attribute | `context.addHighCardinalityKeyValue("user_id", username)` |
+| **Loki Log** | `user_id` | Structured Metadata | `stage.structured_metadata` in Grafana Alloy River config |

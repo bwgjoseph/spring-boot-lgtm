@@ -47,14 +47,14 @@
   - [x] https://github.com/pab1it0/prometheus-mcp-server (See [prometheus.md](mcp/prometheus.md))
   - [x] https://github.com/grafana/mcp-grafana (See [grafana.md](mcp/grafana.md))
   - [x] Kubernetes, MongoDB, Redpanda, MinIO MCP setups (See [mcp/](mcp/README.md))
-- [ ] How to setup span attributes
-  - To write docs on how the while configuring correlation fields work, that also automatically synced to MDC
-- [ ] Scan through https://grafana.com/docs/tempo/latest/metrics-from-traces/
+- [x] How to setup span attributes (See [notes/CUSTOM_ATTRIBUTES.md](./notes/CUSTOM_ATTRIBUTES.md))
+  - [x] To write docs on how the while configuring correlation fields work, that also automatically synced to MDC
+- [x] Scan through https://grafana.com/docs/tempo/latest/metrics-from-traces/ (See [notes/TEMPO_METRICS_FROM_TRACES.md](./notes/TEMPO_METRICS_FROM_TRACES.md))
 - [ ] Create spring-boot-starter to inject span and/or resource attributes that can be [useful](https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/best-practices/)
   - and/or also useful ootb solution - https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/set-up-collector/grafana-alloy/automatic-logging/
     - automatic logging might not be useful for my case since our logging already set traceId to all logs by default
 - [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
-- [ ] Configure git-sync
+- [x] Configure git-sync (Evaluated airgapped support; see [notes/GIT_SYNC_AIRGAPPED.md](./notes/GIT_SYNC_AIRGAPPED.md))
 - [ ] Make all the dashboard support filter by namespace
 - [ ] Figure out if possible to forward logs to syslog directly
 - [ ] Gitlab CI dashboard integration
