@@ -70,7 +70,9 @@
   - [x] [Application](./ADR/application.md)
   - [x] [Redpanda](./ADR/redpanda.md)
   - [x] [Mimir (Proposed)](./ADR/mimir.md)
-- [ ] How to integrate and scape JMX metrics (See https://blog.frankel.ch/tip-opentelemetry-projects/)
+- [x] How to integrate and scrape JMX metrics (See https://blog.frankel.ch/tip-opentelemetry-projects/ and [notes/JMX_METRICS.md](./notes/JMX_METRICS.md))
+  - Reviewed both approaches: (1) In-process dynamic JMX bridge (`DebeziumMetricsBinder` with platform MBeanServer + Jolokia) vs (2) External OTel JMX Metric Scraper sidecar.
+  - Decided to adopt (1) in-process bridge for current architecture (zero extra sidecars, native Micrometer integration, served via `/actuator/prometheus`). Still open to exploring (2) external OTel JMX Scraper as an alternative/sandbox later.
 - [ ] Integrate with Pyroscope
 - [ ] Figure out how to publish data from alloy to different sources
 - [ ] Figure out what are the more commonly used alerts and defined it
