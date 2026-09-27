@@ -197,3 +197,19 @@ gateway:
       memory: 512Mi
     limits:
       memory: 1Gi
+
+# Pod Disruption Budgets: ensure quorum survives any single node drain/eviction
+write:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2  # replication_factor=3; maintain quorum
+
+read:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+backend:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1

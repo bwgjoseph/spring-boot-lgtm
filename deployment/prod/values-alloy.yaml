@@ -198,10 +198,6 @@ alloy:
           type = "probabilistic"
           probabilistic { sampling_percentage = 10 }
         }
-        output { traces = [otelcol.processor.batch.default.input] }
-      }
-
-      otelcol.processor.batch "default" {
         output { traces = [otelcol.exporter.otlp.tempo.input] }
       }
 

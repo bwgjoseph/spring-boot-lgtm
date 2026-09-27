@@ -1,6 +1,7 @@
-# MinIO Production Configuration: Standalone mode with SSD persistence
-mode: standalone
-replicas: 1
+# MinIO Production Configuration: Distributed mode with SSD persistence
+# 4 nodes x 250Gi = 1TB raw — covers 600GB Loki (90d) + 200GB Tempo (14d) + 30% buffer
+mode: distributed
+replicas: 4
 
 # Credential management using existing Kubernetes Secret for security
 existingSecret: minio-secret
@@ -8,7 +9,7 @@ existingSecret: minio-secret
 # Persistence: High-performance SSD volume for object storage durability
 persistence:
   enabled: true
-  size: 100Gi
+  size: 250Gi
   # storageClass: "ssd" # Ensure SSD/NVMe storage class is used
 
 # Create buckets on startup for LGTM stack
@@ -20,13 +21,13 @@ buckets:
   - name: mimir
     policy: public
 
-# Resource allocations sized for high-volume S3 metadata caching
+# Resource allocations sized for small-scale S3 metadata caching
 resources:
   requests:
-    cpu: 500m
+    cpu: 250m
     memory: 1Gi
   limits:
-    memory: 4Gi
+    memory: 2Gi
 
 # Service configuration
 service:

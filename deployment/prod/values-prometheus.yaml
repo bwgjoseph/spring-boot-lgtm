@@ -82,3 +82,9 @@ prometheus-node-exporter:
 
 kube-state-metrics:
   enabled: true
+
+# Pod Disruption Budget: protect the HA Prometheus pair
+server:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1  # 2-node HA pair; always keep 1 scraping

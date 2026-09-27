@@ -143,3 +143,24 @@ overrides:
     metrics_generator:
       processors: [span-metrics, service-graphs]
       generate_native_histograms: both
+
+# Pod Disruption Budgets: protect stateful ingestion and query paths
+blockBuilder:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2  # 3 replicas matching Kafka partitions; keep at least 2
+
+liveStore:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
+distributor:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+querier:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1

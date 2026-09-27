@@ -180,10 +180,27 @@ backend:
   persistence:
     size: 15Gi
 
+
 # Gateway: Nginx ingress for external/internal traffic routing
 gateway:
   enabled: true
   replicas: 2
   podDisruptionBudget:
     enabled: true
-    maxUnavailable: 1
+    minAvailable: 1
+
+# Pod Disruption Budgets: ensure at least 1 replica survives any single node drain/eviction
+write:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+read:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+backend:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
