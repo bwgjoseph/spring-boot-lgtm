@@ -13,13 +13,24 @@ monitoring:
   rules:
     enabled: false
 
-# Caching disabled to fit local resource constraints.
-# TO_RESOLVE: Re-enable and correctly map resources for Memcached sub-chart.
+# Memcached caching enabled and tuned for local sandbox constraints (~460Mi total memory).
 chunksCache:
-  enabled: false
+  enabled: true
+  allocatedMemory: 256
+  allocatedCPU: 100m
+  maxItemMemory: 2
+  writebackSizeLimit: 50MB
+  writebackBuffer: 10000
+  replicas: 1
 
 resultsCache:
-  enabled: false
+  enabled: true
+  allocatedMemory: 128
+  allocatedCPU: 100m
+  maxItemMemory: 2
+  writebackSizeLimit: 50MB
+  writebackBuffer: 10000
+  replicas: 1
 
 loki:
   auth_enabled: false

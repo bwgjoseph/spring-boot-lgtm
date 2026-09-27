@@ -80,7 +80,7 @@
 ## 📋 Issues to Resolve & Technical Backlog
 
 - [x] **Prometheus Alerting Rules Loading:** Current alerting rules (`alerting_rules.yml`) in Prometheus are appearing empty (`{}`) even after configuration changes. Requires further investigation into how `prometheus-community/prometheus` Helm chart processes `serverFiles` vs `extraConfigmapMounts`. (Resolved by leveraging chart-native `serverFiles.alerting_rules.yml` which generates the rules config and links with `configmap-reload`).
-- [ ] **Loki HA Caching Resource Mapping:** Memcached sub-charts for Loki are currently disabled in `prod-local` due to incorrectly mapped high-resource defaults. Requires proper sub-chart resource configuration to enable in resource-constrained sandboxes.
+- [x] **Loki HA Caching Resource Mapping:** Memcached sub-charts for Loki are currently disabled in `prod-local` due to incorrectly mapped high-resource defaults. Requires proper sub-chart resource configuration to enable in resource-constrained sandboxes. (Resolved by setting `allocatedMemory: 256` and `128` with `allocatedCPU: 100m` in `deployment/prod-local/values-loki.yaml`, bounding memory request to ~460Mi total).
 - [ ] **Mimir Migration Strategy:** Implement `swap:mimir` to replace local Prometheus storage with Mimir (Monolithic HA-ready mode).
 - [ ] **Prometheus Remote Write Configuration:** Configure existing Prometheus Helm release to act as a pass-through by enabling `remoteWrite` to the Mimir endpoint.
 - [ ] **Grafana Datasource Migration:** Update Grafana to transition from `Prometheus` datasource to `Mimir` datasource upon completion of the Mimir swap.
