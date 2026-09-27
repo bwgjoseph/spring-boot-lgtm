@@ -23,35 +23,171 @@ server:
     limits:
       memory: 8Gi
 
+  # Pod Disruption Budget: protect the HA Prometheus pair
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1  # 2-node HA pair; always keep 1 scraping
 
-  # Prometheus configuration file contents
-  config:
-    rule_files:
-      - /etc/config/rules/*.yaml
-    alerting:
-      alertmanagers:
-        - kubernetes_sd_configs:
-            - role: pod
-          relabel_configs:
-            - source_labels: [__meta_kubernetes_namespace]
-              action: keep
-              regex: monitoring
-            - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
-              action: keep
-              regex: alertmanager
-            - source_labels: [__meta_kubernetes_pod_container_port_number]
-              action: keep
-              regex: "9093"
+  # Alertmanager discovery via Kubernetes SD
+  alertmanagers:
+    - kubernetes_sd_configs:
+        - role: pod
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_namespace]
+          action: keep
+          regex: monitoring
+        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+          action: keep
+          regex: alertmanager
+        - source_labels: [__meta_kubernetes_pod_container_port_number]
+          action: keep
+          regex: "9093"
 
-extraVolumes:
-  - name: extra-rules
-    configMap:
-      name: prometheus-alert-rules
+# Alerting rules injected via chart-native serverFiles mechanism.
+# The chart merges these into its ConfigMap and configmap-reload watches them automatically.
+serverFiles:
+  alerting_rules.yml:
+    groups:
+      - name: sandbox_alerts
+        rules:
+          - alert: InstanceAbsent
+            expr: absent(up{service_name="spring-boot-app"})
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Instance spring-boot-app is ABSENT"
+              description: "Prometheus is not receiving any metrics for spring-boot-app. The deployment might be scaled to 0 or Alloy cannot reach it."
 
-extraVolumeMounts:
-  - name: extra-rules
-    mountPath: /etc/config/rules
-    readOnly: true
+          - alert: InstanceDown
+            expr: up{service_name="spring-boot-app"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Instance {{ $labels.instance }} is DOWN"
+              description: "The pod {{ $labels.pod }} is running but the metrics endpoint is returning an error."
+
+          - alert: HighCpuUsage
+            expr: sum(rate(container_cpu_usage_seconds_total{service_name="spring-boot-app"}[5m])) by (pod, namespace) > 0.8
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage on pod {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is using more than 80% CPU."
+
+          - alert: PokemonApiHighErrorRate
+            expr: sum(rate(pokemon_controller_seconds_count{outcome="SERVER_ERROR"}[5m])) / sum(rate(pokemon_controller_seconds_count[5m])) * 100 > 5
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High error rate on Pokemon API"
+              description: "Error rate is {{ $value }}% over the last 5 minutes."
+
+          - alert: PokemonApiHighLatency
+            expr: histogram_quantile(0.99, sum(rate(pokemon_controller_seconds_bucket[5m])) by (le)) * 1000 > 2000
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High latency on Pokemon API"
+              description: "P99 latency is {{ $value }}ms over the last 5 minutes."
+
+      - name: loki_alerts
+        rules:
+          - alert: LokiRequestErrors
+            expr: 100 * sum(rate(loki_request_duration_seconds_count{status_code=~"5.."}[5m])) / sum(rate(loki_request_duration_seconds_count[5m])) > 10
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Loki High Request Error Rate"
+              description: "Loki has > 10% 5xx server errors over the last 5 minutes."
+
+          - alert: LokiIngesterUnhealthy
+            expr: max by (namespace) (loki_ring_members{state="Unhealthy", name="ingester"}) > 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Loki Ingester Unhealthy"
+              description: "There are unhealthy Loki ingester(s) in namespace {{ $labels.namespace }}."
+
+          - alert: LokiDistributorUnhealthy
+            expr: max by (namespace) (loki_ring_members{state="Unhealthy", name="distributor"}) > 0
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Loki Distributor Unhealthy"
+              description: "There are unhealthy Loki distributor(s) in namespace {{ $labels.namespace }}."
+
+          - alert: LokiCompactorUnhealthy
+            expr: sum by (namespace) (increase(loki_compactor_runs_failed_total[1h])) > 2
+            for: 15m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Loki Compactor Unhealthy"
+              description: "More than 2 Loki compaction runs failed in the past hour in namespace {{ $labels.namespace }}."
+
+          - alert: LokiPanics
+            expr: sum by (namespace) (increase(loki_panic_total[10m])) > 0
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Loki Instance Panic"
+              description: "Loki process in namespace {{ $labels.namespace }} encountered a panic."
+
+      - name: tempo_alerts
+        rules:
+          - alert: TempoDistributorUnhealthy
+            expr: max by (namespace) (tempo_ring_members{state="Unhealthy", name="distributor"}) > 0
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Tempo Distributor Unhealthy"
+              description: "There are unhealthy Tempo distributor(s) in namespace {{ $labels.namespace }}."
+
+          - alert: TempoLiveStoreUnhealthy
+            expr: max by (namespace) (tempo_ring_members{state="Unhealthy", name="live-store"}) > 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Tempo LiveStore Unhealthy"
+              description: "There are unhealthy Tempo LiveStore component(s) in namespace {{ $labels.namespace }}."
+
+          - alert: TempoMetricsGeneratorUnhealthy
+            expr: max by (namespace) (tempo_ring_members{state="Unhealthy", name="metrics-generator"}) > 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Tempo Metrics Generator Unhealthy"
+              description: "There are unhealthy Tempo metrics generator(s) in namespace {{ $labels.namespace }}."
+
+          - alert: TempoCompactionsFailing
+            expr: sum by (namespace) (increase(tempodb_compaction_errors_total[1h])) > 2
+            for: 15m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Tempo Compactions Failing"
+              description: "More than 2 compactions failed in the past hour in namespace {{ $labels.namespace }}."
+
+          - alert: TempoPollsFailing
+            expr: sum by (namespace) (increase(tempodb_blocklist_poll_errors_total[1h])) > 2
+            for: 15m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Tempo Blocklist Polls Failing"
+              description: "More than 2 blocklist poll requests failed in the past hour in namespace {{ $labels.namespace }}."
 
 
 # Enable/Disable components
@@ -82,9 +218,3 @@ prometheus-node-exporter:
 
 kube-state-metrics:
   enabled: true
-
-# Pod Disruption Budget: protect the HA Prometheus pair
-server:
-  podDisruptionBudget:
-    enabled: true
-    minAvailable: 1  # 2-node HA pair; always keep 1 scraping
