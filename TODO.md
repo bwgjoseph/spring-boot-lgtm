@@ -76,7 +76,7 @@
 - [ ] Integrate with Pyroscope
 - [x] Figure out how to publish data from alloy to different sources (See [notes/ALLOY_SECONDARY_KAFKA_EXPORT.md](./notes/ALLOY_SECONDARY_KAFKA_EXPORT.md))
   - [ ] Validated secondary export pipeline to Kafka/Redpanda (Documented architecture blueprint and River configuration; awaiting deployment verification)
-- [ ] Figure out what are the more commonly used alerts and defined it
+- [x] Figure out what are the more commonly used alerts and defined it (See [notes/COMMON_ALERTING_RULES.md](./notes/COMMON_ALERTING_RULES.md))
   - Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
 - [ ] Evaluate Minio replacement
 - [ ] Review lgtm improvement - https://trello.com/c/q8XZTkHS/239-lgtm-improvement

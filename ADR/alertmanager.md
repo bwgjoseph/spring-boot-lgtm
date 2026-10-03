@@ -99,6 +99,8 @@ flowchart TD
 | `HighCpuUsage` | `rate(container_cpu_usage_seconds_total[5m]) > 0.8` | 2m | warning | Detects pods consuming more than 80% of their allocated CPU. |
 | `PokemonApiHighErrorRate` | `rate(pokemon_controller_seconds_count{outcome="SERVER_ERROR"}[5m]) / total * 100 > 5` | 5m | critical | Business SLA: fires when server error rate on the Pokemon API exceeds 5%. |
 | `PokemonApiHighLatency` | `histogram_quantile(0.99, rate(pokemon_controller_seconds_bucket[5m])) * 1000 > 2000` | 5m | warning | Business SLA: fires when P99 latency of the Pokemon API exceeds 2000ms. |
+| `JvmHeapUsageHigh` | `sum(jvm_memory_used_bytes{area="heap"}) / max * 100 > 85` | 3m | warning | JVM Runtime: fires when JVM heap usage exceeds 85% of allocated maximum. |
+| `PodCrashLooping` | `rate(kube_pod_container_status_restarts_total[15m]) * 60 * 5 > 0` | 5m | critical | Container Infrastructure: fires when a pod repeatedly restarts in crash-loop. |
 
 ---
 

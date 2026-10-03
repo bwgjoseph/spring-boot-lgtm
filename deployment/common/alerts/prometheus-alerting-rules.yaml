@@ -50,3 +50,23 @@ groups:
         annotations:
           summary: "High latency on Pokemon API"
           description: "P99 latency is {{ $value }}ms over the last 5 minutes."
+
+      # 6. JVM Heap Memory Exhaustion (> 85%)
+      - alert: JvmHeapUsageHigh
+        expr: (sum(jvm_memory_used_bytes{area="heap"}) by (pod, namespace) / sum(jvm_memory_max_bytes{area="heap"}) by (pod, namespace)) * 100 > 85
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM Heap usage > 85% on {{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} JVM heap usage is {{ $value | printf \"%.1f\" }}% of max allocated memory."
+
+      # 7. Pod CrashLooping
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 5 > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crashlooping"
+          description: "Pod {{ $labels.pod }} restarted {{ $value | printf \"%.0f\" }} times in the last 5 minutes."
