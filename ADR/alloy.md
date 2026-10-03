@@ -168,6 +168,7 @@ This table maps the production implementation in `deployment/prod/values-alloy.y
   - Zero log label cardinality explosion by using Loki Structured Metadata for `trace_id` and `user_id`.
   - Seamless Metric-to-Trace and Trace-to-Log bidirectional navigation in Grafana.
   - Fully resilient to node churn and rolling upgrades with WAL and graceful drain periods.
+  - Native DAG fan-out support: capable of dual-shipping signals to secondary sinks (e.g., Redpanda/Kafka) with built-in bridges (`otelcol.receiver.loki`, `otelcol.receiver.prometheus`) and zero external drivers (see [notes/ALLOY_SECONDARY_KAFKA_EXPORT.md](../notes/ALLOY_SECONDARY_KAFKA_EXPORT.md)).
 - **Negative:**
   - Trace buffering introduces a 10-second latency before traces appear in Tempo.
   - Higher memory usage per replica due to trace buffering and gossip communication.

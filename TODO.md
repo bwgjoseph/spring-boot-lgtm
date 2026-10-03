@@ -74,7 +74,8 @@
   - Reviewed both approaches: (1) In-process dynamic JMX bridge (`DebeziumMetricsBinder` with platform MBeanServer + Jolokia) vs (2) External OTel JMX Metric Scraper sidecar.
   - Decided to adopt (1) in-process bridge for current architecture (zero extra sidecars, native Micrometer integration, served via `/actuator/prometheus`). Still open to exploring (2) external OTel JMX Scraper as an alternative/sandbox later.
 - [ ] Integrate with Pyroscope
-- [ ] Figure out how to publish data from alloy to different sources
+- [x] Figure out how to publish data from alloy to different sources (See [notes/ALLOY_SECONDARY_KAFKA_EXPORT.md](./notes/ALLOY_SECONDARY_KAFKA_EXPORT.md))
+  - [ ] Validated secondary export pipeline to Kafka/Redpanda (Documented architecture blueprint and River configuration; awaiting deployment verification)
 - [ ] Figure out what are the more commonly used alerts and defined it
   - Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
 - [ ] Evaluate Minio replacement
@@ -122,4 +123,6 @@
 - As of 8 Sep, have configured for small and medium sizing setup. While it's reviewing and fixing configuration halfway, ran out of token. Refer to prod_config_review.md and get agent to resume based on that.
 - As of 20 Sep, created the /mcp hub with individual setup guides and Claude Code uvx/npx configuration for Grafana, Prometheus, Kubernetes, MongoDB, Redpanda/Kafka, and MinIO/S3.
 - As of 27 Sep, completed the review and update of all ADRs (Alloy, Grafana, Loki, MinIO, Tempo, Alertmanager, Debezium, Application, Redpanda, and Mimir blueprint) with updated Mermaid architecture diagrams and technical specifications.
-- As of 27 Sep, working on dashboard namespace filtering halfway when the token runs out
+- As of 27 Sep, completed dashboard namespace filter documentation in notes/DASHBOARD_NAMESPACE_FILTER.md.
+- As of 4 Oct, integrated gitlab-ci-pipelines-exporter with pre-packaged dashboards (pipelines, jobs, environments) under deployment/common/dashboards/gitlab and wired into sync-dashboards.ps1; documented in notes/GITLAB_CI_DASHBOARD.md.
+- As of 4 Oct, explored and documented Alloy fan-out architecture to secondary Kafka/Redpanda sinks, including OTel/Loki/Prometheus bridge mechanics, pure-Go internal Sarama driver, and native vs embedded prometheus.exporter.kafka scraping in notes/ALLOY_SECONDARY_KAFKA_EXPORT.md.
