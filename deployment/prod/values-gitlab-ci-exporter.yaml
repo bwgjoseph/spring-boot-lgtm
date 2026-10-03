@@ -1,0 +1,50 @@
+# GitLab CI Pipelines Exporter - Prod Configuration
+# Chart: mvisonneau/gitlab-ci-pipelines-exporter v0.3.5 (AppVersion: v0.5.10)
+# Docs: https://github.com/mvisonneau/gitlab-ci-pipelines-exporter
+
+config:
+  gitlab:
+    # Token injected via extraEnv from Secret below
+    url: "https://gitlab.com"          # Change to your internal GitLab URL if self-hosted
+
+  pull:
+    projects:
+      interval: 300                    # Poll for new projects every 5 minutes
+
+  # Monitor specific projects by name
+  projects:
+    - name: "your-group/your-project"  # Replace with your GitLab project path
+      pull:
+        refs:
+          regexp: "^(main|develop)$"   # Only watch main and develop branches
+
+  # OR: Monitor entire GitLab groups
+  # wildcards:
+  #   - owner:
+  #       name: "your-group"
+  #       kind: group
+  #     pull:
+  #       refs:
+  #         regexp: "^main$"
+
+# Inject GitLab token from Kubernetes Secret (created via task secret:gitlab)
+extraEnv:
+  - name: GITLAB_CI_PIPELINES_EXPORTER_GITLAB_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: gitlab-ci-exporter-token
+        key: token
+
+# Enable Prometheus annotation-based scraping (aligned with Alloy's annotation scraper)
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

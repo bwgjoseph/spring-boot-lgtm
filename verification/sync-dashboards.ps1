@@ -15,6 +15,7 @@ Get-ChildItem -Path "$dashboardsDir" -Directory | ForEach-Object {
         "prometheus" { "Prometheus" }
         "spring"     { "Spring" }
         "uptime"     { "Uptime" }
+        "gitlab"     { "GitLab" }
 
         default      { (Get-Culture).TextInfo.ToTitleCase($folderName) }
     }

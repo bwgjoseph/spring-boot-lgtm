@@ -55,9 +55,9 @@
     - automatic logging might not be useful for my case since our logging already set traceId to all logs by default
 - [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
 - [x] Configure git-sync (Evaluated airgapped support; see [notes/GIT_SYNC_AIRGAPPED.md](./notes/GIT_SYNC_AIRGAPPED.md))
-- [ ] Make all the dashboard support filter by namespace
+- [x] Make all the dashboard support filter by namespace (See [notes/DASHBOARD_NAMESPACE_FILTER.md](./notes/DASHBOARD_NAMESPACE_FILTER.md))
 - [ ] Figure out if possible to forward logs to syslog directly
-- [ ] Gitlab CI dashboard integration
+- [x] Gitlab CI dashboard integration (See [notes/GITLAB_CI_DASHBOARD.md](./notes/GITLAB_CI_DASHBOARD.md))
 - [ ] Integrate Grafana with Keycloak SSO
 - [x] Review ADR
   - [x] [Alloy](./ADR/alloy.md)
@@ -78,6 +78,7 @@
 - [ ] Figure out what are the more commonly used alerts and defined it
   - Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
 - [ ] Evaluate Minio replacement
+- [ ] Review lgtm improvement - https://trello.com/c/q8XZTkHS/239-lgtm-improvement
 
 ## 📋 Issues to Resolve & Technical Backlog
 
@@ -121,3 +122,4 @@
 - As of 8 Sep, have configured for small and medium sizing setup. While it's reviewing and fixing configuration halfway, ran out of token. Refer to prod_config_review.md and get agent to resume based on that.
 - As of 20 Sep, created the /mcp hub with individual setup guides and Claude Code uvx/npx configuration for Grafana, Prometheus, Kubernetes, MongoDB, Redpanda/Kafka, and MinIO/S3.
 - As of 27 Sep, completed the review and update of all ADRs (Alloy, Grafana, Loki, MinIO, Tempo, Alertmanager, Debezium, Application, Redpanda, and Mimir blueprint) with updated Mermaid architecture diagrams and technical specifications.
+- As of 27 Sep, working on dashboard namespace filtering halfway when the token runs out

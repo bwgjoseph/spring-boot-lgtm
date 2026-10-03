@@ -16,6 +16,7 @@ vars:
   VER_MINIO: "5.4.0"
   VER_MONGODB: "18.6.31"
   VER_REDPANDA: "26.2.1"
+  VER_GITLAB_CI_EXPORTER: "0.3.5"
 
 tasks:
   # --- 📦 SETUP & FOUNDATION ---
@@ -28,6 +29,7 @@ tasks:
       - helm repo add minio https://charts.min.io/
       - helm repo add bitnami https://charts.bitnami.com/bitnami
       - helm repo add redpanda https://charts.redpanda.com
+      - helm repo add mvisonneau https://charts.visonneau.fr
       - helm repo update
 
   namespace:
@@ -53,6 +55,12 @@ tasks:
     deps: [namespace]
     cmds:
       - kubectl create secret generic minio-secret -n {{.NAMESPACE}} --from-literal=rootUser=admin --from-literal=rootPassword=password123 --dry-run=client -o yaml | kubectl apply -f -
+
+  secret:gitlab:
+    desc: Create GitLab PAT secret for gitlab-ci-pipelines-exporter (set GITLAB_TOKEN env var first)
+    deps: [namespace]
+    cmds:
+      - kubectl create secret generic gitlab-ci-exporter-token -n {{.NAMESPACE}} --from-literal=token=$env:GITLAB_TOKEN --dry-run=client -o yaml | kubectl apply -f -
 
   secret:
     desc: Deploy all secrets (MongoDB, Grafana, Minio)
@@ -146,6 +154,12 @@ tasks:
     deps: [repos, namespace]
     cmds:
       - helm upgrade --install alloy grafana/alloy -n {{.NAMESPACE}} --version {{.VER_ALLOY}} -f deployment/{{.ENV}}/values-alloy.yaml
+
+  gitlab-ci-exporter:
+    desc: Install or Upgrade GitLab CI Pipelines Exporter (requires secret:gitlab to be run first)
+    deps: [repos, namespace]
+    cmds:
+      - helm upgrade --install gitlab-ci-exporter mvisonneau/gitlab-ci-pipelines-exporter -n {{.NAMESPACE}} --version {{.VER_GITLAB_CI_EXPORTER}} -f deployment/{{.ENV}}/values-gitlab-ci-exporter.yaml
 
   use:k8s-monitoring:
     desc: Switch telemetry collector layer to grafana/k8s-monitoring Helm chart
