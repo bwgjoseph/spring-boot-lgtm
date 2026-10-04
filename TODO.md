@@ -56,7 +56,7 @@
 - [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
 - [x] Configure git-sync (Evaluated airgapped support; see [notes/GIT_SYNC_AIRGAPPED.md](./notes/GIT_SYNC_AIRGAPPED.md))
 - [x] Make all the dashboard support filter by namespace (See [notes/DASHBOARD_NAMESPACE_FILTER.md](./notes/DASHBOARD_NAMESPACE_FILTER.md))
-- [ ] Figure out if possible to forward logs to syslog directly
+- [x] Figure out if possible to forward logs to syslog directly (See [notes/ALLOY_SYSLOG_FORWARDING.md](./notes/ALLOY_SYSLOG_FORWARDING.md))
 - [x] Gitlab CI dashboard integration (See [notes/GITLAB_CI_DASHBOARD.md](./notes/GITLAB_CI_DASHBOARD.md))
 - [ ] Integrate Grafana with Keycloak SSO
 - [x] Review ADR
