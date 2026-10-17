@@ -188,19 +188,3 @@ gateway:
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
-
-# Pod Disruption Budgets: ensure at least 1 replica survives any single node drain/eviction
-write:
-  podDisruptionBudget:
-    enabled: true
-    minAvailable: 1
-
-read:
-  podDisruptionBudget:
-    enabled: true
-    minAvailable: 1
-
-backend:
-  podDisruptionBudget:
-    enabled: true
-    minAvailable: 1
