@@ -200,3 +200,35 @@ Tempo:      { resource.k8s.namespace.name = "$namespace" }
 | Chain `$pod` after `$namespace` | Use `kube_pod_info{namespace=~"$namespace"}` as the pod variable query so it auto-narrows. |
 | Add `refresh: 2` | Refreshes label values on every dashboard load to pick up new namespaces dynamically. |
 | For community dashboards | Most community dashboards from Grafana.com already include `$namespace`; import them as-is and check the variable datasource UIDs match (`prometheus`, `loki`). |
+
+---
+
+## 🔧 Setting a Default / Fallback Namespace
+
+> **Decision (Oct 2026):** Our dashboards currently use `current.value = "$__all"` (no forced default). This is intentional — the `=~` regex matcher combined with `allValue = ".*"` ensures the "All" option returns every namespace. A pinned default can be added later if needed.
+
+If you want the dashboard to open with a specific namespace pre-selected (e.g. `monitoring`), set the `current` field in the variable definition:
+
+```json
+{
+  "name": "namespace",
+  "label": "Namespace",
+  "type": "query",
+  "datasource": { "type": "prometheus", "uid": "prometheus" },
+  "query": { "query": "label_values(kube_namespace_labels, namespace)", "refId": "A" },
+  "includeAll": true,
+  "allValue": ".*",
+  "multi": false,
+  "sort": 1,
+  "refresh": 2,
+  "hide": 0,
+  "current": { "text": "monitoring", "value": "monitoring", "selected": true }
+}
+```
+
+**How it works:**
+- Grafana uses `current.value` as the initial selection on first load.
+- If the user switches to *All*, the query expands to `namespace=~".*"` which matches every namespace — the regex matcher (`=~`) is required for this fallback to work.
+- To reset to "no default", change `current` back to `{ "text": "All", "value": "$__all", "selected": true }`.
+
+**Tip:** Keep `includeAll: true` and `allValue: ".*"` in every dashboard — they are prerequisites for the regex wildcard fallback to behave correctly.

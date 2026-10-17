@@ -103,7 +103,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "debezium_connected{context=\"streaming\"}",
+          "expr": "debezium_connected{context=\"streaming\",namespace=~\"$namespace\"}",
           "instant": true,
           "range": false,
           "refId": "A"
@@ -173,7 +173,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "debezium_milli_seconds_behind_source{context=\"streaming\"}",
+          "expr": "debezium_milli_seconds_behind_source{context=\"streaming\",namespace=~\"$namespace\"}",
           "instant": true,
           "range": false,
           "refId": "A"
@@ -258,7 +258,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "irate(debezium_total_number_of_events_seen{context=\"streaming\"}[5m])",
+          "expr": "irate(debezium_total_number_of_events_seen{context=\"streaming\",namespace=~\"$namespace\"}[5m])",
           "legendFormat": "Events/sec",
           "range": true,
           "refId": "A"
@@ -323,7 +323,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "debezium_milli_seconds_since_last_event{context=\"streaming\"}",
+          "expr": "debezium_milli_seconds_since_last_event{context=\"streaming\",namespace=~\"$namespace\"}",
           "instant": true,
           "range": false,
           "refId": "A"
@@ -387,7 +387,7 @@
       },
       "targets": [
         {
-          "expr": "debezium_snapshot_running",
+          "expr": "debezium_snapshot_running{namespace=~\"$namespace\"}",
           "refId": "A"
         }
       ],
@@ -436,7 +436,7 @@
       },
       "targets": [
         {
-          "expr": "debezium_snapshot_completed",
+          "expr": "debezium_snapshot_completed{namespace=~\"$namespace\"}",
           "refId": "A"
         }
       ],
@@ -469,7 +469,7 @@
       },
       "targets": [
         {
-          "expr": "debezium_total_table_count",
+          "expr": "debezium_total_table_count{namespace=~\"$namespace\"}",
           "refId": "A"
         }
       ],
@@ -518,7 +518,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "debezium_last_event",
+          "expr": "debezium_last_event{namespace=~\"$namespace\"}",
           "format": "table",
           "instant": true,
           "range": false,
@@ -571,7 +571,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "debezium_captured_tables",
+          "expr": "debezium_captured_tables{namespace=~\"$namespace\"}",
           "format": "table",
           "instant": true,
           "range": false,
@@ -636,6 +636,20 @@
         ],
         "query": "streaming,snapshot",
         "type": "custom"
+      },
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": { "query": "label_values(kube_namespace_labels, namespace)", "refId": "A" },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "sort": 1,
+        "refresh": 2,
+        "hide": 0,
+        "current": { "text": "All", "value": "$__all", "selected": true }
       }
     ]
   },

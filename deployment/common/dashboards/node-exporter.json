@@ -105,7 +105,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\",namespace=~\"$namespace\"}[5m])) * 100)",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -198,7 +198,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100)",
+          "expr": "100 - (node_memory_MemAvailable_bytes{namespace=~\"$namespace\"} / node_memory_MemTotal_bytes{namespace=~\"$namespace\"} * 100)",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -211,7 +211,22 @@
   "schemaVersion": 39,
   "tags": ["nodes"],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "namespace",
+        "label": "Namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": { "query": "label_values(kube_namespace_labels, namespace)", "refId": "A" },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "sort": 1,
+        "refresh": 2,
+        "hide": 0,
+        "current": { "text": "All", "value": "$__all", "selected": true }
+      }
+    ]
   },
   "time": {
     "from": "now-1h",
