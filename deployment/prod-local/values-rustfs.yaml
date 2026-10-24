@@ -1,0 +1,67 @@
+# RustFS Prod-Local Configuration
+# Sized for local HA validation on Docker Desktop / KinD (simulates multi-node prod topology)
+# 4 nodes x 1 drive per node = 4 drives total (EC:1 Reed-Solomon: 3 data + 1 parity, tolerates 1 drive failure)
+# Scaled-down PVC sizes (10Gi per drive = 40Gi total) to prevent disk exhaustion on local laptops.
+
+# --- Deployment Mode ---
+mode:
+  standalone:
+    enabled: false
+  distributed:
+    enabled: true
+
+# --- Clustered Topology (Simulated HA) ---
+# 4 StatefulSet pods running on local KinD/Docker Desktop
+replicaCount: 4
+drivesPerNode: 1
+
+# --- Authentication Credentials ---
+secret:
+  rustfs:
+    access_key: "admin"
+    secret_key: "password123"
+
+# --- Storage Configuration ---
+# 4 pods x 10Gi = 40Gi raw. Safe for local sandbox testing without filling host disk.
+storageclass:
+  name: "standard"
+  dataStorageSize: 10Gi
+  logStorageSize: 1Gi
+
+# --- Bucket Auto-Provisioning ---
+# IMPORTANT: Bucket versioning must remain disabled for LGTM compactors.
+buckets:
+  - name: loki
+  - name: tempo
+  - name: pyroscope
+  - name: mimir
+
+# --- Resource Allocation (Tuned for Docker Desktop) ---
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# --- Self-Observability ---
+env:
+  - name: RUSTFS_OBS_ENDPOINT
+    value: "http://alloy.monitoring.svc.cluster.local:4318"
+  - name: RUSTFS_OBS_ENVIRONMENT
+    value: "prod-local"
+  - name: RUSTFS_REGION
+    value: "us-east-1"
+
+# --- Service Configuration ---
+service:
+  type: ClusterIP
+  port: 9000
+
+consoleService:
+  type: ClusterIP
+  port: 9001
+
+ingress:
+  enabled: false

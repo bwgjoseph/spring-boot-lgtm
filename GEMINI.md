@@ -23,7 +23,7 @@ The repository is structured as a **multi-module Maven project**:
   - **Prometheus (29.27.0):** Metrics scraper and Alerting engine.
   - **Mimir (6.0.6):** Metrics Long-term Storage (Monolithic HA mode).
   - **Pyroscope (2.4.0):** Continuous profiling backend for CPU, memory, and lock contention flame graphs.
-  - **MinIO (5.4.0):** Internal Object Storage for Loki, Tempo, Mimir, and Pyroscope.
+  - **MinIO (5.4.0) / RustFS (1.0.3):** S3-compatible Object Storage for Loki, Tempo, Mimir, and Pyroscope (RustFS supersedes MinIO as primary open source S3 backend).
   - **MongoDB (18.6.31):** 3-node ReplicaSet instrumented for CDC via Debezium.
 - **Build & Deployment:** 
   - **Maven:** Build system with BOM management.
@@ -54,6 +54,7 @@ The project uses `Taskfile` to simplify complex operations across environments (
 | **Surgical Swap** | `task swap:loki` | Upgrades Loki from Dev to Prod-Local HA for validation. |
 | **Surgical Swap** | `task swap:tempo`| Upgrades Tempo from Dev to Prod-Local HA for validation. |
 | **Surgical Swap** | `task swap:alloy`| Upgrades Alloy from Dev to Prod-Local HA for validation. |
+| **Surgical Swap** | `task swap:rustfs`| Upgrades RustFS from Dev Standalone to Prod-Local Distributed HA for validation. |
 | **Surgical Swap** | `task swap:mimir`| Swaps Prometheus for Mimir Monolithic HA. |
 | **Config Sync** | `task sync:loki` | Promotes verified `prod-local` architectural keys to `prod`. |
 | **Utilities** | `task pf:redpanda`| Port-forwards Redpanda Console UI (http://localhost:8081). |

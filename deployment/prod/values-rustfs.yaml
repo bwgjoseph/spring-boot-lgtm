@@ -1,0 +1,82 @@
+# RustFS Production Configuration
+# Distributed 4-node StatefulSet with Reed-Solomon EC:2 (8 total drives = 4 nodes x 2 drives).
+# Replaces MinIO distributed mode; MinIO xl.meta disk format compatible for zero-reupload migration.
+# Helm: helm upgrade --install rustfs rustfs/rustfs --version 1.0.3 -n monitoring
+
+# --- Deployment Mode ---
+mode:
+  standalone:
+    enabled: false
+  distributed:
+    enabled: true
+
+# --- Distributed Cluster Topology ---
+# 4 pods x 2 drives each = 8 total drives.
+# Reed-Solomon EC automatically selected as EC:2 (6 data + 2 parity) for a 8-drive set.
+# Tolerates loss of 2 full drives without data loss.
+replicaCount: 4
+drivesPerNode: 2
+
+# --- Authentication Credentials ---
+secret:
+  rustfs:
+    access_key: "admin"
+    secret_key: "password123"
+
+# --- Storage ---
+# High-performance SSD/NVMe storage class recommended.
+# 4 pods x 2 PVCs x 125Gi = 1TB raw capacity total.
+# With EC:2 parity: ~750Gi usable. Covers 600GB Loki + 100GB Tempo + 50GB Pyroscope.
+storageclass:
+  name: "standard"         # Override with SSD StorageClass in real prod (e.g., "fast-nvme")
+  dataStorageSize: 125Gi   # Per-drive PVC size
+  logStorageSize: 5Gi      # RustFS internal system log PVC per node
+
+# --- Bucket Auto-Provisioning ---
+# All four LGTM telemetry buckets provisioned on first startup.
+# IMPORTANT: versioning must remain disabled (compactors use DeleteObjects heavily).
+buckets:
+  - name: loki
+  - name: tempo
+  - name: pyroscope
+  - name: mimir
+
+# --- Resource Allocation ---
+# Generous headroom for concurrent multi-stream compaction without GC pauses (Rust runtime).
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# --- Self-Observability (OTLP Push to Alloy) ---
+# RustFS natively streams its own metrics/traces/logs via OTLP to Grafana Alloy.
+# Replaces the need for a separate prometheus.scrape exporter.
+env:
+  - name: RUSTFS_OBS_ENDPOINT
+    value: "http://alloy.monitoring.svc.cluster.local:4318"
+  - name: RUSTFS_OBS_ENVIRONMENT
+    value: "production"
+  - name: RUSTFS_REGION
+    value: "us-east-1"
+
+# --- Service Configuration ---
+service:
+  type: ClusterIP
+  port: 9000           # S3 API endpoint (no consumer-side change from MinIO)
+
+consoleService:
+  type: ClusterIP
+  port: 9001           # Web Console (Keycloak OIDC can be wired here)
+
+# --- Ingress (enable for prod with proper hostname) ---
+ingress:
+  enabled: false
+  # className: "nginx"
+  # hosts:
+  #   - host: rustfs.monitoring.internal
+  #     paths:
+  #       - path: /
+  #         pathType: Prefix

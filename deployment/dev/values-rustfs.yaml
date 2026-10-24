@@ -1,0 +1,65 @@
+# RustFS Dev/Sandbox Configuration
+# Standalone single-pod deployment for local Docker Desktop / KinD environments.
+# Replaces MinIO; uses ~80MB idle RAM vs MinIO's ~350MB.
+# Helm: helm upgrade --install rustfs rustfs/rustfs --version 1.0.3 -n monitoring
+
+# --- Deployment Mode ---
+mode:
+  standalone:
+    enabled: true
+  distributed:
+    enabled: false
+
+# --- Authentication Credentials ---
+# Mirrors MinIO secret keys for seamless endpoint swap in Loki/Tempo/Pyroscope values.
+secret:
+  rustfs:
+    access_key: "admin"
+    secret_key: "password123"
+
+# --- Storage ---
+# Separate storageclass entry per RustFS Helm chart schema.
+storageclass:
+  name: "standard"         # Default KinD / Docker Desktop storageclass
+  dataStorageSize: 50Gi    # Main object data PVC (log chunks, trace blocks, profiles)
+  logStorageSize: 1Gi      # RustFS internal system log PVC
+
+# --- Bucket Auto-Provisioning ---
+# All four LGTM telemetry buckets provisioned on first startup.
+# IMPORTANT: versioning must remain disabled (compactors use DeleteObjects heavily).
+buckets:
+  - name: loki
+  - name: tempo
+  - name: pyroscope
+  - name: mimir
+
+# --- Resource Allocation ---
+# Significantly lighter than MinIO (256Mi req / unlimited limit).
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# --- Self-Observability (OTLP Push to Alloy) ---
+# RustFS natively streams its own metrics/traces/logs via OTLP to Grafana Alloy.
+env:
+  - name: RUSTFS_OBS_ENDPOINT
+    value: "http://alloy.monitoring.svc.cluster.local:4318"
+  - name: RUSTFS_REGION
+    value: "us-east-1"
+
+# --- Service Configuration ---
+service:
+  type: ClusterIP
+  port: 9000           # S3 API port (same as MinIO — no consumer config changes needed)
+
+consoleService:
+  type: ClusterIP
+  port: 9001           # Web Console port (Next.js/Tailwind UI)
+
+# --- Ingress (disabled for local sandbox) ---
+ingress:
+  enabled: false

@@ -59,7 +59,7 @@
 - [x] Make all the dashboard support filter by namespace (See [notes/DASHBOARD_NAMESPACE_FILTER.md](./notes/DASHBOARD_NAMESPACE_FILTER.md))
 - [x] Figure out if possible to forward logs to syslog directly (See [notes/ALLOY_SYSLOG_FORWARDING.md](./notes/ALLOY_SYSLOG_FORWARDING.md))
 - [x] Gitlab CI dashboard integration (See [notes/GITLAB_CI_DASHBOARD.md](./notes/GITLAB_CI_DASHBOARD.md))
-- [ ] Integrate Grafana with Keycloak SSO
+- [ ] **Grafana + Keycloak SSO (DEFERRED):** No immediate need in sandbox/local environment. Revisit when multi-user access control or enterprise SSO is required.
 - [x] Review ADR
   - [x] [Alloy](./ADR/alloy.md)
   - [x] [Grafana](./ADR/grafana.md)
@@ -75,11 +75,13 @@
   - Reviewed both approaches: (1) In-process dynamic JMX bridge (`DebeziumMetricsBinder` with platform MBeanServer + Jolokia) vs (2) External OTel JMX Metric Scraper sidecar.
   - Decided to adopt (1) in-process bridge for current architecture (zero extra sidecars, native Micrometer integration, served via `/actuator/prometheus`). Still open to exploring (2) external OTel JMX Scraper as an alternative/sandbox later.
 - [x] Integrate with Pyroscope (See [notes/PYROSCOPE_PROFILING.md](./notes/PYROSCOPE_PROFILING.md))
-- [x] Figure out how to publish data from alloy to different sources (See [notes/ALLOY_SECONDARY_KAFKA_EXPORT.md](./notes/ALLOY_SECONDARY_KAFKA_EXPORT.md))
+- [ ] **Alloy → Kafka/Redpanda secondary export (DEFERRED):** Architecture and River config blueprint fully documented in `notes/ALLOY_SECONDARY_KAFKA_EXPORT.md`. No operational need currently — revisit if secondary data lake, SIEM, or real-time stream processing is required.
   - [ ] Validated secondary export pipeline to Kafka/Redpanda (Documented architecture blueprint and River configuration; awaiting deployment verification)
 - [x] Figure out what are the more commonly used alerts and defined it (See [notes/COMMON_ALERTING_RULES.md](./notes/COMMON_ALERTING_RULES.md))
   - Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
-- [ ] Evaluate Minio replacement
+- [x] Evaluate Minio replacement (Completed comprehensive evaluation of MinIO vs. RustFS vs. VaultS3; see [notes/OBJECT_STORAGE_EVALUATION.md](./notes/OBJECT_STORAGE_EVALUATION.md))
+- [x] Create ADR for Object Storage migration (Adopted Unified RustFS strategy across dev and prod; see [ADR: RustFS](./ADR/rustfs.md) superseding [ADR: MinIO](./ADR/minio.md))
+- [x] Implement RustFS Helm migration (`values-rustfs.yaml` for dev and prod, taskfile integration)
 - [ ] Review lgtm improvement - https://trello.com/c/q8XZTkHS/239-lgtm-improvement
 - [ ] When all is done, perform a final upgrade to the latest releases for every modules
 
@@ -87,10 +89,11 @@
 
 - [x] **Prometheus Alerting Rules Loading:** Current alerting rules (`alerting_rules.yml`) in Prometheus are appearing empty (`{}`) even after configuration changes. Requires further investigation into how `prometheus-community/prometheus` Helm chart processes `serverFiles` vs `extraConfigmapMounts`. (Resolved by leveraging chart-native `serverFiles.alerting_rules.yml` which generates the rules config and links with `configmap-reload`).
 - [x] **Loki HA Caching Resource Mapping:** Memcached sub-charts for Loki are currently disabled in `prod-local` due to incorrectly mapped high-resource defaults. Requires proper sub-chart resource configuration to enable in resource-constrained sandboxes. (Resolved by setting `allocatedMemory: 256` and `128` with `allocatedCPU: 100m` in `deployment/prod-local/values-loki.yaml`, bounding memory request to ~460Mi total).
-- [ ] **Mimir Migration Strategy:** Implement `swap:mimir` to replace local Prometheus storage with Mimir (Monolithic HA-ready mode).
-- [ ] **Prometheus Remote Write Configuration:** Configure existing Prometheus Helm release to act as a pass-through by enabling `remoteWrite` to the Mimir endpoint.
-- [ ] **Grafana Datasource Migration:** Update Grafana to transition from `Prometheus` datasource to `Mimir` datasource upon completion of the Mimir swap.
-- [ ] **Alerting Rules Migration:** Migrate alerting rules from Prometheus `serverFiles` to Mimir's `ruler` configuration.
+- [ ] **Mimir Migration Strategy (DEFERRED):** Prometheus handles current load adequately. Mimir adds HA ingestion and long-term object storage but at significant resource cost (~2–4Gi RAM). Revisit only if Prometheus RAM saturates or multi-tenancy/global query is needed.
+  - [ ] Implement `swap:mimir` to replace local Prometheus storage with Mimir (Monolithic HA-ready mode).
+  - [ ] Configure existing Prometheus Helm release to act as a pass-through by enabling `remoteWrite` to the Mimir endpoint.
+  - [ ] Update Grafana to transition from `Prometheus` datasource to `Mimir` datasource upon completion of the Mimir swap.
+  - [ ] Migrate alerting rules from Prometheus `serverFiles` to Mimir's `ruler` configuration.
 - [ ] **Storage - RWX Support:** Check for NFS/shared StorageClass support.
 - [ ] **Storage - Alloy SSD PVCs:** Confirm availability of local SSD PVCs for Alloy WAL.
 - [ ] **Storage - Class Performance:** Identify high-performance SSD/NVMe storage classes.

@@ -14,6 +14,7 @@ vars:
   VER_MIMIR: "6.0.6"
   VER_PROMETHEUS: "29.27.0"
   VER_MINIO: "5.4.0"
+  VER_RUSTFS: "1.0.3"
   VER_MONGODB: "18.6.31"
   VER_REDPANDA: "26.2.1"
   VER_GITLAB_CI_EXPORTER: "0.3.5"
@@ -28,6 +29,7 @@ tasks:
       - helm repo add grafana-community https://grafana-community.github.io/helm-charts
       - helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
       - helm repo add minio https://charts.min.io/
+      - helm repo add rustfs https://rustfs.github.io/helm/
       - helm repo add bitnami https://charts.bitnami.com/bitnami
       - helm repo add redpanda https://charts.redpanda.com
       - helm repo add mvisonneau https://charts.visonneau.fr
@@ -56,6 +58,12 @@ tasks:
     deps: [namespace]
     cmds:
       - kubectl create secret generic minio-secret -n {{.NAMESPACE}} --from-literal=rootUser=admin --from-literal=rootPassword=password123 --dry-run=client -o yaml | kubectl apply -f -
+
+  secret:rustfs:
+    desc: Create RustFS credentials secret (mirrors minio-secret keys for drop-in compatibility)
+    deps: [namespace]
+    cmds:
+      - kubectl create secret generic rustfs-secret -n {{.NAMESPACE}} --from-literal=rootUser=admin --from-literal=rootPassword=password123 --dry-run=client -o yaml | kubectl apply -f -
 
   secret:gitlab:
     desc: Create GitLab PAT secret for gitlab-ci-pipelines-exporter (set GITLAB_TOKEN env var first)
@@ -104,10 +112,35 @@ tasks:
       - pwsh -ExecutionPolicy Bypass -File ./verification/storage-bootstrap.ps1
 
   minio:
-    desc: Install or Upgrade MinIO
+    desc: Install or Upgrade MinIO (legacy — prefer rustfs task)
     deps: [repos, namespace]
     cmds:
       - helm upgrade --install minio minio/minio -n {{.NAMESPACE}} --version {{.VER_MINIO}} -f deployment/{{.ENV}}/values-minio.yaml
+
+  rustfs:
+    desc: Install or Upgrade RustFS (replaces MinIO as S3 backend — Apache 2.0, zero GC jitter)
+    deps: [repos, namespace, secret:rustfs]
+    cmds:
+      - helm upgrade --install rustfs rustfs/rustfs -n {{.NAMESPACE}} --version {{.VER_RUSTFS}} -f deployment/{{.ENV}}/values-rustfs.yaml
+
+  uninstall:rustfs:
+    desc: Uninstall RustFS and its storage PVCs
+    cmds:
+      - helm uninstall rustfs -n {{.NAMESPACE}} --ignore-not-found
+      - kubectl delete pvc -l app.kubernetes.io/instance=rustfs -n {{.NAMESPACE}} --ignore-not-found
+
+  swap:minio-to-rustfs:
+    desc: Migrate S3 backend from MinIO to RustFS (uninstall MinIO, deploy RustFS)
+    cmds:
+      - task: uninstall:minio
+      - task: rustfs
+      - task: validate:rustfs
+
+  validate:rustfs:
+    desc: Deploy RustFS and verify it is healthy
+    cmds:
+      - task: rustfs
+      - kubectl rollout status statefulset/rustfs -n {{.NAMESPACE}} --timeout=180s
 
   init:mongodb:
     desc: Ensure MongoDB 'kx' database exists
@@ -468,6 +501,14 @@ tasks:
       - echo MinIO API http://localhost:9000
       - echo MinIO Console http://localhost:9001
 
+  pf:rustfs:
+    desc: Port-forward RustFS S3 API (9000) and Web Console (9001)
+    cmds:
+      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward service/rustfs 9000:9000 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - pwsh -Command "Start-Process kubectl -ArgumentList 'port-forward service/rustfs-console 9001:9001 -n {{.NAMESPACE}}' -WindowStyle Hidden"
+      - echo RustFS S3 API http://localhost:9000
+      - echo RustFS Console http://localhost:9001
+
   pf:redpanda:
     desc: Port-forward Redpanda Console (8081)
     cmds:
@@ -477,7 +518,7 @@ tasks:
   pf:all:
     desc: Port-forward all observability UIs
     cmds:
-      - task: pf:minio
+      - task: pf:rustfs
       - task: pf:grafana
       - task: pf:prometheus
       - task: pf:alertmanager
@@ -680,6 +721,17 @@ tasks:
         vars: { ENV: '{{.TO}}' }
       - task: verify:alloy
         vars: { ENV: '{{.TO}}' }
+
+  swap:rustfs:
+    desc: Swap RustFS from Standalone (dev) to Distributed Clustered HA (prod-local) for validation
+    vars:
+      FROM: '{{.FROM | default "dev"}}'
+      TO: '{{.TO | default "prod-local"}}'
+    cmds:
+      - task: uninstall:rustfs
+      - task: rustfs
+        vars: { ENV: '{{.TO}}' }
+      - task: validate:rustfs
 
   swap:mimir:
     desc: Swap Mimir (Prometheus -> Mimir Monolithic)

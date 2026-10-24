@@ -1,7 +1,7 @@
 # ADR: MinIO S3-Compatible Object Storage Backend
 
 ## Status
-Accepted
+Superseded by [ADR: RustFS S3-Compatible Distributed Object Storage Backend](./rustfs.md)
 
 ## Context
 For on-premise and local Kubernetes deployments of the LGTM stack, an S3-compatible object storage layer is required. Decoupling long-term telemetry storage from compute pods guarantees durability, scalability, and cost efficiency. Key architectural requirements include:

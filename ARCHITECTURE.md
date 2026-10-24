@@ -13,7 +13,7 @@ Optimized for resource efficiency and rapid feedback loops.
 - **Tempo:** `Microservices` mode (distributor, querier, query-frontend, block-builder, live-store, backend-scheduler, backend-worker) backed by **Redpanda** Kafka streaming buffer. gRPC-only OTLP ingestion.
 - **Mimir:** Standalone Prometheus instance (metrics).
 - **Alloy:** Standalone deployment.
-- **Persistence:** Local SSD PVCs (MinIO).
+- **Persistence:** Local SSD PVCs (RustFS / MinIO).
 
 ### B. Production / HA (Prod)
 Optimized for durability, high-availability, and long-term retention.
@@ -21,7 +21,7 @@ Optimized for durability, high-availability, and long-term retention.
 - **Tempo:** `Microservices` mode (tempo-distributed, Tempo 3.x) with 2 replicas per component (distributor, querier, query-frontend), Memberlist gossip coordination, gRPC-only OTLP ingestion. **Redpanda** (3 replicas, 3 partitions) as the Kafka-compatible streaming buffer for `blockBuilder` and `liveStore`.
 - **Mimir:** Monolithic HA-ready deployment (2 replicas) using S3 block storage.
 - **Alloy:** Clustered Deployment (2 replicas) with Gossip protocol and Tail-based sampling enabled for trace affinity.
-- **Persistence:** S3-native object storage (MinIO/AWS S3) with compactor-enforced physical retention.
+- **Persistence:** S3-native object storage (RustFS / MinIO / AWS S3) with compactor-enforced physical retention.
 
 ## 2. Integrated Data Flow
 

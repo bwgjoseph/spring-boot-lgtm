@@ -104,7 +104,8 @@ graph TD
 | **Tempo**           | Trace Storage     | `grafana-community/tempo-distributed` | `3.0.6` |
 | **Redpanda**        | Streaming Log     | `redpanda/redpanda`               | `26.2.1`  |
 | **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `29.27.0` |
-| **MinIO**           | Object Storage    | `minio/minio`                     | `5.4.0`   |
+| **RustFS**          | Object Storage    | `rustfs/rustfs`                   | `1.0.3`   |
+| **MinIO**           | Object Storage (Legacy) | `minio/minio`               | `5.4.0`   |
 | **MongoDB**         | DB / CDC Source   | `bitnami/mongodb` (OCI)           | `18.6.31` |
 
 
