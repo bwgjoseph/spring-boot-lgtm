@@ -1,0 +1,5 @@
+com.bwgjoseph.observability.starter.core.LgtmCoreAutoConfiguration
+com.bwgjoseph.observability.starter.security.LgtmSecurityAutoConfiguration
+com.bwgjoseph.observability.starter.metrics.LgtmMetricsAutoConfiguration
+com.bwgjoseph.observability.starter.debezium.LgtmDebeziumAutoConfiguration
+com.bwgjoseph.observability.starter.resource.LgtmResourceAutoConfiguration

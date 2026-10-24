@@ -189,7 +189,7 @@ tasks:
   app:build:
     desc: Build the Spring Boot application and Docker image using Jib
     cmds:
-      - .\\mvnw clean compile jib:dockerBuild
+      - .\\mvnw clean compile jib:dockerBuild -pl spring-boot-app -am
 
   app:load:
     desc: Build and sideload the image into local Kubernetes

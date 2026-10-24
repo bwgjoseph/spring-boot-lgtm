@@ -3,6 +3,10 @@
 ## Project Overview
 This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed to demonstrate the **Grafana LGTM stack** (Loki, Grafana, Tempo, Mimir/Prometheus) using **Grafana Alloy** as the central collector. It follows a "Scrape & Push" architecture optimized for High Availability (HA).
 
+The repository is structured as a **multi-module Maven project**:
+- **`observability-spring-boot-starter/`** — Reusable Spring Boot starter that encapsulates all LGTM observability concerns (noise filtering, security correlation, metrics histograms, OTel resource attributes, logging correlation, Debezium JMX bridging).
+- **`spring-boot-app/`** — The sandbox application that consumes the starter and exercises the full LGTM stack.
+
 ### Tech Stack
 - **Framework:** Spring Boot 3.5.x
 - **Language:** Java 25
@@ -60,8 +64,8 @@ The project uses `Taskfile` to simplify complex operations across environments (
 
 ### Instrumentation
 - **Micrometer Observation API:** Use `@Observed` annotation or `Observation.createNotStarted(...)`.
-- **Security Correlation:** `SecurityObservationHandler` extracts `userId` and injects it into baggage.
-- **MDC Correlation:** Trace IDs and Span IDs are included in logs via the pattern: `[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{userId:-}]`.
+- **Security Correlation:** `SecurityObservationHandler` (auto-configured by `observability-spring-boot-starter`) extracts `userId` from the Spring Security context and injects it into baggage.
+- **MDC Correlation:** Trace IDs and Span IDs are included in logs via the pattern: `[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{userId:-}]` — injected by the starter's `LgtmLoggingEnvironmentPostProcessor`.
 - **Trace-to-Log Correlation:** App logs use camelCase (`traceId`); Grafana Alloy maps these to snake_case (`trace_id`) in Loki Structured Metadata.
 
 ### Observability Patterns
@@ -77,3 +81,6 @@ The project uses `Taskfile` to simplify complex operations across environments (
 - `IMAGES.md`: Software Bill of Materials (SBOM) and container image inventory.
 - `TROUBLESHOOT.md`: Known issues and resolutions for the local HA stack.
 - `notes/CUSTOM_ATTRIBUTES.md`: Documentation for cross-stack attribute mapping.
+- `observability-spring-boot-starter/`: Reusable LGTM observability starter (noise filter, security correlation, metrics histograms, OTel resource, logging pattern, Debezium JMX bridge).
+- `spring-boot-app/`: The sandbox application that exercises the LGTM stack.
+- `notes/OBSERVABILITY_STARTER.md`: Developer guide for the observability starter (configuration reference, extension recipes).

@@ -50,7 +50,7 @@
 - [x] How to setup span attributes (See [notes/CUSTOM_ATTRIBUTES.md](./notes/CUSTOM_ATTRIBUTES.md))
   - [x] To write docs on how the while configuring correlation fields work, that also automatically synced to MDC
 - [x] Scan through https://grafana.com/docs/tempo/latest/metrics-from-traces/ (See [notes/TEMPO_METRICS_FROM_TRACES.md](./notes/TEMPO_METRICS_FROM_TRACES.md))
-- [ ] Create spring-boot-starter to inject span and/or resource attributes that can be [useful](https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/best-practices/)
+- [x] Create spring-boot-starter to inject span and/or resource attributes that can be [useful](https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/best-practices/) (Implemented modular `observability-spring-boot-starter`; see [notes/OBSERVABILITY_STARTER.md](./notes/OBSERVABILITY_STARTER.md) and [ADR/application.md](./ADR/application.md))
   - and/or also useful ootb solution - https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/set-up-collector/grafana-alloy/automatic-logging/
     - automatic logging might not be useful for my case since our logging already set traceId to all logs by default
     - make sure that it supports async - https://github.com/ehayik/spring-boot-async-mdc

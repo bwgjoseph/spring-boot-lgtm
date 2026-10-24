@@ -23,16 +23,17 @@ flowchart TD
     end
 
     subgraph SpringBootApp ["Spring Boot 3.5 App Pod (Port: 8080)"]
-        subgraph FrameworkCore ["Core Instrumentation Engines"]
-            MICROMETER["Micrometer Observation API<br/><i>@Observed & SecurityObservationHandler</i>"]
+        subgraph StarterModule ["observability-spring-boot-starter (Modular Auto-Config)"]
+            MICROMETER["Micrometer Observation API<br/><i>@Observed & Actuator Noise Filter</i>"]
             TRACING_BRIDGE["Micrometer Tracing (OTEL Bridge)<br/><i>OpenTelemetry SDK 1.59.0 | 100% Sampling</i>"]
-            BAGGAGE["W3C Baggage & MDC Correlation<br/><i>userId in Baggage & MDC</i>"]
-            PROM_REG["Micrometer Prometheus Registry<br/><i>Histogram percentiles & Exemplars</i>"]
+            BAGGAGE["W3C Baggage & MDC Correlation<br/><i>SecurityObservationHandler (userId)</i>"]
+            PROM_REG["Micrometer Prometheus Registry<br/><i>Histogram Percentiles & SLA Buckets</i>"]
+            METRICS_BINDER["DebeziumMetricsBinder<br/><i>Dynamic JMX MBean Discovery (@ConditionalOnClass)</i>"]
+            RESOURCE_CUST["ResourceCustomizer<br/><i>service.name, service.version, deployment.environment</i>"]
         end
 
         subgraph EmbeddedEngines ["Embedded Services"]
             DEBEZIUM["Debezium Embedded Engine<br/><i>Tails MongoDB ReplicaSet 'mgrs'</i>"]
-            METRICS_BINDER["DebeziumMetricsBinder<br/><i>Dynamic JMX MBean Discovery</i>"]
             JOLOKIA["Jolokia HTTP Bridge<br/><i>/actuator/jolokia</i>"]
         end
 
@@ -117,6 +118,14 @@ flowchart TD
    - Runs in-process inside the Spring Boot container, capturing changes from the MongoDB ReplicaSet (`mgrs`).
    - JMX MBeans are dynamically surfaced to Micrometer via `DebeziumMetricsBinder`, making CDC lag and snapshot metrics available on `/actuator/prometheus`.
    - Raw JMX endpoint accessible via `/actuator/jolokia`.
+
+7. **Reusable Observability Starter Architecture (`observability-spring-boot-starter`):**
+   - **Zero Hard Assumptions:** The starter does not force Spring Security, Debezium, or database drivers onto consuming projects. All specialized integrations use `<optional>true</optional>` and are guarded by `@ConditionalOnClass`.
+   - **Sensible, Low-Interference Defaults:**
+     - Actuator noise filtering (`ObservationPredicate`) suppresses tracing/metric observations for `/actuator/health`, `/actuator/prometheus`, `/actuator/jolokia`, and `/actuator/info`.
+     - Standard MDC correlation format (`[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{userId:-}]`) is injected via `EnvironmentPostProcessor` at lowest priority, matching Grafana Alloy's Loki structured metadata extraction regex while allowing application-level overrides.
+     - Percentile histograms and latency SLA boundaries (5ms to 5s) are automatically applied to HTTP and DB meters via `MeterFilter`.
+   - **Full Overridability:** Every bean registered by the starter is annotated with `@ConditionalOnMissingBean` to allow applications to customize security context extraction, observation filters, or metric binders.
 
 ---
 
