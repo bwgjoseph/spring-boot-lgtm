@@ -18,7 +18,8 @@ This project is a **Spring Boot 3.5 (Java 25) Observability Sandbox** designed t
   - **Redpanda (26.2.1):** High-performance Kafka-compatible streaming log for Tempo trace ingestion.
   - **Prometheus (29.27.0):** Metrics scraper and Alerting engine.
   - **Mimir (6.0.6):** Metrics Long-term Storage (Monolithic HA mode).
-  - **MinIO (5.4.0):** Internal Object Storage for Loki, Tempo, and Mimir.
+  - **Pyroscope (2.4.0):** Continuous profiling backend for CPU, memory, and lock contention flame graphs.
+  - **MinIO (5.4.0):** Internal Object Storage for Loki, Tempo, Mimir, and Pyroscope.
   - **MongoDB (18.6.31):** 3-node ReplicaSet instrumented for CDC via Debezium.
 - **Build & Deployment:** 
   - **Maven:** Build system with BOM management.

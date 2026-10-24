@@ -22,6 +22,9 @@ buckets:
   - name: mimir
     policy: public
     purge: false
+  - name: pyroscope
+    policy: public
+    purge: false
 
 # Resource limits for sandbox
 resources:

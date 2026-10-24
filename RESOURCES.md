@@ -54,3 +54,13 @@ If you see a pod with the status `CrashLoopBackOff` and a reason of `OOMKilled`,
 
 ### 4. CPU Throttling
 If CPU usage hits the **Limit**, Kubernetes will "throttle" the pod (slow it down) rather than killing it. If the application feels sluggish or health checks time out, consider increasing the `limits.cpu`.
+
+### 5. Alloy WAL (Write-Ahead Log) Disk Sizing
+Grafana Alloy persists its Write-Ahead Log (WAL) to disk to survive backend outages. The WAL size varies by environment:
+
+| Environment | WAL Size | Config File |
+| :--- | :--- | :--- |
+| **dev** | `5Gi` | `deployment/dev/values-alloy.yaml` |
+| **prod / prod-local** | `100Gi` | `deployment/prod/values-alloy.yaml` |
+
+*The production WAL is sized at 100Gi to provide meaningful durability headroom for a 2-replica HA deployment under sustained load (logs + traces + metrics). A 5Gi dev WAL is sufficient for local sandbox experimentation.*

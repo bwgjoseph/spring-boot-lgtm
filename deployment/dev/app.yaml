@@ -42,6 +42,15 @@ spec:
         # Ensure application name matches the service_name label for correlation
         - name: SPRING_APPLICATION_NAME
           value: "spring-boot-app"
+        # Continuous Profiling (Pyroscope Java Agent)
+        - name: JAVA_TOOL_OPTIONS
+          value: "-javaagent:/opt/pyroscope/pyroscope.jar"
+        - name: PYROSCOPE_APPLICATION_NAME
+          value: "$(SPRING_APPLICATION_NAME)"
+        - name: PYROSCOPE_SERVER_ADDRESS
+          value: "http://alloy.monitoring.svc.cluster.local:9999"
+        - name: PYROSCOPE_PROFILER_EVENT
+          value: "itimer"
         resources:
           requests:
             memory: "512Mi"

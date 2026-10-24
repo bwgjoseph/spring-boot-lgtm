@@ -39,6 +39,15 @@ spec:
           value: "mongodb://admin:password@mongodb-0.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-1.mongodb-headless.monitoring.svc.cluster.local:27017,mongodb-2.mongodb-headless.monitoring.svc.cluster.local:27017/kx?authSource=admin&replicaSet=mgrs"
         - name: SPRING_APPLICATION_NAME
           value: "spring-boot-app"
+        # Continuous Profiling (Pyroscope Java Agent)
+        - name: JAVA_TOOL_OPTIONS
+          value: "-javaagent:/opt/pyroscope/pyroscope.jar"
+        - name: PYROSCOPE_APPLICATION_NAME
+          value: "$(SPRING_APPLICATION_NAME)"
+        - name: PYROSCOPE_SERVER_ADDRESS
+          value: "http://alloy.monitoring.svc.cluster.local:9999"
+        - name: PYROSCOPE_PROFILER_EVENT
+          value: "itimer"
         resources:
           requests:
             memory: "1Gi"

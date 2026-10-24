@@ -52,3 +52,16 @@ datasources:
         datasourceUid: 'prometheus'
       nodeGraph:
         enabled: true
+      
+      # Trace to Profiles linking (Tempo -> Pyroscope)
+      tracesToProfiles:
+        datasourceUid: 'pyroscope'
+        tags:
+          - key: 'service.name'
+            value: 'service_name'
+        profileTypeId: 'process_cpu:cpu:nanoseconds'
+
+  - name: Pyroscope
+    type: pyroscope
+    uid: pyroscope
+    url: http://pyroscope.monitoring.svc:4040

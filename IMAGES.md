@@ -29,3 +29,4 @@ This document tracks all container images currently deployed in the `monitoring`
 | **Node Exporter** | `node-exporter` | `quay.io/prometheus/node-exporter:v1.11.1` |
 | **MongoDB** | `mongodb` | `registry-1.docker.io/bitnamicharts/mongodb:8.2.7` |
 | **MinIO** | `minio` | `quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z` |
+| **Pyroscope** | `pyroscope` | `docker.io/grafana/pyroscope:2.4.0` |

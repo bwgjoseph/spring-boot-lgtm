@@ -41,6 +41,7 @@ graph TD
         RedpandaDev[Redpanda - Single Node]
         TempoDev["Tempo 3.x - Microservices\n(distributor / querier / query-frontend\nblock-builder x3 / live-store x3\nbackend-scheduler / backend-worker)"]
         MimirDev[Prometheus - Standalone]
+        PyroDev[Pyroscope - Profiles]
     end
 
     subgraph Backends [Backends]
@@ -49,10 +50,12 @@ graph TD
     end
 
     App1 -- "OTLP/gRPC (Push)" --> AlloyDev
+    App1 -- "HTTP :9999 (Push Profiles)" --> AlloyDev
     AlloyDev -- "Scrape (Pull)" --> App1
     
     AlloyDev -- "Forwarding" --> LokiDev
     AlloyDev -- "OTLP/gRPC" --> TempoDev
+    AlloyDev -- "Forwarding Profiles" --> PyroDev
     AlloyDev -- "Scrape" --> MimirDev
 
     TempoDev -- "Produce" --> RedpandaDev

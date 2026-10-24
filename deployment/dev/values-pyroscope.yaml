@@ -1,0 +1,30 @@
+# Pyroscope Dev Configuration (Single-binary mode using MinIO S3 backend)
+
+pyroscope:
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+  persistence:
+    enabled: false
+
+  # Wire to our existing central MinIO cluster
+  config: |
+    storage:
+      backend: s3
+      s3:
+        endpoint: "minio.monitoring.svc.cluster.local:9000"
+        bucket_name: "pyroscope"
+        access_key_id: "admin"
+        secret_access_key: "password123"
+        insecure: true
+
+# Disable the bundled sub-chart MinIO since we have a dedicated MinIO cluster
+minio:
+  enabled: false

@@ -53,6 +53,7 @@
 - [ ] Create spring-boot-starter to inject span and/or resource attributes that can be [useful](https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/best-practices/)
   - and/or also useful ootb solution - https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/set-up-collector/grafana-alloy/automatic-logging/
     - automatic logging might not be useful for my case since our logging already set traceId to all logs by default
+    - make sure that it supports async - https://github.com/ehayik/spring-boot-async-mdc
 - [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
 - [x] Configure git-sync (Evaluated airgapped support; see [notes/GIT_SYNC_AIRGAPPED.md](./notes/GIT_SYNC_AIRGAPPED.md))
 - [x] Make all the dashboard support filter by namespace (See [notes/DASHBOARD_NAMESPACE_FILTER.md](./notes/DASHBOARD_NAMESPACE_FILTER.md))
@@ -73,13 +74,14 @@
 - [x] How to integrate and scrape JMX metrics (See https://blog.frankel.ch/tip-opentelemetry-projects/ and [notes/JMX_METRICS.md](./notes/JMX_METRICS.md))
   - Reviewed both approaches: (1) In-process dynamic JMX bridge (`DebeziumMetricsBinder` with platform MBeanServer + Jolokia) vs (2) External OTel JMX Metric Scraper sidecar.
   - Decided to adopt (1) in-process bridge for current architecture (zero extra sidecars, native Micrometer integration, served via `/actuator/prometheus`). Still open to exploring (2) external OTel JMX Scraper as an alternative/sandbox later.
-- [ ] Integrate with Pyroscope
+- [x] Integrate with Pyroscope (See [notes/PYROSCOPE_PROFILING.md](./notes/PYROSCOPE_PROFILING.md))
 - [x] Figure out how to publish data from alloy to different sources (See [notes/ALLOY_SECONDARY_KAFKA_EXPORT.md](./notes/ALLOY_SECONDARY_KAFKA_EXPORT.md))
   - [ ] Validated secondary export pipeline to Kafka/Redpanda (Documented architecture blueprint and River configuration; awaiting deployment verification)
 - [x] Figure out what are the more commonly used alerts and defined it (See [notes/COMMON_ALERTING_RULES.md](./notes/COMMON_ALERTING_RULES.md))
   - Alerting Template: https://samber.github.io/awesome-prometheus-alerts/
 - [ ] Evaluate Minio replacement
 - [ ] Review lgtm improvement - https://trello.com/c/q8XZTkHS/239-lgtm-improvement
+- [ ] When all is done, perform a final upgrade to the latest releases for every modules
 
 ## 📋 Issues to Resolve & Technical Backlog
 
@@ -126,3 +128,4 @@
 - As of 27 Sep, completed dashboard namespace filter documentation in notes/DASHBOARD_NAMESPACE_FILTER.md.
 - As of 4 Oct, integrated gitlab-ci-pipelines-exporter with pre-packaged dashboards (pipelines, jobs, environments) under deployment/common/dashboards/gitlab and wired into sync-dashboards.ps1; documented in notes/GITLAB_CI_DASHBOARD.md.
 - As of 4 Oct, explored and documented Alloy fan-out architecture to secondary Kafka/Redpanda sinks, including OTel/Loki/Prometheus bridge mechanics, pure-Go internal Sarama driver, and native vs embedded prometheus.exporter.kafka scraping in notes/ALLOY_SECONDARY_KAFKA_EXPORT.md.
+- As of 17 Oct, implemented Pyroscope continuous profiling: documented concepts/architecture in notes/PYROSCOPE_PROFILING.md, configured Jib extraDirectories and maven-dependency-plugin for agent packaging in pom.xml, added JAVA_TOOL_OPTIONS in app.yaml, created Pyroscope Helm values, configured MinIO bucket, wired Pyroscope datasource with Tempo tracesToProfiles in datasources.yaml, and updated GEMINI.md, IMAGES.md, and ARCHITECTURE.md.

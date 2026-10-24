@@ -20,6 +20,8 @@ buckets:
     policy: public
   - name: mimir
     policy: public
+  - name: pyroscope
+    policy: public
 
 # Resource allocations sized for small-scale S3 metadata caching
 resources:

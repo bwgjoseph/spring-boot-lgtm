@@ -28,6 +28,7 @@
 	</scm>
 	<properties>
 		<java.version>25</java.version>
+		<pyroscope.agent.version>2.9.2</pyroscope.agent.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -200,6 +201,32 @@
 				</configuration>
 			</plugin>
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>copy-pyroscope-agent</id>
+						<phase>generate-resources</phase>
+						<goals>
+							<goal>copy</goal>
+						</goals>
+						<configuration>
+							<artifactItems>
+								<artifactItem>
+									<groupId>io.pyroscope</groupId>
+									<artifactId>agent</artifactId>
+									<version>${pyroscope.agent.version}</version>
+									<type>jar</type>
+									<overWrite>false</overWrite>
+									<outputDirectory>${project.build.directory}/agents</outputDirectory>
+									<destFileName>pyroscope.jar</destFileName>
+								</artifactItem>
+							</artifactItems>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
 				<groupId>com.google.cloud.tools</groupId>
 				<artifactId>jib-maven-plugin</artifactId>
 				<version>3.5.1</version>
@@ -210,6 +237,14 @@
 					<to>
 						<image>spring-boot-app:demo</image>
 					</to>
+					<extraDirectories>
+						<paths>
+							<path>
+								<from>${project.build.directory}/agents</from>
+								<into>/opt/pyroscope</into>
+							</path>
+						</paths>
+					</extraDirectories>
 				</configuration>
 			</plugin>
 		</plugins>

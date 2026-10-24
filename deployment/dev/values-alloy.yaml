@@ -6,11 +6,15 @@ alloy:
   clustering:
     enabled: false
   
-  # Expose essential ports for OTLP ingestion
+  # Expose essential ports for OTLP ingestion & Pyroscope profiles
   extraPorts:
     - name: "otlp-grpc"
       port: 4317
       targetPort: 4317
+      protocol: TCP
+    - name: "pyroscope-http"
+      port: 9999
+      targetPort: 9999
       protocol: TCP
   
   # Headless service for reliable discovery
@@ -167,6 +171,21 @@ alloy:
         client {
           endpoint = "tempo-distributor.monitoring.svc.cluster.local:4317"
           tls { insecure = true }
+        }
+      }
+
+      // --- PROFILES: PYROSCOPE INGESTION & FORWARDING ---
+      pyroscope.receive_http "default" {
+        http {
+          listen_address = "0.0.0.0"
+          listen_port    = 9999
+        }
+        forward_to = [pyroscope.write.local.receiver]
+      }
+
+      pyroscope.write "local" {
+        endpoint {
+          url = "http://pyroscope.monitoring.svc.cluster.local:4040"
         }
       }
 

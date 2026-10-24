@@ -17,6 +17,7 @@ vars:
   VER_MONGODB: "18.6.31"
   VER_REDPANDA: "26.2.1"
   VER_GITLAB_CI_EXPORTER: "0.3.5"
+  VER_PYROSCOPE: "2.4.0"
 
 tasks:
   # --- 📦 SETUP & FOUNDATION ---
@@ -160,6 +161,12 @@ tasks:
     deps: [repos, namespace]
     cmds:
       - helm upgrade --install gitlab-ci-exporter mvisonneau/gitlab-ci-pipelines-exporter -n {{.NAMESPACE}} --version {{.VER_GITLAB_CI_EXPORTER}} -f deployment/{{.ENV}}/values-gitlab-ci-exporter.yaml
+
+  pyroscope:
+    desc: Install or Upgrade Grafana Pyroscope
+    deps: [repos, namespace, secret:minio]
+    cmds:
+      - helm upgrade --install pyroscope grafana/pyroscope -n {{.NAMESPACE}} --version {{.VER_PYROSCOPE}} -f deployment/{{.ENV}}/values-pyroscope.yaml
 
   use:k8s-monitoring:
     desc: Switch telemetry collector layer to grafana/k8s-monitoring Helm chart

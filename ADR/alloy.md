@@ -143,7 +143,7 @@ This table maps the production implementation in `deployment/prod/values-alloy.y
 | :--- | :--- | :--- | :--- |
 | `controller.type` | `deployment` (`replicas: 2`) | HA clustered deployment for local sandboxes & cloud environments. | Core Topology |
 | `alloy.clustering.enabled` | `true` | Enables Gossip protocol (port 7946) across Alloy replicas. | Clustering |
-| `alloy.extraPorts` | `4317` (otlp-grpc), `4318` (otlp-sampling) | Ingestion entrypoint & internal trace affinity receiving port. | Networking |
+| `alloy.extraPorts` | `4317` (otlp-grpc), `4318` (otlp-sampling), `9999` (pyroscope-http) | Ingestion entrypoints for traces, affinity sampling, and continuous profiling. | Networking |
 | `alloy.service.clusterIP` | `None` | Headless service for direct pod-to-pod DNS resolution in load balancing exporter. | Discovery |
 | `discovery.kubernetes "all_pods"` | `role = "pod"` | Central pod discovery for log tailing and Prometheus scraping. | Discovery |
 | `discovery.relabel "pod_logs"` | Extracts `namespace`, `pod`, `service_name` | Canonical log stream labelling. | Logs |
@@ -155,9 +155,11 @@ This table maps the production implementation in `deployment/prod/values-alloy.y
 | `otelcol.processor.k8sattributes "default"` | Extracts `k8s.pod.name`, `k8s.namespace.name`, `k8s.node.name` | Enriches traces with infrastructure context based on client IP. | Enrichment |
 | `otelcol.processor.tail_sampling "default"` | `decision_wait: 10s`<br>Errors: 100%<br>Success: 10% | Intelligent cost reduction while guaranteeing retention of faulty traces. | Sampling |
 | `otelcol.processor.batch "default"` | Batches after sampling | Efficient network transport to Tempo distributor. | Optimization |
+| `pyroscope.receive_http "default"` | Port `9999` HTTP receiver | Ingests continuous profiling data from Java agent. | Profiling |
+| `pyroscope.write "local"` | Pushes to `http://pyroscope:4040` | Batches and delivers profiles to central Pyroscope storage. | Profiling |
 | `prometheus.exporter.self "myself"` | Internal scrape | Self-monitoring of Alloy pipeline health, memory, and queue lengths. | Self-Monitoring |
 | `terminationGracePeriodSeconds` | `60` | Allows 10s decision wait window to drain cleanly during restarts. | Resilience |
-| `persistence.enabled` | `true` (`size: 5Gi - 20Gi`) | Write-Ahead Log (WAL) persistence against upstream outages. | Durability |
+| `persistence.enabled` | `true` (`size: 5Gi - 100Gi`) | Write-Ahead Log (WAL) persistence against upstream outages. | Durability |
 
 ---
 
