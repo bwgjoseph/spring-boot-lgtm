@@ -1,238 +1,185 @@
-# 🚨 Commonly Used Prometheus Alerting Rules Guide
+# 🚨 Comprehensive Alerting & Service Health Architecture Guide
 
-This document catalogs standard, high-impact alerting rules curated from production best practices and [`awesome-prometheus-alerts`](https://samber.github.io/awesome-prometheus-alerts/) tailored specifically for our **Spring Boot 3.5 + LGTM** observability sandbox and production workloads.
+This document catalogs the enterprise-grade alerting architecture, PromQL & LogQL alert rules, Alertmanager routing and inhibition policies, and Grafana dashboard integration implemented for our **Spring Boot 3.5 + LGTM** observability stack.
 
 ---
 
-## 🎯 Alerting Architecture in This Stack
+## 🎯 Architecture Overview
 
-1. **Rule Engine:** Evaluated by Prometheus Server (`prometheus-community/prometheus`).
+```
+               ┌────────────────────────────────────────────────────────┐
+               │         Kubernetes & Bare-Metal Applications          │
+               │  (Spring Boot 3.5, JVM, HikariCP, Debezium, RustFS)    │
+               └──────────────────────────┬─────────────────────────────┘
+                                          │ Scraped / Pushed
+                                          ▼
+                               ┌─────────────────────┐
+                               │    Grafana Alloy    │
+                               │  (Central Collector)│
+                               └──────────┬──────────┘
+                                          │
+                  ┌───────────────────────┴───────────────────────┐
+                  ▼                                               ▼
+      ┌───────────────────────┐                       ┌───────────────────────┐
+      │   Prometheus Server   │                       │      Loki Ingest      │
+      │  (PromQL Rule Engine) │                       │ (LogQL Anomaly Rules) │
+      └───────────┬───────────┘                       └───────────┬───────────┘
+                  │ Firing Alerts                                 │ Log Anomaly
+                  ▼                                               │
+      ┌────────────────────────────────────────────────────────┐  │
+      │                  Alertmanager (:9093)                  │◄─┘
+      │  - Route tree: critical & warning severity             │
+      │  - Cascade Inhibition: InstanceDown inhibits symptoms  │
+      │  - OOM Inhibition: ContainerOomKilled inhibits crash   │
+      └───────────────────────────┬────────────────────────────┘
+                                  │ Webhook Dispatch
+                                  ▼
+      ┌────────────────────────────────────────────────────────┐
+      │              Webhook Receiver / On-Call Sink           │
+      │           (Mattermost, Slack, Discord, PagerDuty)      │
+      └────────────────────────────────────────────────────────┘
+```
+
+1. **Rule Engine:** Evaluated by Prometheus Server (`prometheus-community/prometheus`) and Loki Ruler.
 2. **Rule Injection Method:** 
-   - Chart-native `serverFiles.alerting_rules.yml` in `values-prometheus.yaml` (automatically monitored by `configmap-reload`).
-   - GitOps-managed ConfigMap file: `deployment/common/alerts/prometheus-alerting-rules.yaml`.
+   - Chart-native `serverFiles.alerting_rules.yml` in `deployment/{env}/values-prometheus.yaml` (automatically watched and reloaded by `configmap-reload`).
+   - GitOps-managed ConfigMap file: `deployment/common/alerts/prometheus-alerting-rules.yaml` (synced via `task configmap:prometheus-alert`).
+   - LogQL rule file: `deployment/common/alerts/loki-alerting-rules.yaml`.
 3. **Dispatcher:** Dispatched to Alertmanager on port `:9093` via dynamic Kubernetes Pod Discovery (`role: pod`, `app=alertmanager`).
-4. **Current Receiver:** `null-receiver` (Mattermost webhook target planned).
+4. **Dispatcher Receivers:** `webhook-notifications` with automatic `send_resolved: true` and fallback `null-receiver`. Webhook URLs are securely injected from the Kubernetes secret `alertmanager-secrets` (generated via `task secret:alertmanager`).
+5. **Dashboard Correlation:** Every alert includes a `runbook_url` pointing directly to the unified **Service Health & Alerting Overview** Grafana dashboard (`UID: service-health-and-alerts`).
 
 ---
 
-## 📂 Alert Rules by Domain
+## 📂 Prometheus Alert Rules Catalog (28 Rules Across 5 Domains)
 
-### 1. JVM & Spring Boot Runtime Alerts
+### 1. Spring Boot & Application RED Alerts (`spring_boot_red_alerts`)
 
-Spring Boot Micrometer exports standard JVM metrics to `/actuator/prometheus`. These alerts catch runtime degradation before it causes catastrophic OutOfMemory (OOM) crashes.
-
-```yaml
-groups:
-  - name: jvm_alerts
-    rules:
-      # --- JVM Heap Memory Exhaustion (> 85%) ---
-      - alert: JvmHeapUsageHigh
-        expr: (sum(jvm_memory_used_bytes{area="heap"}) by (pod, namespace) / sum(jvm_memory_max_bytes{area="heap"}) by (pod, namespace)) * 100 > 85
-        for: 3m
-        labels:
-          severity: warning
-        annotations:
-          summary: "JVM Heap usage > 85% on {{ $labels.pod }}"
-          description: "Pod {{ $labels.pod }} JVM heap usage is {{ $value | printf \"%.1f\" }}% of max allocated memory."
-
-      # --- Metaspace Near Capacity (> 90%) ---
-      - alert: JvmMetaspaceUsageHigh
-        expr: (sum(jvm_memory_used_bytes{id="Metaspace"}) by (pod, namespace) / sum(jvm_memory_max_bytes{id="Metaspace"}) by (pod, namespace)) * 100 > 90
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "JVM Metaspace > 90% on {{ $labels.pod }}"
-          description: "Metaspace is filling up rapidly; risk of java.lang.OutOfMemoryError: Metaspace."
-
-      # --- Excessive Garbage Collection Pause Time ---
-      - alert: JvmGarbageCollectionSlow
-        expr: sum(rate(jvm_gc_pause_seconds_sum[1m])) by (pod, action) > 0.3
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High GC overhead on {{ $labels.pod }}"
-          description: "GC pauses are consuming more than 300ms/second (30% of application runtime) over the last minute."
-
-      # --- Thread Deadlock / Thread Saturation ---
-      - alert: JvmThreadCountHigh
-        expr: jvm_threads_live_threads{service_name="spring-boot-app"} > 250
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High JVM active thread count on {{ $labels.pod }}"
-          description: "Live threads ({{ $value }}) exceeded threshold; check for thread leaks or connection pool starvation."
-```
+| Alert Name | Expression / Condition | Severity | Tier | Description / Action |
+| :--- | :--- | :--- | :--- | :--- |
+| `InstanceAbsent` | `absent(up{service_name="spring-boot-app"})` | `critical` | Application | Dead-man switch: no metrics received for service. |
+| `InstanceDown` | `up{service_name="spring-boot-app"} == 0` | `critical` | Application | Scrape target failing or endpoint returning errors. |
+| `ServiceDown` | `absent(up{...}) or up{...} == 0` | `critical` | Application | Root-cause alert used to inhibit downstream symptom alerts. |
+| `HighHttpErrorRate` | HTTP 5xx rate > 5% over 5m | `critical` | Application | Server error surge affecting end users. |
+| `HighHttpLatencyP99` | P99 latency > 2000ms over 5m | `warning` | Application | Breach of user experience SLA. Links to Tempo Exemplars. |
+| `HttpTrafficSpike` | HTTP rate > 100 req/sec over 2m | `warning` | Application | Unexpected traffic surge or denial-of-service attempt. |
+| `HttpTrafficDrop` | Rate drops near 0 after active traffic | `warning` | Application | Silent failure, upstream proxy failure, or DNS stall. |
+| `PokemonApiHighErrorRate` | Pokemon controller error rate > 5% | `critical` | Business | Specific business API endpoint failure. |
+| `PokemonApiHighLatency` | Pokemon controller P99 latency > 2000ms | `warning` | Business | Specific business API degradation. |
+| `HighCpuUsage` | Container CPU rate > 80% quota over 2m | `warning` | Resource | CPU saturation leading to potential response throttling. |
 
 ---
 
-### 2. HTTP & API Service Level Objectives (SLOs)
+### 2. JVM Runtime & Database Connection Pool Alerts (`jvm_and_database_alerts`)
 
-Using Golden Signals / RED (Rate, Errors, Duration) metrics exported by Micrometer's `http.server.requests`:
-
-```yaml
-  - name: api_slo_alerts
-    rules:
-      # --- HTTP 5xx Server Error Rate Spike (> 5%) ---
-      - alert: Http5xxRateHigh
-        expr: |
-          (
-            sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
-            /
-            sum(rate(http_server_requests_seconds_count[5m]))
-          ) * 100 > 5
-        for: 3m
-        labels:
-          severity: critical
-        annotations:
-          summary: "High HTTP 5xx error rate on {{ $labels.service_name }}"
-          description: "Server error rate is {{ $value | printf \"%.1f\" }}% over the last 5 minutes."
-
-      # --- High P99 Request Latency (> 1000ms) ---
-      - alert: HttpLatencyP99High
-        expr: |
-          histogram_quantile(0.99,
-            sum(rate(http_server_requests_seconds_bucket[5m])) by (le, uri)
-          ) * 1000 > 1000
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "P99 latency > 1000ms for {{ $labels.uri }}"
-          description: "Endpoint {{ $labels.uri }} has P99 latency of {{ $value | printf \"%.0f\" }}ms."
-```
+| Alert Name | Expression / Condition | Severity | Tier | Description / Action |
+| :--- | :--- | :--- | :--- | :--- |
+| `JvmHeapUsageHigh` | Heap used / max > 85% for 3m | `critical` | Runtime | Impending OutOfMemoryError. Check memory leaks / heap dumps. |
+| `JvmMetaspaceUsageHigh` | Metaspace used / max > 90% for 5m | `critical` | Runtime | Metaspace exhaustion from classloader leaks. |
+| `JvmHighGcOverhead` | GC pause time rate > 0.15s/s (15%) | `warning` | Runtime | Excessive GC pauses consuming >15% of application runtime. |
+| `JvmThreadCountHigh` | Live thread count > 250 for 5m | `warning` | Runtime | Unbounded thread creation or thread pool leaks. |
+| `JvmThreadContention` | Blocked threads > 10 for 2m | `warning` | Runtime | Severe monitor contention or database transaction deadlocks. |
+| `HikariPoolStarvation` | Pending connections > 0 for 1m | `critical` | Database | Threads blocked waiting for database connections. |
+| `HikariConnectionTimeoutErrors`| `rate(connections_timeout_total) > 0` | `critical` | Database | Requests timed out waiting for connection acquire. |
+| `HikariConnectionAcquireLatencyHigh` | P99 acquire time > 250ms for 3m | `warning` | Database | Database pool saturation or database server latency. |
 
 ---
 
-### 3. Debezium CDC Engine Alerts
+### 3. Debezium CDC Streaming Alerts (`debezium_cdc_alerts`)
 
-Debezium embedded metrics are bridged to Micrometer via our `DebeziumMetricsBinder`:
-
-```yaml
-  - name: debezium_alerts
-    rules:
-      # --- Debezium Streaming Queue Congestion ---
-      - alert: DebeziumQueueSaturation
-        expr: (debezium_queue_remaining_capacity == 0)
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Debezium queue saturated on {{ $labels.pod }}"
-          description: "Debezium buffer queue has 0 remaining capacity; downstream consumer cannot keep pace with change log."
-
-      # --- Debezium Connection / Snapshot Errors ---
-      - alert: DebeziumConnectorStatusDown
-        expr: debezium_connected{status="false"} == 1
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Debezium CDC connector disconnected"
-          description: "Debezium connector is disconnected from MongoDB replica set."
-```
+| Alert Name | Expression / Condition | Severity | Tier | Description / Action |
+| :--- | :--- | :--- | :--- | :--- |
+| `DebeziumDisconnected` | `debezium_connected == 0` for 1m | `critical` | CDC | CDC engine disconnected from MongoDB replica set oplog. |
+| `DebeziumReplicationLagHigh` | Milliseconds behind source > 30000 | `warning` | CDC | Replication lag > 30s. Downstream data out of sync. |
+| `DebeziumQueueSaturated` | Remaining queue capacity < 10% | `critical` | CDC | Internal event buffer near exhaustion; risk of event drop. |
 
 ---
 
-### 4. Kubernetes Node & Container Infrastructure Alerts
+### 4. Kubernetes Infrastructure & Storage Alerts (`kubernetes_and_storage_alerts`)
 
-Exported by `prometheus-node-exporter` and `kube-state-metrics`:
-
-```yaml
-  - name: infrastructure_alerts
-    rules:
-      # --- Node Disk Space Filling Up (Will fill within 4 hours) ---
-      - alert: DiskWillFillIn4Hours
-        expr: (node_filesystem_free_bytes / node_filesystem_size_bytes < 0.15) and (predict_linear(node_filesystem_free_bytes[1h], 4 * 3600) < 0)
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Disk volume {{ $labels.mountpoint }} will fill in < 4h on {{ $labels.instance }}"
-          description: "Filesystem on {{ $labels.mountpoint }} is below 15% and predicted to run out of space within 4 hours."
-
-      # --- Pod CrashLooping ---
-      - alert: PodCrashLooping
-        expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 5 > 0
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Pod {{ $labels.pod }} is crashlooping"
-          description: "Pod {{ $labels.pod }} restarted {{ $value | printf \"%.0f\" }} times in the last 5 minutes."
-
-      # --- Container Memory Limit Throttling / OOMKilled ---
-      - alert: ContainerOOMKilled
-        expr: (kube_pod_container_status_terminated_reason{reason="OOMKilled"} > 0)
-        for: 0m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Container {{ $labels.container }} in pod {{ $labels.pod }} OOMKilled"
-          description: "Container was terminated by kernel out-of-memory killer."
-```
+| Alert Name | Expression / Condition | Severity | Tier | Description / Action |
+| :--- | :--- | :--- | :--- | :--- |
+| `PodCrashLooping` | Restarts > 0 over last 5m | `critical` | Infrastructure | Pod repeatedly crashing. |
+| `ContainerOomKilled` | Terminated reason is `OOMKilled` | `critical` | Infrastructure | Kernel OOM killer terminated container (cgroup memory breached). |
+| `KubernetesCpuThrottlingHigh` | CFS throttled periods > 25% | `warning` | Infrastructure | CFS quota throttling CPU cycles; app throughput restricted. |
+| `PvcStoragePredictiveExhaustion` | `predict_linear` predicts full in < 4h | `critical` | Storage | PVC disk growth indicates volume full within 4 hours. |
+| `HostDiskFillingFast` | Root filesystem free < 10% | `critical` | Host | Node disk space nearly exhausted. |
 
 ---
 
-### 5. Kafka / Redpanda Streaming Alerts
+### 5. RustFS S3 Object Storage Alerts (`rustfs_storage_alerts`)
 
-Metrics collected from Redpanda native endpoints (`:9644`) or Alloy's `prometheus.exporter.kafka`:
-
-```yaml
-  - name: kafka_redpanda_alerts
-    rules:
-      # --- Kafka Consumer Group Lag High ---
-      - alert: KafkaHighConsumerLag
-        expr: sum(kafka_consumergroup_lag) by (consumergroup, topic) > 1000
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Consumer lag high for group {{ $labels.consumergroup }}"
-          description: "Consumer group {{ $labels.consumergroup }} on topic {{ $labels.topic }} has lag of {{ $value }} messages."
-
-      # --- Redpanda Under-Replicated Partitions ---
-      - alert: RedpandaUnderReplicatedPartitions
-        expr: redpanda_kafka_under_replicated_replicas > 0
-        for: 3m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Redpanda under-replicated partitions detected"
-          description: "{{ $value }} partitions in Redpanda are under-replicated; replica fault in cluster."
-```
+| Alert Name | Expression / Condition | Severity | Tier | Description / Action |
+| :--- | :--- | :--- | :--- | :--- |
+| `RustFsStorageErrorRateHigh` | RustFS S3 5xx errors > 5% over 3m | `critical` | Storage | S3 storage backend failing to serve Loki/Tempo object requests. |
+| `RustFsDriveUnhealthy` | Disk status != healthy or nodes offline | `critical` | Storage | Hardware or node fault in RustFS distributed storage cluster. |
 
 ---
 
-### 6. LGTM Backend Storage Alerts (Loki & Tempo)
+## 🪵 Loki LogQL Anomaly Alerts (`loki-alerting-rules.yaml`)
 
-Already present in `deployment/dev/values-prometheus.yaml`:
-
-| Alert Name | Expression | Severity | Meaning |
+| Alert Name | LogQL Expression | Severity | Description |
 | :--- | :--- | :--- | :--- |
-| `LokiRequestErrors` | `loki_request_duration_seconds_count{status_code=~"5.."}` > 10% | critical | Loki 5xx push/query failures |
-| `LokiIngesterUnhealthy` | `loki_ring_members{state="Unhealthy", name="ingester"} > 0` | critical | Ingester pod failure in gossip ring |
-| `LokiCompactorUnhealthy` | `increase(loki_compactor_runs_failed_total[1h]) > 2` | critical | Retention/compaction table cleanup failed |
-| `TempoMetricsGeneratorUnhealthy` | `tempo_ring_members{state="Unhealthy", name="metrics-generator"} > 0` | critical | Metrics-from-traces processor down |
-| `TempoCompactionsFailing` | `increase(tempodb_compaction_errors_total[1h]) > 2` | critical | Trace block compaction errors |
+| `HighSeverityLogSpike` | `sum(rate({namespace="monitoring"} \|= "ERROR" [5m])) > 10` | `warning` | High volume of ERROR logs (> 10/s) across services. |
+| `JavaOutOfMemoryErrorLogged` | `count_over_time({service_name="spring-boot-app"} \|= "java.lang.OutOfMemoryError" [5m]) > 0` | `critical` | Instant alert upon `OutOfMemoryError` logged by JVM. |
+| `UnhandledExceptionSpike` | `sum(rate({service_name="spring-boot-app"} \|= "Exception" [5m])) > 5` | `warning` | Spike in unhandled exception stack traces. |
+| `LokiRequestErrors` | `loki_request_duration_seconds_count{status_code=~"5.."}` > 10% | `critical` | Loki backend 5xx push/query failures. |
+| `LokiIngesterUnhealthy` | `loki_ring_members{state="Unhealthy", name="ingester"} > 0` | `critical` | Ingester pod failure in gossip ring. |
+| `LokiCompactorUnhealthy`| `increase(loki_compactor_runs_failed_total[1h]) > 2` | `critical` | Table compaction / retention cleanup failure. |
+| `LokiPanics` | `increase(loki_panic_total[10m]) > 0` | `critical` | Fatal Go panic in Loki process. |
 
 ---
 
-## 🛠️ How to Add New Rules to the Stack
+## 🛡️ Alertmanager Hardening: Inhibition Rules
 
-### Option 1: Via GitOps ConfigMap (`Taskfile.yml`)
-1. Edit [`deployment/common/alerts/prometheus-alerting-rules.yaml`](../deployment/common/alerts/prometheus-alerting-rules.yaml).
-2. Sync the ConfigMap:
-   ```powershell
-   task configmap:prometheus-alert
-   ```
-3. Prometheus `configmap-reload` sidecar will automatically detect changes within 30–60 seconds.
+To avoid catastrophic **alert storms** when foundational components fail, Alertmanager is configured with cascading inhibition rules:
 
-### Option 2: Via Helm Values (`values-prometheus.yaml`)
-1. Add the group under `serverFiles.alerting_rules.yml.groups`.
-2. Upgrade Prometheus:
-   ```powershell
-   task prometheus
-   ```
+```yaml
+inhibit_rules:
+  # 1. When an entire service or instance is DOWN, suppress symptoms like latency, errors, and pool starvation
+  - source_matchers:
+      - alertname =~ "ServiceDown|InstanceDown|InstanceAbsent"
+    target_matchers:
+      - alertname =~ "HighHttpErrorRate|HighHttpLatencyP99|PokemonApiHighErrorRate|PokemonApiHighLatency|HikariPoolStarvation|HighCpuUsage"
+    equal: ['service_name', 'namespace']
+
+  # 2. When a container is OOMKilled, suppress the generic CrashLooping alert to pinpoint root cause immediately
+  - source_matchers:
+      - alertname = "ContainerOomKilled"
+    target_matchers:
+      - alertname = "PodCrashLooping"
+    equal: ['pod', 'namespace']
+```
+
+---
+
+## 📊 Unified "Service Health & Alerting" Grafana Dashboard
+
+- **UID:** `service-health-and-alerts`
+- **Location:** `deployment/common/dashboards/service-health-and-alerts.json`
+- **Sidecar Provisioning:** Synced automatically via `task configmap:grafana-dashboard`.
+- **Key Visual Rows:**
+  1. **Executive Health & Alert Summary:** Live UP/DOWN stat badge, Active Critical & Warning counters, 5xx Server Error % gauge.
+  2. **Active Alert Feed:** Built-in `alertlist` panel showing live firing/pending alerts with direct runbook links.
+  3. **RED Method Row:** Request throughput (req/s), HTTP 5xx error rate (threshold line at 5%), and P50/P90/P99 latency with **Tempo Exemplar diamonds** for 1-click trace drill-down.
+  4. **JVM & Database Runtime (USE Row):** Heap & Metaspace memory utilization vs. max, GC pause overhead (%), live thread counts, and HikariCP connection pool states.
+  5. **CDC & Real-Time Logs Row:** Debezium replication lag (ms), queue capacity, and live Loki error stream pre-filtered for the service.
+  6. **Namespace Filter:** Includes `$namespace` template variable for multi-tenant and multi-environment filtering.
+
+---
+
+## 🛠️ Verification & Operations Commands
+
+```powershell
+# 1. Validate Prometheus & Alertmanager configs
+task check:prometheus
+task check:alertmanager
+
+# 2. Push updated dashboards & alert rules
+task configmap:grafana-dashboard
+task configmap:prometheus-alert
+
+# 3. Port-forward Alertmanager & Grafana
+task pf:alertmanager   # http://localhost:9093
+task pf:grafana        # http://localhost:3000
+```

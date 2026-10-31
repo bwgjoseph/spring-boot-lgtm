@@ -1,72 +1,366 @@
 groups:
-  - name: sandbox_alerts
+  # ============================================================================
+  # 1. Spring Boot & Application RED Alerts (Rate, Errors, Duration)
+  # ============================================================================
+  - name: spring_boot_red_alerts
     rules:
-      # 1. Service Down Alert (Detects absence of metrics - used when replicas = 0)
+      # --- Dead-man Switch: Service completely absent ---
       - alert: InstanceAbsent
         expr: absent(up{service_name="spring-boot-app"})
         for: 1m
         labels:
           severity: critical
+          tier: application
         annotations:
           summary: "Instance spring-boot-app is ABSENT"
-          description: "Prometheus is not receiving any metrics for spring-boot-app. The deployment might be scaled to 0 or Alloy cannot reach it."
+          description: "Prometheus is receiving zero metrics for spring-boot-app. The deployment may be scaled to 0 or Alloy collector cannot reach it."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
 
-      # 2. Service Unhealthy Alert (Detects up == 0 - used when pod is running but scrape fails)
+      # --- Service Unhealthy / Scrape Failing ---
       - alert: InstanceDown
         expr: up{service_name="spring-boot-app"} == 0
         for: 1m
         labels:
           severity: critical
+          tier: application
         annotations:
           summary: "Instance {{ $labels.instance }} is DOWN"
-          description: "The pod {{ $labels.pod }} is running but the metrics endpoint is returning an error."
+          description: "The pod {{ $labels.pod }} is running but its metrics endpoint (/actuator/prometheus) returned an error."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
 
-      # 3. High CPU Usage (> 80%)
-      - alert: HighCpuUsage
-        expr: sum(rate(container_cpu_usage_seconds_total{service_name="spring-boot-app"}[5m])) by (pod, namespace) > 0.8
+      # --- Service Down (Root Cause Aggregator) ---
+      - alert: ServiceDown
+        expr: absent(up{service_name="spring-boot-app"}) or (up{service_name="spring-boot-app"} == 0)
+        for: 1m
+        labels:
+          severity: critical
+          tier: application
+        annotations:
+          summary: "Service spring-boot-app is DOWN or UNREACHABLE"
+          description: "No healthy instances of spring-boot-app are responding to Prometheus scrape."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- HTTP 5xx Server Error Rate Spike (> 5%) ---
+      - alert: HighHttpErrorRate
+        expr: >
+          (sum(rate(http_server_requests_seconds_count{service_name="spring-boot-app", status=~"5.."}[5m]))
+          / sum(rate(http_server_requests_seconds_count{service_name="spring-boot-app"}[5m]))) * 100 > 5
+        for: 3m
+        labels:
+          severity: critical
+          tier: application
+        annotations:
+          summary: "High HTTP 5xx error rate (> 5%) on {{ $labels.service_name }}"
+          description: "HTTP 5xx server error rate is {{ $value | printf \"%.2f\" }}% over the last 5 minutes."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- HTTP P99 Latency SLA Breach (> 2000ms) ---
+      - alert: HighHttpLatencyP99
+        expr: >
+          histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{service_name="spring-boot-app"}[5m])) by (le)) * 1000 > 2000
+        for: 5m
+        labels:
+          severity: warning
+          tier: application
+        annotations:
+          summary: "P99 HTTP latency exceeds 2000ms on {{ $labels.service_name }}"
+          description: "P99 latency is {{ $value | printf \"%.0f\" }}ms over the last 5 minutes. Check Exemplars in Tempo."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- HTTP Traffic Surge (> 100 req/s) ---
+      - alert: HttpTrafficSpike
+        expr: sum(rate(http_server_requests_seconds_count{service_name="spring-boot-app"}[5m])) > 100
         for: 2m
         labels:
           severity: warning
+          tier: application
         annotations:
-          summary: "High CPU usage on pod {{ $labels.pod }}"
-          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is using more than 80% CPU."
+          summary: "Abnormal HTTP traffic surge on {{ $labels.service_name }}"
+          description: "Incoming HTTP request rate surged to {{ $value | printf \"%.1f\" }} req/sec."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
 
-      # 4. Pokemon API High Error Rate
+      # --- HTTP Traffic Drop (Silent Crash / Stalled Traffic) ---
+      - alert: HttpTrafficDrop
+        expr: >
+          (sum(rate(http_server_requests_seconds_count{service_name="spring-boot-app"}[5m])) < 0.01)
+          and (sum(rate(http_server_requests_seconds_count{service_name="spring-boot-app"}[30m])) > 0.1)
+        for: 5m
+        labels:
+          severity: warning
+          tier: application
+        annotations:
+          summary: "Unexpected drop in HTTP traffic on {{ $labels.service_name }}"
+          description: "Traffic dropped to near zero despite previous active traffic. Check reverse proxy / ingress routing."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- Business API: Pokemon API High Error Rate (> 5%) ---
       - alert: PokemonApiHighErrorRate
         expr: sum(rate(pokemon_controller_seconds_count{outcome="SERVER_ERROR"}[5m])) / sum(rate(pokemon_controller_seconds_count[5m])) * 100 > 5
         for: 5m
         labels:
           severity: critical
+          tier: business
         annotations:
           summary: "High error rate on Pokemon API"
-          description: "Error rate is {{ $value }}% over the last 5 minutes."
+          description: "Server error rate is {{ $value | printf \"%.1f\" }}% on pokemon-controller over the last 5 minutes."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
 
-      # 5. Pokemon API High Latency
+      # --- Business API: Pokemon API P99 Latency (> 2000ms) ---
       - alert: PokemonApiHighLatency
         expr: histogram_quantile(0.99, sum(rate(pokemon_controller_seconds_bucket[5m])) by (le)) * 1000 > 2000
         for: 5m
         labels:
           severity: warning
+          tier: business
         annotations:
-          summary: "High latency on Pokemon API"
-          description: "P99 latency is {{ $value }}ms over the last 5 minutes."
+          summary: "High P99 latency on Pokemon API"
+          description: "P99 latency is {{ $value | printf \"%.0f\" }}ms on pokemon-controller over the last 5 minutes."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
 
-      # 6. JVM Heap Memory Exhaustion (> 85%)
+      # --- CPU Saturation (> 80% container quota) ---
+      - alert: HighCpuUsage
+        expr: sum(rate(container_cpu_usage_seconds_total{service_name="spring-boot-app"}[5m])) by (pod, namespace) > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          tier: resource
+        annotations:
+          summary: "High CPU usage on pod {{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is using more than 80% CPU."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+  # ============================================================================
+  # 2. JVM Runtime & Database Connection Pool Alerts (USE Method)
+  # ============================================================================
+  - name: jvm_and_database_alerts
+    rules:
+      # --- JVM Heap Exhaustion (> 85%) ---
       - alert: JvmHeapUsageHigh
         expr: (sum(jvm_memory_used_bytes{area="heap"}) by (pod, namespace) / sum(jvm_memory_max_bytes{area="heap"}) by (pod, namespace)) * 100 > 85
         for: 3m
         labels:
-          severity: warning
+          severity: critical
+          tier: runtime
         annotations:
           summary: "JVM Heap usage > 85% on {{ $labels.pod }}"
           description: "Pod {{ $labels.pod }} JVM heap usage is {{ $value | printf \"%.1f\" }}% of max allocated memory."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
 
-      # 7. Pod CrashLooping
+      # --- JVM Metaspace Exhaustion (> 90%) ---
+      - alert: JvmMetaspaceUsageHigh
+        expr: (sum(jvm_memory_used_bytes{id="Metaspace"}) by (pod, namespace) / sum(jvm_memory_max_bytes{id="Metaspace"}) by (pod, namespace)) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          tier: runtime
+        annotations:
+          summary: "JVM Metaspace > 90% on {{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} Metaspace is filling up rapidly; risk of OutOfMemoryError: Metaspace."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- Excessive Garbage Collection Overhead (> 15% CPU lost to GC) ---
+      - alert: JvmHighGcOverhead
+        expr: sum(rate(jvm_gc_pause_seconds_sum[2m])) by (pod, namespace) > 0.15
+        for: 3m
+        labels:
+          severity: warning
+          tier: runtime
+        annotations:
+          summary: "High GC overhead on {{ $labels.pod }}"
+          description: "GC pauses are consuming {{ $value | printf \"%.2f\" }}s/s CPU time (> 15% application runtime)."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- Live Thread Saturation ---
+      - alert: JvmThreadCountHigh
+        expr: jvm_threads_live_threads{service_name="spring-boot-app"} > 250
+        for: 5m
+        labels:
+          severity: warning
+          tier: runtime
+        annotations:
+          summary: "High JVM active thread count on {{ $labels.pod }}"
+          description: "Live threads ({{ $value }}) exceeded 250; check for unclosed thread pools or blocked threads."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- JVM Thread Contention (Blocked Threads) ---
+      - alert: JvmThreadContention
+        expr: jvm_threads_states_threads{state="blocked", service_name="spring-boot-app"} > 10
+        for: 2m
+        labels:
+          severity: warning
+          tier: runtime
+        annotations:
+          summary: "High JVM thread contention on {{ $labels.pod }}"
+          description: "More than 10 threads are in BLOCKED state waiting on synchronization locks."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- HikariCP Database Pool Starvation ---
+      - alert: HikariPoolStarvation
+        expr: hikaricp_connections_pending{service_name="spring-boot-app"} > 0
+        for: 1m
+        labels:
+          severity: critical
+          tier: database
+        annotations:
+          summary: "HikariCP connection pool exhausted on {{ $labels.pod }}"
+          description: "Threads are blocked waiting for available database connections. Check slow queries or connection leaks."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- HikariCP Connection Timeout Errors ---
+      - alert: HikariConnectionTimeoutErrors
+        expr: rate(hikaricp_connections_timeout_total{service_name="spring-boot-app"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          tier: database
+        annotations:
+          summary: "HikariCP connection acquire timeouts on {{ $labels.pod }}"
+          description: "Applications encountered connection acquire timeouts in database pool {{ $labels.pool }}."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- HikariCP Connection Acquire Latency High ---
+      - alert: HikariConnectionAcquireLatencyHigh
+        expr: histogram_quantile(0.99, sum(rate(hikaricp_connections_acquire_seconds_bucket[5m])) by (le)) * 1000 > 250
+        for: 3m
+        labels:
+          severity: warning
+          tier: database
+        annotations:
+          summary: "Slow database connection acquire on {{ $labels.pod }}"
+          description: "P99 connection acquire time is {{ $value | printf \"%.0f\" }}ms (> 250ms)."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+  # ============================================================================
+  # 3. Debezium CDC Streaming Alerts
+  # ============================================================================
+  - name: debezium_cdc_alerts
+    rules:
+      # --- Debezium Disconnected from MongoDB Oplog ---
+      - alert: DebeziumDisconnected
+        expr: debezium_connected{service_name="spring-boot-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          tier: cdc
+        annotations:
+          summary: "Debezium CDC disconnected from MongoDB"
+          description: "Debezium embedded engine is disconnected from the MongoDB replica set oplog."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- Debezium CDC Replication Lag High (> 30s) ---
+      - alert: DebeziumReplicationLagHigh
+        expr: debezium_milli_seconds_behind_source{service_name="spring-boot-app"} > 30000
+        for: 3m
+        labels:
+          severity: warning
+          tier: cdc
+        annotations:
+          summary: "Debezium CDC lag is > 30s behind MongoDB"
+          description: "Replication lag is {{ $value | printf \"%.0f\" }}ms behind the MongoDB source."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+      # --- Debezium Event Buffer Queue Saturation ---
+      - alert: DebeziumQueueSaturated
+        expr: (debezium_queue_remaining_capacity / debezium_queue_capacity) * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+          tier: cdc
+        annotations:
+          summary: "Debezium CDC buffer queue is near capacity"
+          description: "Debezium remaining queue capacity is only {{ $value | printf \"%.1f\" }}% (< 10%). Risk of event drop."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts?var-service=spring-boot-app"
+
+  # ============================================================================
+  # 4. Kubernetes Infrastructure & Storage Alerts
+  # ============================================================================
+  - name: kubernetes_and_storage_alerts
+    rules:
+      # --- Pod CrashLooping ---
       - alert: PodCrashLooping
         expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 5 > 0
         for: 5m
         labels:
           severity: critical
+          tier: infrastructure
         annotations:
           summary: "Pod {{ $labels.pod }} is crashlooping"
-          description: "Pod {{ $labels.pod }} restarted {{ $value | printf \"%.0f\" }} times in the last 5 minutes."
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} restarted {{ $value | printf \"%.0f\" }} times in the last 5 minutes."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts"
+
+      # --- Container OOMKilled ---
+      - alert: ContainerOomKilled
+        expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          tier: infrastructure
+        annotations:
+          summary: "Container {{ $labels.container }} in pod {{ $labels.pod }} was OOMKilled"
+          description: "Linux OOM killer terminated {{ $labels.container }} due to memory limit breach."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts"
+
+      # --- Container CPU Throttling High (> 25% periods throttled) ---
+      - alert: KubernetesCpuThrottlingHigh
+        expr: (rate(container_cpu_cfs_throttled_periods_total{container="spring-boot-app"}[5m]) / rate(container_cpu_cfs_periods_total{container="spring-boot-app"}[5m])) * 100 > 25
+        for: 5m
+        labels:
+          severity: warning
+          tier: infrastructure
+        annotations:
+          summary: "Container {{ $labels.container }} CPU throttled > 25%"
+          description: "Container {{ $labels.container }} on pod {{ $labels.pod }} is CPU throttled {{ $value | printf \"%.1f\" }}% of periods."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts"
+
+      # --- PersistentVolume Predictive Exhaustion (< 4 hours remaining) ---
+      - alert: PvcStoragePredictiveExhaustion
+        expr: predict_linear(kubelet_volume_stats_available_bytes[6h], 4 * 3600) < 0
+        for: 30m
+        labels:
+          severity: critical
+          tier: storage
+        annotations:
+          summary: "PVC {{ $labels.persistentvolumeclaim }} predicted full in < 4 hours"
+          description: "Based on 6-hour growth trend, volume {{ $labels.persistentvolumeclaim }} will run out of storage."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts"
+
+      # --- Host Disk Filling Fast (< 10% Free) ---
+      - alert: HostDiskFillingFast
+        expr: (node_filesystem_free_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          tier: host
+        annotations:
+          summary: "Host root filesystem has < 10% disk free on {{ $labels.instance }}"
+          description: "Available disk space is {{ $value | printf \"%.1f\" }}%."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts"
+
+  # ============================================================================
+  # 5. RustFS S3 Object Storage Alerts
+  # ============================================================================
+  - name: rustfs_storage_alerts
+    rules:
+      # --- RustFS S3 API High Error Rate (> 5%) ---
+      - alert: RustFsStorageErrorRateHigh
+        expr: (sum(rate(rustfs_requests_total{status=~"5.."}[5m])) / sum(rate(rustfs_requests_total[5m]))) * 100 > 5
+        for: 3m
+        labels:
+          severity: critical
+          tier: storage
+        annotations:
+          summary: "RustFS S3 error rate > 5%"
+          description: "RustFS S3 API is returning {{ $value | printf \"%.1f\" }}% 5xx server errors."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts"
+
+      # --- RustFS Storage Drive or Node Fault ---
+      - alert: RustFsDriveUnhealthy
+        expr: (rustfs_disk_status{status!="healthy"} > 0) or (rustfs_cluster_nodes_offline > 0)
+        for: 2m
+        labels:
+          severity: critical
+          tier: storage
+        annotations:
+          summary: "RustFS storage drive or node fault"
+          description: "One or more RustFS storage nodes or drives are offline or unhealthy."
+          runbook_url: "http://localhost:3000/d/service-health/service-health-and-alerts"

@@ -71,12 +71,20 @@ tasks:
     cmds:
       - kubectl create secret generic gitlab-ci-exporter-token -n {{.NAMESPACE}} --from-literal=token=$env:GITLAB_TOKEN --dry-run=client -o yaml | kubectl apply -f -
 
+  secret:alertmanager:
+    desc: Create Alertmanager webhook secret (injects ALERT_WEBHOOK_URL or default local receiver)
+    deps: [namespace]
+    cmds:
+      - pwsh -Command "$url = if ($env:ALERT_WEBHOOK_URL) { $env:ALERT_WEBHOOK_URL } else { 'http://alertmanager-webhook.monitoring.svc:8080/alerts' }; kubectl create secret generic alertmanager-secrets -n {{.NAMESPACE}} --from-literal=webhook-url=$url --dry-run=client -o yaml | kubectl apply -f -"
+
   secret:
-    desc: Deploy all secrets (MongoDB, Grafana, Minio)
+    desc: Deploy all secrets (MongoDB, Grafana, Minio/RustFS, Alertmanager)
     cmds:
       - task: secret:mongodb
       - task: secret:grafana
       - task: secret:minio
+      - task: secret:rustfs
+      - task: secret:alertmanager
 
   configmap:prometheus-alert:
     desc: Deploy Prometheus alerting rules ConfigMap

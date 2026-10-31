@@ -80,27 +80,41 @@ flowchart TD
    - **`repeat_interval: 4h`** — suppression window for repeated notifications of the same ongoing alert.
    - **`resolve_timeout: 5m`** — time before an alert transitions to resolved if no longer firing.
 
-5. **Notification Receiver:**
-   - **Current:** Default receiver is `null-receiver` (no outbound notifications) — this is the **sandbox baseline** while the Mattermost webhook URL is pending configuration.
-   - **Target:** Route critical alerts to a Mattermost channel via an incoming webhook (`send_resolved: true` to surface resolution events).
+5. **Notification Receiver & Webhook Dispatch:**
+   - **Implemented:** Dynamic webhook receiver (`webhook-notifications`) with `send_resolved: true` targeting internal or external incident webhooks (Mattermost/Slack/Discord) injected via Kubernetes secrets (`alertmanager-secrets`).
+   - Alerts with `severity: critical` and `severity: warning` route to `webhook-notifications` with fallback to `null-receiver` if disabled.
 
-6. **State Persistence:**
+6. **Inhibition Rules (Alert Storm Suppression):**
+   - **Root Cause Suppression:** When `ServiceDown`, `InstanceDown`, or `InstanceAbsent` fires, Alertmanager automatically inhibits cascading symptom alerts (`HighHttpErrorRate`, `HighHttpLatencyP99`, `PokemonApiHighErrorRate`, `PokemonApiHighLatency`, `HikariPoolStarvation`, `HighCpuUsage`) for that service.
+   - **Container Failure Suppression:** When `ContainerOomKilled` fires, it inhibits generic `PodCrashLooping` alerts for the same pod.
+
+7. **State Persistence:**
    - Production Alertmanager uses a **10Gi PersistentVolume** (`alertmanager.persistentVolume.enabled: true, size: 10Gi`) to durably store silence definitions and notification state across pod restarts.
-   - Dev uses no persistent volume (ephemeral state acceptable in the sandbox).
+   - Dev uses ephemeral in-memory storage suitable for local sandboxes.
 
 ---
 
-## Implemented Alert Rules (`deployment/common/alerts/prometheus-alerting-rules.yaml`)
+## Implemented Alert Rules Catalog
 
-| Alert Name | Expression | For | Severity | Purpose |
+| Alert Domain | Alert Name | Expression Summary | Severity | Purpose & Target |
 | :--- | :--- | :--- | :--- | :--- |
-| `InstanceAbsent` | `absent(up{service_name="spring-boot-app"})` | 1m | critical | Dead-man switch: fires when Prometheus receives no metrics at all (pod scaled to 0 or Alloy cannot reach it). |
-| `InstanceDown` | `up{service_name="spring-boot-app"} == 0` | 1m | critical | Fires when the pod is running but the metrics scrape endpoint returns an error. |
-| `HighCpuUsage` | `rate(container_cpu_usage_seconds_total[5m]) > 0.8` | 2m | warning | Detects pods consuming more than 80% of their allocated CPU. |
-| `PokemonApiHighErrorRate` | `rate(pokemon_controller_seconds_count{outcome="SERVER_ERROR"}[5m]) / total * 100 > 5` | 5m | critical | Business SLA: fires when server error rate on the Pokemon API exceeds 5%. |
-| `PokemonApiHighLatency` | `histogram_quantile(0.99, rate(pokemon_controller_seconds_bucket[5m])) * 1000 > 2000` | 5m | warning | Business SLA: fires when P99 latency of the Pokemon API exceeds 2000ms. |
-| `JvmHeapUsageHigh` | `sum(jvm_memory_used_bytes{area="heap"}) / max * 100 > 85` | 3m | warning | JVM Runtime: fires when JVM heap usage exceeds 85% of allocated maximum. |
-| `PodCrashLooping` | `rate(kube_pod_container_status_restarts_total[15m]) * 60 * 5 > 0` | 5m | critical | Container Infrastructure: fires when a pod repeatedly restarts in crash-loop. |
+| **App RED** | `InstanceAbsent` | `absent(up{service_name="spring-boot-app"})` | critical | Dead-man switch: pod absent or collector unreachable. |
+| **App RED** | `InstanceDown` | `up{service_name="spring-boot-app"} == 0` | critical | Scrape failure on running pod. |
+| **App RED** | `HighHttpErrorRate` | 5xx error rate > 5% over 5m | critical | General application HTTP SLA breach. |
+| **App RED** | `HighHttpLatencyP99` | P99 latency > 2000ms over 5m | warning | High latency SLA breach; links to Tempo Exemplars. |
+| **Business RED**| `PokemonApiHighErrorRate` | Controller 5xx rate > 5% | critical | Core domain business API failure. |
+| **Business RED**| `PokemonApiHighLatency` | Controller P99 latency > 2000ms | warning | Core domain business API degradation. |
+| **JVM USE** | `JvmHeapUsageHigh` | Heap usage > 85% | critical | Immediate risk of OutOfMemoryError. |
+| **JVM USE** | `JvmMetaspaceUsageHigh` | Metaspace > 90% | critical | Classloader leak or metaspace exhaustion. |
+| **JVM USE** | `JvmHighGcOverhead` | GC pauses > 15% CPU time | warning | Excessive garbage collection latency. |
+| **Database** | `HikariPoolStarvation` | Pending connections > 0 for 1m | critical | Database pool exhaustion and caller thread blocking. |
+| **Database** | `HikariConnectionAcquireLatencyHigh` | Acquire P99 > 250ms | warning | Slow database connection acquisition. |
+| **CDC Stream** | `DebeziumDisconnected` | `debezium_connected == 0` | critical | CDC stream severed from MongoDB oplog. |
+| **CDC Stream** | `DebeziumReplicationLagHigh` | Lag > 30000ms | warning | Change data capture falling behind source DB. |
+| **CDC Stream** | `DebeziumQueueSaturated` | Remaining buffer < 10% | critical | Imminent event drop in CDC memory queue. |
+| **K8s & Host** | `PodCrashLooping` | Restarts > 0 over 5m | critical | Repeated container crashing. |
+| **K8s & Host** | `ContainerOomKilled` | OOMKilled == 1 | critical | Linux cgroup memory limit termination. |
+| **Storage** | `PvcStoragePredictiveExhaustion` | Linear projection full in < 4h | critical | Automated predictive volume exhaustion warning. |
 
 ---
 
@@ -117,7 +131,8 @@ flowchart TD
 | `route.group_wait` | `30s` | Buffer time before initial notification. | dev, prod |
 | `route.group_interval` | `5m` | Minimum time between follow-up notifications. | dev, prod |
 | `route.repeat_interval` | `4h` | Suppression window for ongoing alert re-notification. | dev, prod |
-| `route.receiver` | `null-receiver` (current) | Sandbox placeholder; Mattermost is the target. | dev, prod |
+| `route.receiver` | `webhook-notifications` | Active webhook notification dispatcher. | dev, prod |
+| `inhibit_rules` | ServiceDown/InstanceDown/OOMKilled suppression | Prevents cascading alert storms. | dev, prod |
 
 ---
 
@@ -125,9 +140,11 @@ flowchart TD
 
 - **Positive:**
   - Kubernetes SD ensures Alertmanager is always discovered dynamically, surviving pod rescheduling without config changes.
-  - GitOps-managed alert rules (ConfigMap) allow rule changes without Prometheus pod restarts.
-  - Grouping by `[alertname, cluster, service, namespace]` prevents cascade-flood during infrastructure-wide outages.
+  - Comprehensive RED and USE alert catalog covers application, JVM, database, CDC, and host infrastructure.
+  - Inhibition rules eliminate noise by silencing symptom alerts when root cause failure occurs.
+  - All alerts link directly to the unified **Service Health & Alerting** dashboard in Grafana.
+  - Webhook dispatch with secret reference enables zero-plaintext GitOps incident notification.
 - **Negative:**
-  - Mattermost webhook is not yet configured — all alerts currently route to `null-receiver` (silent).
+  - Highly dynamic environments require tuning prediction windows on `PvcStoragePredictiveExhaustion` to avoid false positives during burst data loads.
 - **Risk:**
   - If the ConfigMap `prometheus-alert-rules` is deleted or malformed, Prometheus will load no alerting rules and fire no alerts until corrected.
