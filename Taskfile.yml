@@ -470,6 +470,26 @@ tasks:
     cmds:
       - pwsh -File ./verification/run-all.ps1
 
+  test:telemetrygen:
+    desc: Run synthetic OTLP traffic generation and automated backend verification (traces, logs, metrics)
+    cmds:
+      - pwsh -File ./verification/verify-telemetrygen.ps1 -Namespace {{.NAMESPACE}} -Type all
+
+  test:telemetrygen:traces:
+    desc: Generate synthetic traces via telemetrygen and verify Tempo API
+    cmds:
+      - pwsh -File ./verification/verify-telemetrygen.ps1 -Namespace {{.NAMESPACE}} -Type traces
+
+  test:telemetrygen:logs:
+    desc: Generate synthetic logs via telemetrygen and verify Loki API
+    cmds:
+      - pwsh -File ./verification/verify-telemetrygen.ps1 -Namespace {{.NAMESPACE}} -Type logs
+
+  test:telemetrygen:metrics:
+    desc: Generate synthetic metrics via telemetrygen and verify Prometheus API
+    cmds:
+      - pwsh -File ./verification/verify-telemetrygen.ps1 -Namespace {{.NAMESPACE}} -Type metrics
+
   # --- 🔌 PORT-FORWARDING (Modular) ---
   pf:grafana:
     desc: Port-forward Grafana (3000)

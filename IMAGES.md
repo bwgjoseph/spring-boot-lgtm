@@ -31,3 +31,4 @@ This document tracks all container images currently deployed in the `monitoring`
 | **MinIO** | `minio` | `quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z` |
 | **RustFS** | `rustfs` | `ghcr.io/rustfs/rustfs:1.0.3` |
 | **Pyroscope** | `pyroscope` | `docker.io/grafana/pyroscope:2.4.0` |
+| **Telemetrygen** | `telemetrygen` | `ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.165.0` |

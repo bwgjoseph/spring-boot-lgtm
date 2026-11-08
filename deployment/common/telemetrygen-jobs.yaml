@@ -1,0 +1,110 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: telemetrygen-traces
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: telemetrygen
+    app.kubernetes.io/component: trace-generator
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: telemetrygen
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: telemetrygen
+          image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.165.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - traces
+            - --otlp-endpoint=alloy.monitoring.svc.cluster.local:4317
+            - --otlp-insecure=true
+            - --traces=50
+            - --rate=10
+            - --service=telemetrygen
+            - --otlp-attributes=test.id="e2e-synthetic",env="dev"
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: telemetrygen-logs
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: telemetrygen
+    app.kubernetes.io/component: log-generator
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: telemetrygen
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: telemetrygen
+          image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.165.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - logs
+            - --otlp-endpoint=alloy.monitoring.svc.cluster.local:4317
+            - --otlp-insecure=true
+            - --logs=50
+            - --rate=10
+            - --service=telemetrygen
+            - --otlp-attributes=test.id="e2e-synthetic",env="dev"
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: telemetrygen-metrics
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: telemetrygen
+    app.kubernetes.io/component: metric-generator
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: telemetrygen
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: telemetrygen
+          image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.165.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - metrics
+            - --otlp-endpoint=alloy.monitoring.svc.cluster.local:4317
+            - --otlp-insecure=true
+            - --metrics=50
+            - --rate=10
+            - --service=telemetrygen
+            - --otlp-attributes=test.id="e2e-synthetic",env="dev"
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi

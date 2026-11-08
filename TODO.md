@@ -54,7 +54,7 @@
   - and/or also useful ootb solution - https://grafana.com/docs/tempo/latest/set-up-for-tracing/instrument-send/set-up-collector/grafana-alloy/automatic-logging/
     - automatic logging might not be useful for my case since our logging already set traceId to all logs by default
     - make sure that it supports async - https://github.com/ehayik/spring-boot-async-mdc
-- [ ] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/)
+- [x] Consider setting up [telemetrygen](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/test/set-up-test-app/) (Implemented telemetrygen Jobs and automated verification script `verification/verify-telemetrygen.ps1` with `task test:telemetrygen`; documented in `notes/TELEMETRYGEN.md`)
 - [x] Configure git-sync (Evaluated airgapped support; see [notes/GIT_SYNC_AIRGAPPED.md](./notes/GIT_SYNC_AIRGAPPED.md))
 - [x] Make all the dashboard support filter by namespace (See [notes/DASHBOARD_NAMESPACE_FILTER.md](./notes/DASHBOARD_NAMESPACE_FILTER.md))
 - [x] Figure out if possible to forward logs to syslog directly (See [notes/ALLOY_SYSLOG_FORWARDING.md](./notes/ALLOY_SYSLOG_FORWARDING.md))
