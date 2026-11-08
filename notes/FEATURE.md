@@ -63,11 +63,13 @@ The sandbox includes an advanced **Dynamic JMX-to-Micrometer Bridge** for Debezi
 *   **Jolokia Integration:** Provides raw JMX access via REST (`/actuator/jolokia`) for ad-hoc debugging of the "Ground Truth" MBeans.
 *   **Dedicated Dashboard:** Includes a pre-configured **Debezium Connector Monitoring** dashboard in Grafana for real-time CDC health tracking.
 
-### 🔔 Integrated Alerting (Alertmanager)
-The sandbox includes a pre-configured **Alertmanager** to handle system and application health alerts.
-*   **Local-first:** In sandbox mode, alerts are visible directly in the **Alertmanager Web UI** (port 9093).
-*   **Production-ready:** Configured with advanced **Grouping** (`alertname`, `cluster`, `service`, `namespace`) to prevent alert fatigue.
-*   **The Benefit:** Real-time notification of issues like high CPU, memory leaks, or service downtime.
+### 🔔 Integrated Alerting (Alertmanager) & Service Health
+The sandbox includes a pre-configured **Alertmanager** to handle system and application health alerts with automated cascade inhibition and unified dashboard correlation.
+*   **Local-first:** In sandbox mode, alerts are visible directly in the **Alertmanager Web UI** (port 9093) and in Grafana's unified **Service Health & Alerting Overview** dashboard (`UID: service-health-and-alerts`).
+*   **Production-ready Rules & Grouping:** Evaluates 28 curated PromQL rules across 5 domains (RED, JVM, HikariCP, Debezium CDC, K8s, RustFS) and LogQL anomaly rules, configured with advanced **Grouping** (`alertname`, `cluster`, `service`, `namespace`) and **Inhibition Rules** (`ServiceDown`/`InstanceDown` suppresses symptom cascades; `ContainerOomKilled` suppresses generic crashloops).
+*   **Incident Dispatch:** Dynamic `webhook-notifications` receiver with `send_resolved: true` configurable via Kubernetes secret (`alertmanager-secrets`).
+*   **External VM Monitoring:** Fully documented architecture for monitoring bare-metal/cloud VMs via Grafana Alloy host mode (`prometheus.exporter.unix`) with Bearer token authentication.
+*   **References:** See [COMMON_ALERTING_RULES.md](./COMMON_ALERTING_RULES.md) and [VM_MONITORING_GUIDE.md](./VM_MONITORING_GUIDE.md).
 
 ---
 

@@ -13,13 +13,13 @@ Alertmanager is the centralized notification dispatcher for the production clust
 ### 1. Alert Pipeline Diagram
 ```mermaid
 flowchart TD
-    subgraph RulesSource ["Alert Rules (ConfigMap)"]
-        CM["prometheus-alert-rules ConfigMap<br/><i>Mounted at /etc/config/rules/*.yaml</i>"]
+    subgraph RulesSource ["Alert Rules Delivery"]
+        SF["serverFiles.alerting_rules.yml (Helm Values)<br/>+ prometheus-alert-rules ConfigMap"]
     end
 
     subgraph PrometheusServer ["Prometheus Server"]
         PROM["Prometheus<br/><i>Evaluates rules every 1m</i>"]
-        CM -->|"extraVolumes + extraVolumeMounts"| PROM
+        SF -->|"Auto-reloaded by configmap-reload"| PROM
     end
 
     subgraph AlertManagerDiscovery ["Alertmanager Discovery (Kubernetes SD)"]
@@ -28,12 +28,14 @@ flowchart TD
 
     subgraph AlertManager ["Alertmanager (Port: 9093)"]
         ROUTE["Route Engine<br/><i>group_by: [alertname, cluster, service, namespace]<br/>group_wait: 30s | group_interval: 5m<br/>repeat_interval: 4h | resolve_timeout: 5m</i>"]
-        NULL_RCV["null-receiver<br/><i>(Current placeholder - no outbound notification)</i>"]
-        MATTER["Mattermost Webhook<br/><i>(Target configuration - pending webhook URL)</i>"]
-        PV[("PersistentVolume<br/><i>10Gi - Silences & Notification State</i>")]
+        INHIBIT["Inhibition Rules<br/><i>ServiceDown suppresses symptoms<br/>ContainerOomKilled suppresses crashloop</i>"]
+        WEBHOOK["webhook-notifications<br/><i>Dynamic webhook sink (Mattermost/Slack/Discord)<br/>send_resolved: true</i>"]
+        NULL_RCV["null-receiver<br/><i>Fallback receiver</i>"]
+        PV[("PersistentVolume<br/><i>10Gi - Silences & Notification State (Prod)</i>")]
 
-        ROUTE --> NULL_RCV
-        ROUTE -.->|"Planned"| MATTER
+        ROUTE --> INHIBIT
+        INHIBIT --> WEBHOOK
+        INHIBIT --> NULL_RCV
         ROUTE <--> PV
     end
 
@@ -43,11 +45,10 @@ flowchart TD
     classDef prom fill:#fff3e0,stroke:#e65100,stroke-width:2px;
     classDef am fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
     classDef sink fill:#e1f5fe,stroke:#0277bd,stroke-width:1px;
-    classDef pending stroke-dasharray:5 5;
 
     class PROM prom;
-    class ROUTE,NULL_RCV am;
-    class MATTER sink;
+    class ROUTE,INHIBIT,NULL_RCV am;
+    class WEBHOOK sink;
 ```
 
 ---
@@ -70,8 +71,10 @@ flowchart TD
        regex: "9093"
    ```
 
-3. **Alert Rules Delivery (ConfigMap Mount):**
-   Alerting rule files are stored in a shared Kubernetes ConfigMap (`prometheus-alert-rules`) and mounted into the Prometheus pod at `/etc/config/rules/*.yaml` via `extraVolumes` and `extraVolumeMounts`. This enables GitOps-style rule management without Prometheus server restarts.
+3. **Alert Rules Delivery (Chart-native `serverFiles` & ConfigMap Sync):**
+   Alerting rules are maintained in two harmonized layers:
+   - Primary: Chart-native `serverFiles.alerting_rules.yml` in Helm values files (`deployment/{env}/values-prometheus.yaml`), which are mounted into Prometheus and automatically reloaded by `configmap-reload`.
+   - GitOps ConfigMap: Shared file [`deployment/common/alerts/prometheus-alerting-rules.yaml`](../deployment/common/alerts/prometheus-alerting-rules.yaml) synced via `task configmap:prometheus-alert` creating the `prometheus-alert-rules` ConfigMap.
 
 4. **Grouping & Deduplication:**
    - **Group by:** `['alertname', 'cluster', 'service', 'namespace']` — ensures related alerts in the same scope are batched into a single notification.
@@ -100,21 +103,32 @@ flowchart TD
 | :--- | :--- | :--- | :--- | :--- |
 | **App RED** | `InstanceAbsent` | `absent(up{service_name="spring-boot-app"})` | critical | Dead-man switch: pod absent or collector unreachable. |
 | **App RED** | `InstanceDown` | `up{service_name="spring-boot-app"} == 0` | critical | Scrape failure on running pod. |
+| **App RED** | `ServiceDown` | `absent(up{...}) or up{...} == 0` | critical | Overall service outage; root trigger for inhibition cascade. |
 | **App RED** | `HighHttpErrorRate` | 5xx error rate > 5% over 5m | critical | General application HTTP SLA breach. |
 | **App RED** | `HighHttpLatencyP99` | P99 latency > 2000ms over 5m | warning | High latency SLA breach; links to Tempo Exemplars. |
+| **App RED** | `HttpTrafficSpike` | HTTP rate > 100 req/sec over 2m | warning | Abnormal traffic surge. |
+| **App RED** | `HttpTrafficDrop` | Rate drops near 0 after active traffic | warning | Silent failure, ingress stall, or upstream network drop. |
 | **Business RED**| `PokemonApiHighErrorRate` | Controller 5xx rate > 5% | critical | Core domain business API failure. |
 | **Business RED**| `PokemonApiHighLatency` | Controller P99 latency > 2000ms | warning | Core domain business API degradation. |
+| **Resource** | `HighCpuUsage` | Container CPU rate > 80% quota | warning | High CPU load on pod. |
 | **JVM USE** | `JvmHeapUsageHigh` | Heap usage > 85% | critical | Immediate risk of OutOfMemoryError. |
 | **JVM USE** | `JvmMetaspaceUsageHigh` | Metaspace > 90% | critical | Classloader leak or metaspace exhaustion. |
 | **JVM USE** | `JvmHighGcOverhead` | GC pauses > 15% CPU time | warning | Excessive garbage collection latency. |
+| **JVM USE** | `JvmThreadCountHigh` | Live threads > 250 | warning | Unbounded thread creation or leak. |
+| **JVM USE** | `JvmThreadContention` | Blocked threads > 10 for 2m | warning | Monitor lock contention / thread deadlocks. |
 | **Database** | `HikariPoolStarvation` | Pending connections > 0 for 1m | critical | Database pool exhaustion and caller thread blocking. |
+| **Database** | `HikariConnectionTimeoutErrors` | `rate(connections_timeout_total) > 0` | critical | Timeouts acquiring connection from pool. |
 | **Database** | `HikariConnectionAcquireLatencyHigh` | Acquire P99 > 250ms | warning | Slow database connection acquisition. |
 | **CDC Stream** | `DebeziumDisconnected` | `debezium_connected == 0` | critical | CDC stream severed from MongoDB oplog. |
 | **CDC Stream** | `DebeziumReplicationLagHigh` | Lag > 30000ms | warning | Change data capture falling behind source DB. |
 | **CDC Stream** | `DebeziumQueueSaturated` | Remaining buffer < 10% | critical | Imminent event drop in CDC memory queue. |
 | **K8s & Host** | `PodCrashLooping` | Restarts > 0 over 5m | critical | Repeated container crashing. |
 | **K8s & Host** | `ContainerOomKilled` | OOMKilled == 1 | critical | Linux cgroup memory limit termination. |
+| **K8s & Host** | `KubernetesCpuThrottlingHigh` | CFS throttled periods > 25% | warning | Severe CFS quota CPU throttling. |
 | **Storage** | `PvcStoragePredictiveExhaustion` | Linear projection full in < 4h | critical | Automated predictive volume exhaustion warning. |
+| **Host** | `HostDiskFillingFast` | Root filesystem free < 10% | critical | Node disk space nearly exhausted. |
+| **RustFS S3** | `RustFsStorageErrorRateHigh` | RustFS S3 5xx errors > 5% | critical | S3 storage backend query/push failures. |
+| **RustFS S3** | `RustFsDriveUnhealthy` | Drive unhealthy or nodes offline | critical | Hardware or node fault in RustFS distributed cluster. |
 
 ---
 
@@ -125,8 +139,8 @@ flowchart TD
 | `alertmanager.enabled` | `true` | Deploy Alertmanager alongside Prometheus. | dev, prod |
 | `alertmanager.persistentVolume` | `enabled: true, size: 10Gi` | Persist silence rules and notification state. | prod only |
 | `config.alerting.alertmanagers` | Kubernetes SD (namespace=monitoring, port=9093) | Dynamic Alertmanager pod discovery. | dev, prod |
-| `server.config.rule_files` | `/etc/config/rules/*.yaml` | Loads alert rules from mounted ConfigMap. | dev, prod |
-| `extraVolumes / extraVolumeMounts` | ConfigMap: `prometheus-alert-rules` | GitOps-managed alert rule delivery. | dev, prod |
+| `serverFiles.alerting_rules.yml` | Full 28-rule catalog + Loki + Tempo alerts | Primary rule delivery mechanism watched by configmap-reload. | dev, prod |
+| `ConfigMap: prometheus-alert-rules` | `deployment/common/alerts/` | GitOps-managed common alert rules. | dev, prod |
 | `route.group_by` | `['alertname', 'cluster', 'service', 'namespace']` | Deduplication and notification consolidation. | dev, prod |
 | `route.group_wait` | `30s` | Buffer time before initial notification. | dev, prod |
 | `route.group_interval` | `5m` | Minimum time between follow-up notifications. | dev, prod |

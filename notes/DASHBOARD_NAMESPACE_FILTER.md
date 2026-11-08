@@ -180,6 +180,7 @@ Tempo:      { resource.k8s.namespace.name = "$namespace" }
 
 | Dashboard File | Variable Needed | Query to Update |
 | :--- | :--- | :--- |
+| [`service-health-and-alerts.json`](../deployment/common/dashboards/service-health-and-alerts.json) | `$namespace`, `$service` | Integrated Overview dashboard with `$namespace` and `$service` template filters across RED, USE, and Logs panels. |
 | [`red-metrics-dashboard.json`](../deployment/common/dashboards/red-metrics-dashboard.json) | `$namespace` | `pokemon_controller_seconds_count`, `pokemon_controller_seconds_bucket` |
 | [`debezium-monitoring.json`](../deployment/common/dashboards/debezium-monitoring.json) | `$namespace` | All `debezium.*` metric selectors |
 | [`node-exporter.json`](../deployment/common/dashboards/node-exporter.json) | `$namespace`, `$node` | Node-level metrics |

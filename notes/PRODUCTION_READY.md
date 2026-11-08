@@ -30,17 +30,19 @@ Tempo is the trace repository.
 *   **High Availability (HA):** For 3+ replicas, an **external PostgreSQL database** is mandatory to persist user sessions and dashboard states; SQLite is strictly prohibited.
 *   **Dashboard Provisioning:** Sidecar pattern with `grafana_dashboard=1` labels is the mandatory deployment pattern.
 
-### Mimir
-*   **Ruler Evaluation:** Mimir's Ruler must use **Remote Evaluation** (query-frontend) to prevent OOMs during rule bursts.
+### Mimir / Prometheus & Alertmanager
+*   **Prometheus & Alertmanager:** High Availability pair with PersistentVolumes for TSDB (120Gi) and Alertmanager silence/notification state (10Gi).
+*   **Alert Routing & Inhibition:** Cascade inhibition rules (`ServiceDown` suppresses downstream symptom alerts; `ContainerOomKilled` suppresses crashloop alerts) and webhook dispatch with Kubernetes secret injection (`alertmanager-secrets`).
+*   **Ruler Evaluation:** When migrating to Mimir, Mimir's Ruler must use **Remote Evaluation** (query-frontend) to prevent OOMs during rule bursts.
 *   **Ingestion:** Remote Write protocol from Prometheus/Alloy instances.
 
 ---
 
 ## III. General Production Considerations
 
-### S3 Backend (MinIO / AWS S3)
-- **Isolation:** Each component (Loki, Tempo, Mimir) **must** have its own bucket or unique prefix to avoid rate-limiting.
-- **Security:** Static credentials via `existingSecret` are mandatory.
+### S3 Backend (RustFS / MinIO / AWS S3)
+- **Isolation:** Each component (Loki, Tempo, Mimir, Pyroscope) **must** have its own bucket or unique prefix to avoid rate-limiting.
+- **Security:** Static credentials via `existingSecret` are mandatory. RustFS 1.0.3 provides Apache 2.0 distributed Reed-Solomon EC:2 storage across production nodes.
 
 ### Persistence
 - **WAL Durability:** All components with WAL (Loki Ingester, Tempo Ingester) require SSD storage to handle the I/O demand of high-frequency flushes.
