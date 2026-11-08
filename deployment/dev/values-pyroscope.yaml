@@ -1,4 +1,5 @@
-# Pyroscope Dev Configuration (Single-binary mode using MinIO S3 backend)
+# Pyroscope Dev Configuration (Single-binary mode, filesystem storage)
+# No MinIO required — uses local ephemeral storage to keep resource footprint minimal.
 
 pyroscope:
   replicaCount: 1
@@ -14,17 +15,12 @@ pyroscope:
   persistence:
     enabled: false
 
-  # Wire to our existing central MinIO cluster
   config: |
     storage:
-      backend: s3
-      s3:
-        endpoint: "minio.monitoring.svc.cluster.local:9000"
-        bucket_name: "pyroscope"
-        access_key_id: "admin"
-        secret_access_key: "password123"
-        insecure: true
+      backend: filesystem
+      filesystem:
+        dir: /data
 
-# Disable the bundled sub-chart MinIO since we have a dedicated MinIO cluster
+# Disable the bundled sub-chart MinIO — not needed for filesystem mode
 minio:
   enabled: false

@@ -17,3 +17,7 @@ spec:
       port: 4318
       targetPort: 4318
       protocol: TCP
+    - name: pyroscope-http
+      port: 9999
+      targetPort: 9999
+      protocol: TCP

@@ -25,6 +25,10 @@ destinations:
     logs:
       enabled: false
 
+  pyroscope:
+    type: pyroscope
+    url: http://pyroscope.monitoring.svc.cluster.local:4040
+
 # Disable self-reporting
 selfReporting:
   enabled: false
@@ -105,6 +109,12 @@ podLogs:
       values = ["app", "traceId", "spanId", "userId"]
     }
 
+profilesReceiver:
+  enabled: true
+  port: 9999
+  destinations:
+    - pyroscope
+
 grafanaDashboards:
   enabled: true
   labelKey: grafana_dashboard
@@ -127,6 +137,10 @@ collectors:
         - name: "otlp-grpc"
           port: 4317
           targetPort: 4317
+          protocol: TCP
+        - name: "pyroscope-http"
+          port: 9999
+          targetPort: 9999
           protocol: TCP
       resources:
         requests:
