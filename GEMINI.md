@@ -15,14 +15,14 @@ The repository is structured as a **multi-module Maven project**:
   - **Micrometer Observation API:** For manual instrumentation and context propagation.
   - **Micrometer Prometheus Registry:** For metric scraping via `/actuator/prometheus`.
   - **Jolokia support-spring:** For raw JMX access via `/actuator/jolokia`.
-  - **Grafana Alloy (1.11.1):** Features `loki.process` metadata extraction and `otelcol.processor.tail_sampling`.
+  - **Grafana Alloy (1.15.0 / v1.21.3):** Features `loki.process` metadata extraction and `otelcol.processor.tail_sampling`.
 - **Storage:** 
-  - **Loki (18.9.0):** Log Storage (SimpleScalable mode with Index Gateway).
-  - **Tempo (3.0.6):** Trace Storage and Service Graph generation (tempo-distributed / Tempo 3.x microservices mode).
-  - **Redpanda (26.2.1):** High-performance Kafka-compatible streaming log for Tempo trace ingestion.
-  - **Prometheus (29.27.0):** Metrics scraper and Alerting engine.
+  - **Loki (18.9.1 / 3.7.6):** Log Storage (SimpleScalable mode with Index Gateway).
+  - **Tempo (3.27.0 / 3.1.1):** Trace Storage and Service Graph generation (tempo-distributed / Tempo 3.x microservices mode).
+  - **Redpanda (26.2.5 / v26.2.6):** High-performance Kafka-compatible streaming log for Tempo trace ingestion.
+  - **Prometheus (29.45.1 / v3.16.0):** Metrics scraper and Alerting engine.
   - **Mimir (6.0.6):** Metrics Long-term Storage (Monolithic HA mode).
-  - **Pyroscope (2.4.0):** Continuous profiling backend for CPU, memory, and lock contention flame graphs.
+  - **Pyroscope (2.4.3):** Continuous profiling backend for CPU, memory, and lock contention flame graphs.
   - **MinIO (5.4.0) / RustFS (1.0.3):** S3-compatible Object Storage for Loki, Tempo, Mimir, and Pyroscope (RustFS supersedes MinIO as primary open source S3 backend).
   - **MongoDB (18.6.31):** 3-node ReplicaSet instrumented for CDC via Debezium.
 - **Build & Deployment:** 

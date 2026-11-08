@@ -83,7 +83,7 @@
 - [x] Create ADR for Object Storage migration (Adopted Unified RustFS strategy across dev and prod; see [ADR: RustFS](./ADR/rustfs.md) superseding [ADR: MinIO](./ADR/minio.md))
 - [x] Implement RustFS Helm migration (`values-rustfs.yaml` for dev and prod, taskfile integration)
 - [x] Review lgtm improvement - https://trello.com/c/q8XZTkHS/239-lgtm-improvement (Completed full Alerting & Incident Response track: multi-domain RED/USE rules catalog, Alertmanager inhibition rules & webhook dispatch, VM monitoring guide, and Unified Service Health & Alerting Grafana dashboard)
-- [ ] When all is done, perform a final upgrade to the latest releases for every modules
+- [x] When all is done, perform a final upgrade to the latest releases for every modules (Completed progressive compatible release upgrade: Alloy 1.15.0 / v1.21.3, Tempo 3.27.0 / 3.1.1, Prometheus 29.45.1 / v3.16.0, Loki 18.9.1 / 3.7.6, Redpanda 26.2.5 / v26.2.6, Pyroscope 2.4.3; validated via Helm dry-run templates across dev, prod-local, and prod)
 
 ## 📋 Issues to Resolve & Technical Backlog
 

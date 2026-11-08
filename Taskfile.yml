@@ -6,19 +6,19 @@ vars:
   DEPLOY_DIR: 'deployment/{{.ENV}}'
   COMMON_DIR: 'deployment/common'
   # HELM CHART VERSIONS (Stable as of March 2026)
-  VER_ALLOY: "1.11.1"
+  VER_ALLOY: "1.15.0"
   VER_K8S_MONITORING: "4.4.0"
   VER_GRAFANA: "12.11.1"
-  VER_LOKI: "18.9.0"
-  VER_TEMPO: "3.0.6"
+  VER_LOKI: "18.9.1"
+  VER_TEMPO: "3.27.0"
   VER_MIMIR: "6.0.6"
-  VER_PROMETHEUS: "29.27.0"
+  VER_PROMETHEUS: "29.45.1"
   VER_MINIO: "5.4.0"
   VER_RUSTFS: "1.0.3"
   VER_MONGODB: "18.6.31"
-  VER_REDPANDA: "26.2.1"
+  VER_REDPANDA: "26.2.5"
   VER_GITLAB_CI_EXPORTER: "0.3.5"
-  VER_PYROSCOPE: "2.4.0"
+  VER_PYROSCOPE: "2.4.3"
 
 tasks:
   # --- 📦 SETUP & FOUNDATION ---
