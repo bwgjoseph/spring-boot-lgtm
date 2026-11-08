@@ -470,6 +470,11 @@ tasks:
     cmds:
       - pwsh -File ./verification/run-all.ps1
 
+  test:isolated:
+    desc: Run resource-constrained (<4GB RAM) isolated lanes observability verification with HTML report
+    cmds:
+      - pwsh -File ./verification/run-isolated-lanes.ps1 -Namespace {{.NAMESPACE}} -Env {{.ENV}}
+
   test:telemetrygen:
     desc: Run synthetic OTLP traffic generation and automated backend verification (traces, logs, metrics)
     cmds:
