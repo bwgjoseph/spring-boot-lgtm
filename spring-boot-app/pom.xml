@@ -165,6 +165,14 @@
 					<to>
 						<image>spring-boot-app:demo</image>
 					</to>
+					<extraDirectories>
+						<paths>
+							<path>
+								<from>${project.build.directory}/agents</from>
+								<into>/opt/pyroscope</into>
+							</path>
+						</paths>
+					</extraDirectories>
 				</configuration>
 			</plugin>
 		</plugins>
