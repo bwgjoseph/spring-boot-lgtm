@@ -44,9 +44,46 @@ Tempo is the trace repository.
 - **Isolation:** Each component (Loki, Tempo, Mimir, Pyroscope) **must** have its own bucket or unique prefix to avoid rate-limiting.
 - **Security:** Static credentials via `existingSecret` are mandatory. RustFS 1.0.3 provides Apache 2.0 distributed Reed-Solomon EC:2 storage across production nodes.
 
-### Persistence
-- **WAL Durability:** All components with WAL (Loki Ingester, Tempo Ingester) require SSD storage to handle the I/O demand of high-frequency flushes.
+### Persistence & StorageClasses
+- **Access Mode Policy (RWO vs RWX):** All stateful observability components (Alloy WAL, Prometheus TSDB, Redpanda, RustFS, Grafana) strictly use **RWO (ReadWriteOnce)** volumes bound to dedicated pods. **RWX (ReadWriteMany / NFS) is strictly prohibited** for TSDB and WAL paths due to file-locking and I/O latency bottlenecks. Shared data access across multiple query/read replicas is handled entirely by the S3 object storage layer (RustFS).
+- **High-Performance SSD/NVMe Classes:** Production clusters must map persistent volume claims to dedicated SSD/NVMe storage classes (`fast-nvme`, `gp3-io2`, `premium-rwo`) with minimum 3,000 IOPS / 125 MB/s baseline throughput:
+  - **Alloy WAL (100Gi):** Absorbs high-throughput trace and log bursts during downstream network partitioning.
+  - **Prometheus TSDB (120Gi):** Ensures sub-second query latency across 50,000+ active series over 30–90 days.
+  - **Redpanda Stream Buffer (170Gi x 3):** Sustains real-time trace streaming at zero drop rate.
+  - **RustFS Cluster Drives (125Gi x 8):** Drives 1TB raw erasure-coded (EC:2) distributed object storage.
 
-### Ingress & Security
-- **TLS Termination:** Always performed at the Ingress controller level.
-- **Network Policies:** Strict egress/ingress isolation between observability pods and external services.
+### Ingress & External Telemetry Ingestion (gRPC & HTTP)
+External microservices and bare-metal VMs outside the Kubernetes cluster push OTLP telemetry directly to Grafana Alloy via Kubernetes Ingress.
+- **OTLP gRPC (Port 4317):** Requires HTTP/2 end-to-end support with backend protocol set to GRPC.
+  - **Ingress-Nginx Annotation:** `nginx.ingress.kubernetes.io/backend-protocol: "GRPC"`
+  - **Traefik IngressRoute:** Use `h2c` scheme to forward cleartext HTTP/2 to Alloy after ingress TLS termination.
+- **OTLP HTTP (Port 4318):** Standard HTTPS ingress with client payload limits tuned (`client_max_body_size: 50m`).
+- **Security & Mutual Auth:** Ingress controllers should enforce TLS 1.3 termination, IP whitelisting, and optional Bearer token or mTLS validation before passing payloads to Alloy.
+
+### Network Policies & DNS
+- **DNS Reliability:** Alloy, Loki, and Tempo rely heavily on headless Kubernetes service DNS (`cluster.local`) for HashRing and Gossip memberlist coordination. CoreDNS caching must be tuned to prevent lookup timeouts under high connection churn.
+- **Network Policies:** Strict egress/ingress isolation between observability pods and external services. Only Alloy OTLP and Grafana Web UI should be exposed externally.
+
+---
+
+## IV. Operational Hardening & Lessons Learned
+
+### 1. Local vs Production Resource Constraints
+- Local sandboxes (dev, prod-local) must constrain requests/limits (10m CPU / 64Mi RAM) to prevent Docker Desktop scheduling deadlocks.
+- Production (prod) uses dedicated 3-node worker topologies with explicit reservations (e.g. 100Gi Alloy WAL, 120Gi TSDB).
+
+### 2. High Availability & Anti-Affinity Rules
+- Production enables strict `podAntiAffinity` across Kubernetes zones (`topology.kubernetes.io/zone`).
+- Dev and single-node validation environments must set `podAntiAffinity` to `soft` (preferred) or `disabled` to allow multi-replica components to co-exist on a single node.
+
+### 3. Cluster Service Discovery (Memberlist / Gossip Ring)
+- Loki and Tempo microservices must always discover ring peers via headless cluster service DNS (`loki-memberlist.monitoring.svc.cluster.local`, `tempo-memberlist.monitoring.svc.cluster.local`) rather than hardcoded pod IPs or stateful pod hostnames.
+
+### 4. Configuration Schema Consistency
+- Use explicit `config: |` blocks in Helm values files to bypass chart-template version-mismatch issues for Tempo/Loki configuration sections.
+
+### 5. S3 Storage Credentials Inheritance
+- In distributed Helm deployments, components (Ingester, Querier, Index Gateway, Compactor) run as independent deployments/StatefulSets. S3 credentials must be explicitly configured via `extraEnv` or `existingSecret` on every stateful sub-component because they do not inherit from the global Helm scope.
+
+### 6. Workload Capacity & Volume Estimates
+- Detailed daily log/trace/series metrics and capacity planning for small-scale compliance workloads are documented in `deployment/prod/production_workload_small_scale_sizing.md` (25 GB/day logs, 500 spans/sec, 50,000 active series, 1.9TB total storage footprint).

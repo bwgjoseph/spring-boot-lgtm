@@ -94,19 +94,19 @@
   - [ ] Configure existing Prometheus Helm release to act as a pass-through by enabling `remoteWrite` to the Mimir endpoint.
   - [ ] Update Grafana to transition from `Prometheus` datasource to `Mimir` datasource upon completion of the Mimir swap.
   - [ ] Migrate alerting rules from Prometheus `serverFiles` to Mimir's `ruler` configuration.
-- [ ] **Storage - RWX Support:** Check for NFS/shared StorageClass support.
-- [ ] **Storage - Alloy SSD PVCs:** Confirm availability of local SSD PVCs for Alloy WAL.
-- [ ] **Storage - Class Performance:** Identify high-performance SSD/NVMe storage classes.
-- [ ] **Infrastructure - S3 Backend:** Finalize managed cloud S3 vs self-hosted MinIO choice.
-- [ ] **Infrastructure - Mattermost Webhook:** Secure webhook URL for Alertmanager.
-- [ ] **Network - Ingress:** Verify Nginx/Traefik gRPC support for OTLP.
-- [ ] **Network - Internal DNS:** Confirm stability of cluster DNS resolution.
-- [ ] **Workload - Volume Estimates:** Gather daily log/trace/series metrics for capacity planning.
-- [ ] **Lessons Learned - Resource Constraints:** Standardize local sandbox resource requests/limits (10m CPU / 64Mi RAM) in all charts to prevent scheduling deadlocks.
-- [ ] **Lessons Learned - Configuration Schema:** Use explicit `config: |` blocks in Helm values to bypass chart-template version-mismatch issues for Tempo/Loki.
-- [ ] **Lessons Learned - Anti-Affinity:** Ensure `podAntiAffinity` is set to `soft` or `disabled` for gateway/ingress components in single-node environments.
-- [ ] **Lessons Learned - Memberlist DNS:** Always use cluster service DNS (`loki-memberlist`) instead of hardcoded pod names for Gossip/HashRing coordination.
-- [ ] **Lessons Learned - S3 Credentials:** Explicitly configure `extraEnv` for every component (Ingester/Querier/Index Gateway) as they do not inherit from the global scope.
+- [x] **Storage - RWX Support:** Check for NFS/shared StorageClass support. (Resolved: RWX is prohibited for TSDB/WAL; all stateful pods use RWO SSD/NVMe, while shared access is delegated to RustFS S3 object storage; see notes/PRODUCTION_READY.md).
+- [x] **Storage - Alloy SSD PVCs:** Confirm availability of local SSD PVCs for Alloy WAL. (Resolved: 100Gi RWO SSD PVC configured in deployment/prod/values-alloy.yaml and documented in notes/PRODUCTION_READY.md).
+- [x] **Storage - Class Performance:** Identify high-performance SSD/NVMe storage classes. (Resolved: Standardized on RWO SSD/NVMe storage classes with >=3,000 IOPS baseline; see notes/PRODUCTION_READY.md).
+- [x] **Infrastructure - S3 Backend:** Finalize managed cloud S3 vs self-hosted MinIO choice. (Resolved: Migrated to RustFS 1.0.3 Apache 2.0 with 4-node distributed Reed-Solomon EC:2 across dev, prod-local, and prod; see ADR/rustfs.md).
+- [x] **Infrastructure - Mattermost Webhook:** Secure webhook URL for Alertmanager. (Resolved: Configured Alertmanager webhook-notifications receiver reading from alertmanager-secrets via task secret:alertmanager; see ADR/alertmanager.md).
+- [x] **Network - Ingress:** Verify Nginx/Traefik gRPC support for OTLP. (Resolved: Documented end-to-end HTTP/2 gRPC backend protocol annotations and buffer tuning in notes/PRODUCTION_READY.md).
+- [x] **Network - Internal DNS:** Confirm stability of cluster DNS resolution. (Resolved: Documented CoreDNS headless service DNS guidance for Loki/Tempo memberlist; always use cluster service DNS; see notes/PRODUCTION_READY.md).
+- [x] **Workload - Volume Estimates:** Gather daily log/trace/series metrics for capacity planning. (Resolved: Fully calculated in deployment/prod/production_workload_small_scale_sizing.md — 25GB/day logs, 500 spans/sec, 50K active series, 1.9TB storage).
+- [x] **Lessons Learned - Resource Constraints:** Standardize local sandbox resource requests/limits (10m CPU / 64Mi RAM) in all charts to prevent scheduling deadlocks. (Resolved: Documented in notes/PRODUCTION_READY.md Section IV.1).
+- [x] **Lessons Learned - Configuration Schema:** Use explicit `config: |` blocks in Helm values to bypass chart-template version-mismatch issues for Tempo/Loki. (Resolved: Documented in notes/PRODUCTION_READY.md Section IV.4).
+- [x] **Lessons Learned - Anti-Affinity:** Ensure `podAntiAffinity` is set to `soft` or `disabled` for gateway/ingress components in single-node environments. (Resolved: Documented in notes/PRODUCTION_READY.md Section IV.2).
+- [x] **Lessons Learned - Memberlist DNS:** Always use cluster service DNS (`loki-memberlist`) instead of hardcoded pod names for Gossip/HashRing coordination. (Resolved: Documented in notes/PRODUCTION_READY.md Section IV.3).
+- [x] **Lessons Learned - S3 Credentials:** Explicitly configure `extraEnv` for every component (Ingester/Querier/Index Gateway) as they do not inherit from the global scope. (Resolved: Documented in notes/PRODUCTION_READY.md Section IV.5).
 
 ## Journal
 
