@@ -5,6 +5,8 @@ This document tracks all container images currently deployed in the `monitoring`
 | Component | Container Name | Full Image String |
 | :--- | :--- | :--- |
 | **Spring Boot App** | `spring-boot-app` | `spring-boot-app:demo` |
+| **Grafana** | `grafana` | `docker.io/grafana/grafana:13.3.0-distroless` |
+| **Grafana Sidecar** | `k8s-sidecar` | `quay.io/kiwigrid/k8s-sidecar:2.14.3` |
 | **Grafana Alloy** | `alloy` | `docker.io/grafana/alloy:v1.21.3` |
 | **Alloy Config Reloader** | `config-reloader` | `quay.io/prometheus-operator/prometheus-config-reloader:v0.94.2` |
 | **Loki** | `loki` | `docker.io/grafana/loki:3.7.6` |
