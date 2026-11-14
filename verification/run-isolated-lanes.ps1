@@ -319,6 +319,10 @@ if ($helperPod) {
     $lane5Checks.Add((Assert-Check "Pyroscope HTTP Health & Query API" $isPyroReady "Service port 4040 responded healthy"))
 }
 
+# Teardown Lane 5
+Write-Host "Teardown Lane 5: Scaling down Pyroscope..." -ForegroundColor DarkGray
+helm uninstall pyroscope -n $Namespace --ignore-not-found 2>$null | Out-Null
+
 $lane5Status = if ($lane5Checks.Status -contains "FAIL") { "FAIL" } else { "PASS" }
 $lanesData.Add(@{
     Index = "5"

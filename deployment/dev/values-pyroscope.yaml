@@ -21,6 +21,9 @@ pyroscope:
       filesystem:
         dir: /data
 
-# Disable the bundled sub-chart MinIO — not needed for filesystem mode
+# Disable the bundled sub-chart MinIO & embedded Alloy — central Alloy handles collection
 minio:
+  enabled: false
+
+alloy:
   enabled: false

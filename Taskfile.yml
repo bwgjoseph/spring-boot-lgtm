@@ -148,7 +148,7 @@ tasks:
     desc: Deploy RustFS and verify it is healthy
     cmds:
       - task: rustfs
-      - kubectl rollout status statefulset/rustfs -n {{.NAMESPACE}} --timeout=180s
+      - pwsh -Command "if (kubectl get statefulset/rustfs -n {{.NAMESPACE}} 2>`$null) { kubectl rollout status statefulset/rustfs -n {{.NAMESPACE}} --timeout=180s } else { kubectl rollout status deployment/rustfs -n {{.NAMESPACE}} --timeout=180s }"
 
   init:mongodb:
     desc: Ensure MongoDB 'kx' database exists
