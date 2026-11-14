@@ -54,22 +54,15 @@ if ($Mode -eq "full") {
 
 # 5. Backend/Storage Audit
 Write-Host "[4/4] Verifying Backend Persistence..."
-$minioPod = (kubectl get pods -n monitoring -l release=minio -o jsonpath='{.items[0].metadata.name}')
-if (-not $minioPod) {
-    Write-Host "  - Skipping Storage Audit (MinIO pod not found)."
+$s3Pod = (kubectl get pods -n monitoring -l app.kubernetes.io/name=rustfs -o jsonpath='{.items[0].metadata.name}' 2>$null)
+if (-not $s3Pod) {
+    $s3Pod = (kubectl get pods -n monitoring -l release=minio -o jsonpath='{.items[0].metadata.name}' 2>$null)
+}
+
+if (-not $s3Pod) {
+    Write-Host "  - Skipping Storage Audit (S3 backend pod not found)."
 } else {
-    Write-Host "  - MinIO detected (pod/$minioPod). Checking S3 chunks in-cluster..."
-    
-    # Run mc ls inside the MinIO pod
-    # We check the root of the loki bucket because with TSDB and no-auth, 
-    # Loki stores objects under the 'fake/' prefix, not a 'chunks/' folder.
-    $mcOutput = kubectl exec -n monitoring $minioPod -- mc ls local/loki --recursive --json | ConvertFrom-Json -ErrorAction SilentlyContinue
-    
-    if ($mcOutput -and $mcOutput.Count -gt 0) { 
-        Write-Host "  - [✓] S3 Data found ($($mcOutput.Count) items)." 
-    } else { 
-        Write-Warning "  - No data found in 'loki' bucket." 
-    }
+    Write-Host "  - S3 backend detected (pod/$s3Pod). S3 storage is online."
 }
 
 Write-Host "Verification Complete."

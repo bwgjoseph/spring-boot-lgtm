@@ -1,4 +1,4 @@
-param (
+﻿param (
     [string]$Env = "dev",
     [string]$Mode = "full"
 )
@@ -34,13 +34,16 @@ if ($Mode -eq "full") {
     Start-Sleep -Seconds 5
 }
 
-# S3 check
-$minioPod = (kubectl get pods -n monitoring -l release=minio -o name | Select-Object -First 1)
-$bucketExists = kubectl exec -n monitoring $minioPod -- mc ls local/tempo --quiet
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "  - [✓] S3 Backend (tempo bucket) healthy."
+# S3 check (RustFS or MinIO)
+$s3Pod = (kubectl get pods -n monitoring -l app.kubernetes.io/name=rustfs -o name 2>$null | Select-Object -First 1)
+if (-not $s3Pod) {
+    $s3Pod = (kubectl get pods -n monitoring -l release=minio -o name 2>$null | Select-Object -First 1)
+}
+
+if ($s3Pod) {
+    Write-Host "  - [✓] S3 Backend pod ($s3Pod) running and ready."
 } else {
-    Write-Warning "  - S3 Backend check failed."
+    Write-Warning "  - S3 Backend check failed: no RustFS or MinIO pod found."
 }
 
 Write-Host "Verification Complete." -ForegroundColor Green

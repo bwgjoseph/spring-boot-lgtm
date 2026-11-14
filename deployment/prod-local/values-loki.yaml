@@ -66,7 +66,7 @@ loki:
     - name: S3_SECRET_KEY
       valueFrom:
         secretKeyRef:
-          name: minio
+          name: rustfs-secret
           key: rootPassword
 
   # Production Guardrails & Retention Policy

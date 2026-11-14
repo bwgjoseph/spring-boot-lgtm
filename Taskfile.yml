@@ -205,7 +205,7 @@ tasks:
 
   pyroscope:
     desc: Install or Upgrade Grafana Pyroscope
-    deps: [repos, namespace, secret:minio]
+    deps: [repos, namespace, secret:rustfs]
     cmds:
       - helm upgrade --install pyroscope grafana/pyroscope -n {{.NAMESPACE}} --version {{.VER_PYROSCOPE}} -f deployment/{{.ENV}}/values-pyroscope.yaml
 
@@ -591,7 +591,7 @@ tasks:
     cmds:
       - task: secret
       - task: configmap
-      - task: minio
+      - task: rustfs
       - task: mongodb
       - task: redpanda
       - task: prometheus
@@ -608,7 +608,7 @@ tasks:
       - task: app:deploy
 
   scale-down:
-    desc: Scale down heavy components to save resources (Keeps MinIO/MongoDB as support)
+    desc: Scale down heavy components to save resources (Keeps RustFS/MongoDB as support)
     ignore_error: true
     cmds:
       - kubectl scale deployment spring-boot-app -n {{.NAMESPACE}} --replicas=0
@@ -624,7 +624,7 @@ tasks:
     cmds:
       - kubectl scale deployment spring-boot-app -n {{.NAMESPACE}} --replicas=1
       - kubectl scale deployment grafana -n {{.NAMESPACE}} --replicas=1
-      - kubectl scale deployment minio -n {{.NAMESPACE}} --replicas=1
+      - pwsh -Command "if (kubectl get statefulset/rustfs -n {{.NAMESPACE}} 2>`$null) { kubectl scale statefulset rustfs -n {{.NAMESPACE}} --replicas=1 } elseif (kubectl get deployment/rustfs -n {{.NAMESPACE}} 2>`$null) { kubectl scale deployment rustfs -n {{.NAMESPACE}} --replicas=1 }"
       - kubectl scale deployment prometheus-kube-state-metrics -n {{.NAMESPACE}} --replicas=1
       - kubectl scale statefulset prometheus-alertmanager -n {{.NAMESPACE}} --replicas=1
       - kubectl scale deployment prometheus-server -n {{.NAMESPACE}} --replicas=1
