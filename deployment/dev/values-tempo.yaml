@@ -64,13 +64,13 @@ traces:
     http:
       enabled: false
 
-# 5. Storage configuration for MinIO S3 backend
+# 5. Storage configuration for RustFS S3 backend
 storage:
   trace:
     backend: s3
     blocklist_poll: 1m
     s3:
-      endpoint: minio.monitoring.svc.cluster.local:9000
+      endpoint: rustfs.monitoring.svc.cluster.local:9000
       bucket: tempo
       access_key: admin
       secret_key: ${S3_SECRET_KEY}
@@ -82,7 +82,8 @@ globalExtraEnv:
   - name: S3_SECRET_KEY
     valueFrom:
       secretKeyRef:
-        name: minio
+        name: rustfs-secret
+        key: rootPassword
         key: rootPassword
 
 # 6. Minimal resource limits & 1 replica per component

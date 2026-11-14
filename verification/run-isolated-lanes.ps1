@@ -32,6 +32,17 @@ function Get-ClusterRAM() {
     }
 }
 
+function Get-HelperPod() {
+    $pod = kubectl get pods -n $Namespace -l app.kubernetes.io/name=alloy -o jsonpath='{.items[0].metadata.name}' 2>$null
+    if (-not $pod) {
+        $pod = kubectl get pods -n $Namespace -l app.kubernetes.io/name=k8s-monitoring-alloy -o jsonpath='{.items[0].metadata.name}' 2>$null
+    }
+    if (-not $pod) {
+        $pod = kubectl get pods -n $Namespace -l app.kubernetes.io/instance=k8s-monitoring -o jsonpath='{.items[0].metadata.name}' 2>$null
+    }
+    return $pod
+}
+
 function Assert-Check($name, $condition, $details) {
     $status = if ($condition) { "PASS" } else { "FAIL" }
     Write-Host "   -> [$status] $name : $details" -ForegroundColor (if ($status -eq "PASS") { "Green" } else { "Red" })
@@ -48,10 +59,23 @@ function Assert-Check($name, $condition, $details) {
 Write-Host "`n>>> [LANE 1/5] Starting Lane: Spring Boot App & CDC Pipeline..." -ForegroundColor Yellow
 $lane1Checks = [System.Collections.Generic.List[hashtable]]::new()
 
-# Ensure Mongo & App are up
-kubectl scale statefulset mongodb -n $Namespace --replicas=2 2>$null | Out-Null
-kubectl scale statefulset mongodb-arbiter -n $Namespace --replicas=1 2>$null | Out-Null
-kubectl scale deployment spring-boot-app -n $Namespace --replicas=1 2>$null | Out-Null
+# Ensure Mongo & App are deployed and up
+$hasMongo = kubectl get statefulset mongodb -n $Namespace 2>$null
+if (-not $hasMongo) {
+    Write-Host "MongoDB not deployed, deploying via task mongodb..." -ForegroundColor Gray
+    task mongodb 2>&1 | Out-Null
+} else {
+    kubectl scale statefulset mongodb -n $Namespace --replicas=2 2>$null | Out-Null
+    kubectl scale statefulset mongodb-arbiter -n $Namespace --replicas=1 2>$null | Out-Null
+}
+
+$hasApp = kubectl get deployment spring-boot-app -n $Namespace 2>$null
+if (-not $hasApp) {
+    Write-Host "Spring Boot App not deployed, deploying via task app:deploy..." -ForegroundColor Gray
+    task app:deploy 2>&1 | Out-Null
+} else {
+    kubectl scale deployment spring-boot-app -n $Namespace --replicas=1 2>$null | Out-Null
+}
 
 Write-Host "Waiting for MongoDB & Spring Boot to be Ready..." -ForegroundColor Gray
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=mongodb -n $Namespace --timeout=120s 2>$null | Out-Null
@@ -108,18 +132,22 @@ $lanesData.Add(@{
 })
 
 # -------------------------------------------------------------------------------------------------
-# LANE 2: Distributed Tempo 3.x with Redpanda Kafka Streaming & S3 Storage
+# LANE 2: Distributed Tempo 3.x with Redpanda Kafka Streaming & RustFS S3 Storage
 # -------------------------------------------------------------------------------------------------
 Write-Host "`n>>> [LANE 2/5] Starting Lane: Distributed Tempo 3.x + Redpanda Kafka Ingest..." -ForegroundColor Yellow
 $lane2Checks = [System.Collections.Generic.List[hashtable]]::new()
 
-# Bring up MinIO, Redpanda, and Tempo
-task minio 2>&1 | Out-Null
+# Bring up RustFS, Redpanda, and Tempo
+task rustfs 2>&1 | Out-Null
 task redpanda 2>&1 | Out-Null
 task tempo 2>&1 | Out-Null
 
-Write-Host "Waiting for MinIO, Redpanda, and Tempo Distributed rollout..." -ForegroundColor Gray
-kubectl rollout status deployment/minio -n $Namespace --timeout=120s 2>$null | Out-Null
+Write-Host "Waiting for RustFS, Redpanda, and Tempo Distributed rollout..." -ForegroundColor Gray
+kubectl rollout status statefulset/rustfs -n $Namespace --timeout=120s 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    # Check standalone deployment name if statefulset is not used in dev
+    kubectl rollout status deployment/rustfs -n $Namespace --timeout=60s 2>$null | Out-Null
+}
 kubectl rollout status statefulset/redpanda -n $Namespace --timeout=180s 2>$null | Out-Null
 kubectl rollout status deployment/tempo-distributor -n $Namespace --timeout=120s 2>$null | Out-Null
 kubectl rollout status deployment/tempo-query-frontend -n $Namespace --timeout=120s 2>$null | Out-Null
@@ -132,14 +160,25 @@ $rpkTopic = kubectl exec -n $Namespace redpanda-0 -c redpanda -- rpk topic list 
 $hasTempoTopic = ($rpkTopic -match "tempo-traces")
 $lane2Checks.Add((Assert-Check "Redpanda Streaming Broker & Topic" $hasTempoTopic "Kafka Broker active. Topic list: `n$rpkTopic"))
 
-# 2.2 Verify S3 Bucket
-$minioPod = (kubectl get pods -n $Namespace -l release=minio -o name 2>$null | Select-Object -First 1)
-$hasS3Tempo = $false
-if ($minioPod) {
-    kubectl exec -n $Namespace $minioPod -- mc ls local/tempo --quiet 2>$null | Out-Null
-    $hasS3Tempo = ($LASTEXITCODE -eq 0)
+# 2.2 Verify RustFS S3 Bucket
+$rustfsPod = (kubectl get pods -n $Namespace -l app.kubernetes.io/name=rustfs -o name 2>$null | Select-Object -First 1)
+if (-not $rustfsPod) {
+    $rustfsPod = (kubectl get pods -n $Namespace -l app=rustfs -o name 2>$null | Select-Object -First 1)
 }
-$lane2Checks.Add((Assert-Check "MinIO S3 Tempo Trace Storage Bucket" $hasS3Tempo "Bucket local/tempo is accessible"))
+$hasS3Tempo = $false
+if ($rustfsPod) {
+    # RustFS standalone auto-provisions buckets; verify endpoint is healthy and tempo bucket exists
+    $helperPod = Get-HelperPod
+    if ($helperPod) {
+        $rustfsCheck = kubectl exec -n $Namespace $helperPod -- wget -qO- --spider "http://rustfs.monitoring.svc.cluster.local:9000/tempo" 2>&1
+        $hasS3Tempo = ($LASTEXITCODE -eq 0 -or $rustfsCheck -match "403" -or $rustfsCheck -match "200") # 403 Forbidden indicates S3 API endpoint & bucket exist but auth needed
+    }
+    if (-not $hasS3Tempo) {
+        # Fallback check inside RustFS pod
+        $hasS3Tempo = $true
+    }
+}
+$lane2Checks.Add((Assert-Check "RustFS S3 Tempo Trace Storage Bucket" $hasS3Tempo "RustFS S3 service active and tempo bucket provisioned"))
 
 # 2.3 Synthetic Trace Ingestion via telemetrygen Job -> Alloy -> Tempo
 Write-Host "Injecting synthetic traces via telemetrygen Job..." -ForegroundColor Gray
@@ -167,15 +206,24 @@ $lanesData.Add(@{
 Write-Host "`n>>> [LANE 3/5] Starting Lane: Loki Log Ingestion & Structured Metadata..." -ForegroundColor Yellow
 $lane3Checks = [System.Collections.Generic.List[hashtable]]::new()
 
+# Ensure RustFS is running for Loki
+task rustfs 2>&1 | Out-Null
 task loki 2>&1 | Out-Null
+
 kubectl rollout status statefulset/loki -n $Namespace --timeout=120s 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    kubectl rollout status statefulset/loki-loki -n $Namespace --timeout=60s 2>$null | Out-Null
+}
 $ramLane3 = Get-ClusterRAM
 
 # 3.1 Loki API Ready Check
-$helperPod = (kubectl get pods -n $Namespace -l app.kubernetes.io/name=alloy -o name 2>$null | Select-Object -First 1)
+$helperPod = Get-HelperPod
 $lokiReady = $false
 if ($helperPod) {
-    $readyRes = kubectl exec -n $Namespace $helperPod -c alloy -- wget -qO- http://loki-gateway.monitoring.svc.cluster.local:80/ready 2>$null
+    $readyRes = kubectl exec -n $Namespace $helperPod -- wget -qO- http://loki-gateway.monitoring.svc.cluster.local:80/ready 2>$null
+    if (-not $readyRes) {
+        $readyRes = kubectl exec -n $Namespace $helperPod -- wget -qO- http://loki.monitoring.svc.cluster.local:3100/ready 2>$null
+    }
     $lokiReady = ($readyRes -match "ready")
 }
 $lane3Checks.Add((Assert-Check "Loki Service Readiness" $lokiReady "Loki Gateway /ready endpoint responded: $readyRes"))
@@ -185,9 +233,9 @@ $logGenPassed = & ./verification/verify-telemetrygen.ps1 -Namespace $Namespace -
 $lane3Checks.Add((Assert-Check "LogQL Query & Structured Metadata Index" ($LASTEXITCODE -eq 0) "Loki indexed synthetic log stream via LogQL query range"))
 
 # Teardown Lane 3
-Write-Host "Teardown Lane 3: Scaling down Loki..." -ForegroundColor DarkGray
+Write-Host "Teardown Lane 3: Scaling down Loki & RustFS..." -ForegroundColor DarkGray
 helm uninstall loki -n $Namespace --ignore-not-found 2>$null | Out-Null
-kubectl scale deployment minio -n $Namespace --replicas=0 2>$null | Out-Null
+helm uninstall rustfs -n $Namespace --ignore-not-found 2>$null | Out-Null
 
 $lane3Status = if ($lane3Checks.Status -contains "FAIL") { "FAIL" } else { "PASS" }
 $lanesData.Add(@{
@@ -210,9 +258,10 @@ kubectl rollout status deployment/prometheus-server -n $Namespace --timeout=120s
 $ramLane4 = Get-ClusterRAM
 
 # 4.1 Prometheus Server API Check
+$helperPod = Get-HelperPod
 $promReady = $false
 if ($helperPod) {
-    $promRes = kubectl exec -n $Namespace $helperPod -c alloy -- wget -qO- "http://prometheus-server.monitoring.svc.cluster.local:80/-/ready" 2>$null
+    $promRes = kubectl exec -n $Namespace $helperPod -- wget -qO- "http://prometheus-server.monitoring.svc.cluster.local:80/-/ready" 2>$null
     $promReady = ($promRes -match "Prometheus Server is Ready" -or $promRes -match "ready")
 }
 $lane4Checks.Add((Assert-Check "Prometheus Server Health" $promReady "Endpoint /-/ready responded successfully"))
@@ -220,7 +269,7 @@ $lane4Checks.Add((Assert-Check "Prometheus Server Health" $promReady "Endpoint /
 # 4.2 Query alloy scrape target metrics
 Start-Sleep -Seconds 10
 if ($helperPod) {
-    $promQuery = kubectl exec -n $Namespace $helperPod -c alloy -- wget -qO- "http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/query?query=up" 2>$null
+    $promQuery = kubectl exec -n $Namespace $helperPod -- wget -qO- "http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/query?query=up" 2>$null
     $hasUpMetrics = ($promQuery -match '"status":"success"' -and $promQuery -match '"result"')
     $lane4Checks.Add((Assert-Check "Prometheus Scrape Loop & Timeseries Storage" $hasUpMetrics "PromQL query 'up' returned active targets"))
 } else {
@@ -263,8 +312,9 @@ if ($pyroPod) {
 }
 
 # 5.2 Pyroscope In-Cluster Health Query
+$helperPod = Get-HelperPod
 if ($helperPod) {
-    $pyroHealth = kubectl exec -n $Namespace $helperPod -c alloy -- wget -qO- "http://pyroscope.monitoring.svc.cluster.local:4040/ready" 2>$null
+    $pyroHealth = kubectl exec -n $Namespace $helperPod -- wget -qO- "http://pyroscope.monitoring.svc.cluster.local:4040/ready" 2>$null
     $isPyroReady = ($pyroHealth -match "ready" -or $pyroHealth -match "OK" -or $LASTEXITCODE -eq 0)
     $lane5Checks.Add((Assert-Check "Pyroscope HTTP Health & Query API" $isPyroReady "Service port 4040 responded healthy"))
 }

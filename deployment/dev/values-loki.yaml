@@ -46,7 +46,7 @@ loki:
   storage:
     type: s3
     s3:
-      endpoint: minio.monitoring.svc:9000
+      endpoint: rustfs.monitoring.svc.cluster.local:9000
       access_key_id: admin
       secret_access_key: password123
       s3ForcePathStyle: true

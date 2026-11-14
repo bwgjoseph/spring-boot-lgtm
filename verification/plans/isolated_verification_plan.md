@@ -19,17 +19,17 @@ To solve this, testing is partitioned into **5 serial lanes**. Each lane spins u
   |     - Test: Actuator Health, Debezium CDC stream, baggage, MDC logs
   |     - Teardown: SpringBootApp -> 0, MongoDB -> 0
   |
-  +---> [LANE 2: Distributed Tempo 3.x + Redpanda + S3] (~3.0 GB)
-  |     - Up: MinIO + Redpanda + Tempo Distributed (Kafka ingest)
+  +---> [LANE 2: Distributed Tempo 3.x + Redpanda + RustFS S3] (~2.5 GB)
+  |     - Up: RustFS + Redpanda + Tempo Distributed (Kafka ingest)
   |     - Test: OTLP gRPC 4317 -> Alloy -> Tempo Distributor -> Redpanda 
   |             -> BlockBuilder -> S3 & Querier HTTP Trace search
   |     - Teardown: Tempo -> 0, Redpanda -> 0
   |
-  +---> [LANE 3: Log Ingestion & Structured Metadata: Loki + S3] (~1.2 GB)
-  |     - Up: MinIO + Loki (Single-Binary with S3)
+  +---> [LANE 3: Log Ingestion & Structured Metadata: Loki + RustFS S3] (~1.0 GB)
+  |     - Up: RustFS + Loki (Single-Binary with S3)
   |     - Test: Pod log tailing -> regex parser -> Structured Metadata index
   |             (trace_id, span_id, user_id) verified via Loki LogQL API
-  |     - Teardown: Loki -> 0, MinIO -> 0
+  |     - Teardown: Loki -> 0, RustFS -> 0
   |
   +---> [LANE 4: Metrics & Prometheus Scrape / Histograms] (~900 MiB)
   |     - Up: Prometheus Server
@@ -66,11 +66,11 @@ To solve this, testing is partitioned into **5 serial lanes**. Each lane spins u
 
 ### Lane 2: Distributed Tempo 3.x & Redpanda Kafka Pipeline
 * **Purpose:** Proves that the production-grade distributed tracing architecture functions end-to-end, including high-throughput Kafka ingest buffering and S3 persistence.
-* **Active Pods:** `minio`, `redpanda-0`, `tempo-distributor`, `tempo-block-builder`, `tempo-live-store`, `tempo-query-frontend`, `tempo-querier`, `tempo-backend-worker`, `alloy`.
-* **Peak Estimated RAM:** ~3.0 GB.
+* **Active Pods:** `rustfs`, `redpanda-0`, `tempo-distributor`, `tempo-block-builder`, `tempo-live-store`, `tempo-query-frontend`, `tempo-querier`, `tempo-backend-worker`, `alloy`.
+* **Peak Estimated RAM:** ~2.5 GB.
 * **Deterministic Checks:**
   1. `rpk topic list` verifies the Kafka topic `tempo-traces` is active and healthy on the Redpanda broker.
-  2. MinIO S3 bucket `local/tempo` is initialized and reachable.
+  2. RustFS S3 service is active and `tempo` bucket is provisioned.
   3. OTLP gRPC telemetry batch injected on Alloy port `4317` traverses:
      `Alloy -> Tempo Distributor -> Redpanda Kafka Topic -> Tempo Block Builder -> S3 Storage`.
   4. Querying Tempo HTTP API `/api/search?tags=service.name=telemetrygen` confirms trace indexing.
@@ -80,13 +80,13 @@ To solve this, testing is partitioned into **5 serial lanes**. Each lane spins u
 
 ### Lane 3: Loki Log Ingestion & Structured Metadata Pipeline
 * **Purpose:** Validates log tailing from `/var/log/pods`, regex promotion of baggage/trace IDs into structured metadata, and S3 chunks storage.
-* **Active Pods:** `minio`, `loki-0` (or `loki-gateway`), `alloy`.
-* **Peak Estimated RAM:** ~1.2 GB.
+* **Active Pods:** `rustfs`, `loki-0` (or `loki-gateway`), `alloy`.
+* **Peak Estimated RAM:** ~1.0 GB.
 * **Deterministic Checks:**
   1. Loki `/ready` gateway endpoint responds with HTTP 200 / `ready`.
   2. Synthetic log injection via `telemetrygen` job.
   3. Querying Loki LogQL API (`/loki/api/v1/query_range`) verifies logs are indexed and queryable with structured metadata tags.
-* **Teardown:** Helm uninstalls `loki` and scales `minio` to 0 replicas.
+* **Teardown:** Helm uninstalls `loki` and `rustfs`.
 
 ---
 
