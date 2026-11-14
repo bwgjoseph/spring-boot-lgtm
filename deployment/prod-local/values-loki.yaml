@@ -110,7 +110,7 @@ loki:
   storage:
     type: s3
     s3:
-      endpoint: minio.monitoring.svc.cluster.local:9000
+      endpoint: rustfs.monitoring.svc.cluster.local:9000
       access_key_id: admin
       secret_access_key: ${S3_SECRET_KEY}
       s3ForcePathStyle: true
@@ -137,7 +137,7 @@ write:
     - name: S3_SECRET_KEY
       valueFrom:
         secretKeyRef:
-          name: minio
+          name: rustfs-secret
           key: rootPassword
   resources:
     requests:
@@ -153,7 +153,7 @@ read:
     - name: S3_SECRET_KEY
       valueFrom:
         secretKeyRef:
-          name: minio
+          name: rustfs-secret
           key: rootPassword
   resources:
     requests:
@@ -169,7 +169,7 @@ backend:
     - name: S3_SECRET_KEY
       valueFrom:
         secretKeyRef:
-          name: minio
+          name: rustfs-secret
           key: rootPassword
   resources:
     requests:

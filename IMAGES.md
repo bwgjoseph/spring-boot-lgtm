@@ -9,11 +9,11 @@ This document tracks all container images currently deployed in the `monitoring`
 | **Grafana Sidecar** | `k8s-sidecar` | `quay.io/kiwigrid/k8s-sidecar:2.14.3` |
 | **Grafana Alloy** | `alloy` | `docker.io/grafana/alloy:v1.21.3` |
 | **Alloy Config Reloader** | `config-reloader` | `quay.io/prometheus-operator/prometheus-config-reloader:v0.94.2` |
-| **Loki** | `loki` | `docker.io/grafana/loki:3.7.6` |
-| **Loki Canary** | `loki-canary` | `docker.io/grafana/loki-canary:3.7.6` |
+| **Loki** | `loki` | `docker.io/grafana/loki:3.7.9` |
+| **Loki Canary** | `loki-canary` | `docker.io/grafana/loki-canary:3.7.9` |
 | **Loki Gateway** | `nginx` | `docker.io/nginxinc/nginx-unprivileged:1.31-alpine` |
-| **Loki Cache** | `memcached` | `docker.io/library/memcached:1.6.29-alpine` |
-| **Loki Access Log** | `access-log-exporter` | `ghcr.io/jkroepke/access-log-exporter:0.4.11` |
+| **Loki Cache** | `memcached` | `docker.io/library/memcached:1.6.45-alpine` |
+| **Loki Access Log** | `access-log-exporter` | `ghcr.io/jkroepke/access-log-exporter:1.0.1` |
 | **Redpanda Broker** | `redpanda` | `docker.io/redpandadata/redpanda:v26.2.6` |
 | **Redpanda Console** | `console` | `docker.io/redpandadata/console:v3.9.0` |
 | **Redpanda Operator** | `redpanda-operator` | `docker.io/redpandadata/redpanda-operator:v26.2.5` |
