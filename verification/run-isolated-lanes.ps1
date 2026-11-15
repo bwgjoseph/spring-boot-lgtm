@@ -1,4 +1,4 @@
-param (
+﻿param (
     [string]$Namespace = "monitoring",
     [string]$Env = "dev",
     [switch]$SkipReportLaunch = $false
@@ -80,6 +80,34 @@ function Assert-Check($name, $condition, $details) {
         Details = $details
     }
 }
+
+# -------------------------------------------------------------------------------------------------
+# PRE-FLIGHT BASELINE RESET: Clean / Scale down non-essential deployments
+# -------------------------------------------------------------------------------------------------
+Write-Host "`n>>> [PRE-FLIGHT] Resetting cluster to clean baseline..." -ForegroundColor Cyan
+
+# Remove completed/error batch jobs
+kubectl delete jobs -n $Namespace -l app.kubernetes.io/name=telemetrygen --ignore-not-found 2>$null | Out-Null
+kubectl delete pods -n $Namespace -l app.kubernetes.io/name=redpanda-configuration --ignore-not-found 2>$null | Out-Null
+
+# Clean up active trace/log backends from previous runs
+Write-Host "  - Cleaning up heavy trace/log/metrics backends..." -ForegroundColor Gray
+helm uninstall tempo -n $Namespace --ignore-not-found 2>$null | Out-Null
+helm uninstall redpanda -n $Namespace --ignore-not-found 2>$null | Out-Null
+helm uninstall loki -n $Namespace --ignore-not-found 2>$null | Out-Null
+helm uninstall pyroscope -n $Namespace --ignore-not-found 2>$null | Out-Null
+helm uninstall rustfs -n $Namespace --ignore-not-found 2>$null | Out-Null
+
+# Scale down deployments & statefulsets
+kubectl scale deployment spring-boot-app -n $Namespace --replicas=0 2>$null | Out-Null
+kubectl scale deployment prometheus-server -n $Namespace --replicas=0 2>$null | Out-Null
+kubectl scale deployment minio -n $Namespace --replicas=0 2>$null | Out-Null
+kubectl scale statefulset mongodb -n $Namespace --replicas=0 2>$null | Out-Null
+kubectl scale statefulset mongodb-arbiter -n $Namespace --replicas=0 2>$null | Out-Null
+
+Write-Host "  - Waiting for baseline pods to settle..." -ForegroundColor Gray
+Start-Sleep -Seconds 5
+Write-Host "  [✓] Pre-flight baseline ready (Resident Alloy active)." -ForegroundColor Green
 
 # -------------------------------------------------------------------------------------------------
 # LANE 1: Spring Boot App Core, Debezium CDC, MDC, & Starter Contract
