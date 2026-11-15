@@ -1,4 +1,4 @@
-param (
+﻿param (
     [string]$Namespace = "monitoring",
     [string]$Type = "traces", # 'traces', 'logs', 'metrics', or 'all'
     [int]$TimeoutSeconds = 60
@@ -71,25 +71,52 @@ spec:
     return $true
 }
 
-# Auto-detect querying pod
-$queryPod = kubectl get pods -n $Namespace -l app=spring-boot-app -o jsonpath='{.items[0].metadata.name}' 2>$null
-if (-not $queryPod) {
-    $queryPod = kubectl get pods -n $Namespace -l app.kubernetes.io/name=alloy -o jsonpath='{.items[0].metadata.name}' 2>$null
-}
-
-if (-not $queryPod) {
-    Write-Warning "Could not find an in-cluster helper pod for internal curl/wget queries. Using port-forward fallback if needed."
+# Auto-detect querying pod capable of running curl or wget
+function Get-QueryRunner() {
+    $candidates = @(
+        @{ selector = "app=spring-boot-app"; container = "" },
+        @{ selector = "app.kubernetes.io/name=redpanda"; container = "redpanda" },
+        @{ selector = "app.kubernetes.io/name=mongodb"; container = "mongodb" },
+        @{ selector = "app=rustfs"; container = "" },
+        @{ selector = "app.kubernetes.io/name=alloy"; container = "alloy" },
+        @{ selector = "app.kubernetes.io/name=k8s-monitoring-alloy"; container = "alloy" }
+    )
+    foreach ($c in $candidates) {
+        $pod = kubectl get pods -n $Namespace -l $c.selector -o jsonpath='{.items[0].metadata.name}' 2>$null
+        if ($pod) {
+            $phase = kubectl get pod $pod -n $Namespace -o jsonpath='{.status.phase}' 2>$null
+            if ($phase -eq "Running") {
+                return @{ Pod = $pod; Container = $c.container }
+            }
+        }
+    }
+    return $null
 }
 
 # Polling helper
 function Verify-BackendQuery([string]$name, [string]$url, [string]$jqFilter) {
     Write-Host "Verifying $name ingestion at: $url" -ForegroundColor Gray
+    $runner = Get-QueryRunner
+    if (-not $runner) {
+        Write-Error "  [✗] No running helper pod found for in-cluster queries."
+        return $false
+    }
+    $cmdPrefix = "kubectl exec $($runner.Pod) -n $Namespace"
+    if ($runner.Container) { $cmdPrefix += " -c $($runner.Container)" }
+
     for ($i = 1; $i -le 6; $i++) {
         Write-Host "  Attempt $i/6: querying $name..." -ForegroundColor Gray
-        $res = kubectl exec $queryPod -n $Namespace -- wget -qO- "$url" 2>$null | jq -r "$jqFilter" 2>$null
-        if ($res -and $res -ne "null" -and $res -ne "0" -and $res -ne "[]") {
-            Write-Host "  [✓] $name successfully received and indexed telemetry data!" -ForegroundColor Green
-            return $true
+        # Try curl first, then wget
+        $raw = Invoke-Expression "$cmdPrefix -- curl -s `"$url`" 2>`$null"
+        if (-not $raw) {
+            $raw = Invoke-Expression "$cmdPrefix -- wget -qO- `"$url`" 2>`$null"
+        }
+        if ($raw) {
+            $res = $raw | jq -r "$jqFilter" 2>$null
+            if ($res -and $res -ne "null" -and $res -ne "0" -and $res -ne "[]") {
+                Write-Host "  [✓] $name successfully received and indexed telemetry data!" -ForegroundColor Green
+                return $true
+            }
         }
         Start-Sleep -Seconds 5
     }
@@ -102,7 +129,7 @@ $results = @{}
 # Traces Verification
 if ($Type -eq "traces" -or $Type -eq "all") {
     $ran = Run-TelemetrygenJob "traces"
-    if ($ran -and $queryPod) {
+    if ($ran) {
         Write-Host "`n[2/3] Querying Tempo API for service.name=telemetrygen..." -ForegroundColor Cyan
         $tempoSvc = "http://tempo-query-frontend.$Namespace.svc.cluster.local:3200"
         $isTempoPresent = kubectl get svc tempo-query-frontend -n $Namespace 2>$null
@@ -111,14 +138,14 @@ if ($Type -eq "traces" -or $Type -eq "all") {
         $verified = Verify-BackendQuery "Tempo" "$tempoSvc/api/search?tags=service.name=telemetrygen&limit=5" '.traces | length'
         $results["Traces (Tempo)"] = if ($verified) { "PASS" } else { "FAIL" }
     } else {
-        $results["Traces (Tempo)"] = if ($ran) { "PASS (Job Completed)" } else { "FAIL (Job Failed)" }
+        $results["Traces (Tempo)"] = "FAIL (Job Failed)"
     }
 }
 
 # Logs Verification
 if ($Type -eq "logs" -or $Type -eq "all") {
     $ran = Run-TelemetrygenJob "logs"
-    if ($ran -and $queryPod) {
+    if ($ran) {
         Write-Host "`n[2/3] Querying Loki API for service_name=telemetrygen..." -ForegroundColor Cyan
         $lokiSvc = "http://loki-gateway.$Namespace.svc.cluster.local:80"
         $isGatewayPresent = kubectl get svc loki-gateway -n $Namespace 2>$null
@@ -127,20 +154,20 @@ if ($Type -eq "logs" -or $Type -eq "all") {
         $verified = Verify-BackendQuery "Loki" "$lokiSvc/loki/api/v1/query_range?query=%7Bservice_name%3D%22telemetrygen%22%7D" '.data.result | length'
         $results["Logs (Loki)"] = if ($verified) { "PASS" } else { "FAIL" }
     } else {
-        $results["Logs (Loki)"] = if ($ran) { "PASS (Job Completed)" } else { "FAIL (Job Failed)" }
+        $results["Logs (Loki)"] = "FAIL (Job Failed)"
     }
 }
 
 # Metrics Verification
 if ($Type -eq "metrics" -or $Type -eq "all") {
     $ran = Run-TelemetrygenJob "metrics"
-    if ($ran -and $queryPod) {
+    if ($ran) {
         Write-Host "`n[2/3] Querying Prometheus API for telemetrygen metrics..." -ForegroundColor Cyan
         $promSvc = "http://prometheus-server.$Namespace.svc.cluster.local:80"
         $verified = Verify-BackendQuery "Prometheus" "$promSvc/api/v1/query?query=gen_traces_total" '.data.result | length'
         $results["Metrics (Prometheus)"] = if ($verified) { "PASS" } else { "FAIL" }
     } else {
-        $results["Metrics (Prometheus)"] = if ($ran) { "PASS (Job Completed)" } else { "FAIL (Job Failed)" }
+        $results["Metrics (Prometheus)"] = "FAIL (Job Failed)"
     }
 }
 

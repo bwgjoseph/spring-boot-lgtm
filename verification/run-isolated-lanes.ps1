@@ -33,19 +33,47 @@ function Get-ClusterRAM() {
 }
 
 function Get-HelperPod() {
-    $pod = kubectl get pods -n $Namespace -l app.kubernetes.io/name=alloy -o jsonpath='{.items[0].metadata.name}' 2>$null
-    if (-not $pod) {
-        $pod = kubectl get pods -n $Namespace -l app.kubernetes.io/name=k8s-monitoring-alloy -o jsonpath='{.items[0].metadata.name}' 2>$null
+    # Check for pods with curl/wget capability
+    $candidates = @(
+        @{ selector = "app=spring-boot-app"; container = "" },
+        @{ selector = "app.kubernetes.io/name=redpanda"; container = "redpanda" },
+        @{ selector = "app.kubernetes.io/name=mongodb"; container = "mongodb" },
+        @{ selector = "app=rustfs"; container = "" },
+        @{ selector = "app.kubernetes.io/name=alloy"; container = "alloy" },
+        @{ selector = "app.kubernetes.io/name=k8s-monitoring-alloy"; container = "alloy" }
+    )
+    foreach ($c in $candidates) {
+        $pod = kubectl get pods -n $Namespace -l $c.selector -o jsonpath='{.items[0].metadata.name}' 2>$null
+        if ($pod) {
+            $phase = kubectl get pod $pod -n $Namespace -o jsonpath='{.status.phase}' 2>$null
+            if ($phase -eq "Running") {
+                return @{ Pod = $pod; Container = $c.container }
+            }
+        }
     }
-    if (-not $pod) {
-        $pod = kubectl get pods -n $Namespace -l app.kubernetes.io/instance=k8s-monitoring -o jsonpath='{.items[0].metadata.name}' 2>$null
-    }
-    return $pod
+    return $null
+}
+
+function Invoke-HttpQuery([string]$url) {
+    $helper = Get-HelperPod
+    if (-not $helper) { return "" }
+    $cmdPrefix = "kubectl exec $($helper.Pod) -n $Namespace"
+    if ($helper.Container) { $cmdPrefix += " -c $($helper.Container)" }
+
+    # Try curl first, then wget
+    $res = Invoke-Expression "$cmdPrefix -- curl -s `"$url`" 2>`$null"
+    if ($LASTEXITCODE -eq 0 -and $res) { return $res }
+
+    $res = Invoke-Expression "$cmdPrefix -- wget -qO- `"$url`" 2>`$null"
+    if ($LASTEXITCODE -eq 0 -and $res) { return $res }
+
+    return ""
 }
 
 function Assert-Check($name, $condition, $details) {
     $status = if ($condition) { "PASS" } else { "FAIL" }
-    Write-Host "   -> [$status] $name : $details" -ForegroundColor (if ($status -eq "PASS") { "Green" } else { "Red" })
+    $color = if ($status -eq "PASS") { "Green" } else { "Red" }
+    Write-Host "   -> [$status] $name : $details" -ForegroundColor $color
     return @{
         Name = $name
         Status = $status
@@ -168,11 +196,8 @@ if (-not $rustfsPod) {
 $hasS3Tempo = $false
 if ($rustfsPod) {
     # RustFS standalone auto-provisions buckets; verify endpoint is healthy and tempo bucket exists
-    $helperPod = Get-HelperPod
-    if ($helperPod) {
-        $rustfsCheck = kubectl exec -n $Namespace $helperPod -- wget -qO- --spider "http://rustfs.monitoring.svc.cluster.local:9000/tempo" 2>&1
-        $hasS3Tempo = ($LASTEXITCODE -eq 0 -or $rustfsCheck -match "403" -or $rustfsCheck -match "200") # 403 Forbidden indicates S3 API endpoint & bucket exist but auth needed
-    }
+    $rustfsCheck = Invoke-HttpQuery "http://rustfs.monitoring.svc.cluster.local:9000/tempo"
+    $hasS3Tempo = ($rustfsCheck -ne "" -or $LASTEXITCODE -eq 0)
     if (-not $hasS3Tempo) {
         # Fallback check inside RustFS pod
         $hasS3Tempo = $true
@@ -217,15 +242,11 @@ if ($LASTEXITCODE -ne 0) {
 $ramLane3 = Get-ClusterRAM
 
 # 3.1 Loki API Ready Check
-$helperPod = Get-HelperPod
-$lokiReady = $false
-if ($helperPod) {
-    $readyRes = kubectl exec -n $Namespace $helperPod -- wget -qO- http://loki-gateway.monitoring.svc.cluster.local:80/ready 2>$null
-    if (-not $readyRes) {
-        $readyRes = kubectl exec -n $Namespace $helperPod -- wget -qO- http://loki.monitoring.svc.cluster.local:3100/ready 2>$null
-    }
-    $lokiReady = ($readyRes -match "ready")
+$readyRes = Invoke-HttpQuery "http://loki-gateway.monitoring.svc.cluster.local:80/ready"
+if (-not $readyRes) {
+    $readyRes = Invoke-HttpQuery "http://loki.monitoring.svc.cluster.local:3100/ready"
 }
+$lokiReady = ($readyRes -match "ready")
 $lane3Checks.Add((Assert-Check "Loki Service Readiness" $lokiReady "Loki Gateway /ready endpoint responded: $readyRes"))
 
 # 3.2 Ingest synthetic logs & verify via LogQL
@@ -258,23 +279,15 @@ kubectl rollout status deployment/prometheus-server -n $Namespace --timeout=120s
 $ramLane4 = Get-ClusterRAM
 
 # 4.1 Prometheus Server API Check
-$helperPod = Get-HelperPod
-$promReady = $false
-if ($helperPod) {
-    $promRes = kubectl exec -n $Namespace $helperPod -- wget -qO- "http://prometheus-server.monitoring.svc.cluster.local:80/-/ready" 2>$null
-    $promReady = ($promRes -match "Prometheus Server is Ready" -or $promRes -match "ready")
-}
+$promRes = Invoke-HttpQuery "http://prometheus-server.monitoring.svc.cluster.local:80/-/ready"
+$promReady = ($promRes -match "Prometheus Server is Ready" -or $promRes -match "ready")
 $lane4Checks.Add((Assert-Check "Prometheus Server Health" $promReady "Endpoint /-/ready responded successfully"))
 
 # 4.2 Query alloy scrape target metrics
 Start-Sleep -Seconds 10
-if ($helperPod) {
-    $promQuery = kubectl exec -n $Namespace $helperPod -- wget -qO- "http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/query?query=up" 2>$null
-    $hasUpMetrics = ($promQuery -match '"status":"success"' -and $promQuery -match '"result"')
-    $lane4Checks.Add((Assert-Check "Prometheus Scrape Loop & Timeseries Storage" $hasUpMetrics "PromQL query 'up' returned active targets"))
-} else {
-    $lane4Checks.Add((Assert-Check "Prometheus Scrape Targets" $false "Helper pod unavailable for internal query"))
-}
+$promQuery = Invoke-HttpQuery "http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/query?query=up"
+$hasUpMetrics = ($promQuery -match '"status":"success"' -and $promQuery -match '"result"')
+$lane4Checks.Add((Assert-Check "Prometheus Scrape Loop & Timeseries Storage" $hasUpMetrics "PromQL query 'up' returned active targets"))
 
 # Teardown Lane 4
 Write-Host "Teardown Lane 4: Scaling down Prometheus..." -ForegroundColor DarkGray
@@ -312,12 +325,9 @@ if ($pyroPod) {
 }
 
 # 5.2 Pyroscope In-Cluster Health Query
-$helperPod = Get-HelperPod
-if ($helperPod) {
-    $pyroHealth = kubectl exec -n $Namespace $helperPod -- wget -qO- "http://pyroscope.monitoring.svc.cluster.local:4040/ready" 2>$null
-    $isPyroReady = ($pyroHealth -match "ready" -or $pyroHealth -match "OK" -or $LASTEXITCODE -eq 0)
-    $lane5Checks.Add((Assert-Check "Pyroscope HTTP Health & Query API" $isPyroReady "Service port 4040 responded healthy"))
-}
+$pyroHealth = Invoke-HttpQuery "http://pyroscope.monitoring.svc.cluster.local:4040/ready"
+$isPyroReady = ($pyroHealth -match "ready" -or $pyroHealth -match "OK" -or $LASTEXITCODE -eq 0)
+$lane5Checks.Add((Assert-Check "Pyroscope HTTP Health & Query API" $isPyroReady "Service port 4040 responded healthy"))
 
 # Teardown Lane 5
 Write-Host "Teardown Lane 5: Scaling down Pyroscope..." -ForegroundColor DarkGray

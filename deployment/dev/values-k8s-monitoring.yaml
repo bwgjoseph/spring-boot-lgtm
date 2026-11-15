@@ -79,6 +79,24 @@ integrations:
 
 
 # Telemetry Features
+applicationObservability:
+  enabled: true
+  destinations:
+    - tempo
+  metrics:
+    enabled: false
+  logs:
+    enabled: false
+  traces:
+    enabled: true
+  receivers:
+    otlp:
+      grpc:
+        enabled: true
+        port: 4317
+      http:
+        enabled: false
+
 annotationAutodiscovery:
   enabled: true
 
