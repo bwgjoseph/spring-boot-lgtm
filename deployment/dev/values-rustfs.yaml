@@ -11,8 +11,9 @@ mode:
     enabled: false
 
 # --- Authentication Credentials ---
-# Mirrors MinIO secret keys for seamless endpoint swap in Loki/Tempo/Pyroscope values.
+# Use existingSecret to reuse pre-created rustfs-secret with both rootUser/rootPassword and RUSTFS_ACCESS_KEY/RUSTFS_SECRET_KEY
 secret:
+  existingSecret: "rustfs-secret"
   rustfs:
     access_key: "admin"
     secret_key: "password123"

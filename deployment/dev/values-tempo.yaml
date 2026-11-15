@@ -77,14 +77,14 @@ storage:
       insecure: true
       forcepathstyle: true
 
-# Secret injection for S3 bucket credentials
-globalExtraEnv:
-  - name: S3_SECRET_KEY
-    valueFrom:
-      secretKeyRef:
-        name: rustfs-secret
-        key: rootPassword
-        key: rootPassword
+# Secret injection for S3 bucket credentials via global.extraEnv
+global:
+  extraEnv:
+    - name: S3_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: rustfs-secret
+          key: rootPassword
 
 # 6. Minimal resource limits & 1 replica per component
 distributor:

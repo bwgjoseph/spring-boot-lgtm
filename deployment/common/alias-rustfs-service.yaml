@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustfs
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: rustfs-alias
+spec:
+  type: ExternalName
+  externalName: rustfs-svc.monitoring.svc.cluster.local
+  ports:
+    - name: endpoint
+      port: 9000
+      targetPort: 9000
+      protocol: TCP
+    - name: console
+      port: 9001
+      targetPort: 9001
+      protocol: TCP
