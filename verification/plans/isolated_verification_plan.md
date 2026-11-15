@@ -14,6 +14,12 @@ To solve this, testing is partitioned into **5 serial lanes**. Each lane spins u
 | Resident Anchor: Grafana Alloy (~150 MiB)                   |
 +-------------------------------------------------------------+
   |
+  +---> [PRE-FLIGHT: Baseline Reset]
+  |     - Purges leftover jobs (telemetrygen, redpanda-configuration)
+  |     - Uninstalls prior backends (tempo, redpanda, loki, pyroscope, rustfs)
+  |     - Scales app, prometheus, minio, mongo to 0
+  |     - Ensures clean low-RAM slate before Lane 1 starts
+  |
   +---> [LANE 1: App + MongoDB CDC + Starter Contract] (~2.3 GB)
   |     - Up: MongoDB RS (3 pods) + SpringBootApp + Alloy
   |     - Test: Actuator Health, Debezium CDC stream, baggage, MDC logs
@@ -139,8 +145,8 @@ task test:isolated
 
 | Symptom | Likely Cause | Recommended Resolution |
 | :--- | :--- | :--- |
-| **Lane 1 Pod Pending** | Node memory exhausted before lane teardown | Run `task scale-down` before starting the test suite. |
+| **Lane 1 Pod Pending** | Node memory exhausted before lane teardown | Pre-flight baseline automatically handles this; or run `task scale-down`. |
 | **Lane 2 Redpanda Crash** | Docker Desktop WSL2 memory limit hit | Check `.wslconfig` memory limit (ensure >= 4GB); verify `resources.memory.container.max: 2Gi` in `values-redpanda.yaml`. |
-| **Lane 2 Tempo Block Builder Not Ready** | S3 bucket not accessible | Ensure MinIO secret exists (`task secret:minio`) and `minio` deployment is running. |
+| **Lane 2 Tempo Block Builder Not Ready** | S3 bucket not accessible | Ensure RustFS secret exists (`task secret:rustfs`) and `rustfs` statefulset/deployment is running. |
 | **Lane 3 Loki Ingestion Timeout** | Gateway service DNS lookup failure | Verify `alias-alloy-service.yaml` and `values-k8s-monitoring.yaml` endpoint URLs match `loki-gateway.monitoring.svc.cluster.local`. |
 | **Lane 5 Port 9999 Connection Refused** | Alloy config missing `profilesReceiver` | Ensure `values-k8s-monitoring.yaml` has `profilesReceiver.enabled: true` and `port: 9999` exposed under `extraPorts`. |
