@@ -24,7 +24,7 @@ ObjectName debeziumPattern = new ObjectName("debezium.*:*");
 
 ### 3. Dependencies
 We added the following to `pom.xml`:
-- `io.debezium:debezium-bom:3.5.0.Final`
+- `io.debezium:debezium-bom:3.7.0.Final`
 - `io.debezium:debezium-connector-mongodb`
 - `org.jolokia:jolokia-support-spring:2.1.2` (JMX-to-HTTP bridge)
 - `lombok` (For logging and concurrent collection helpers)
