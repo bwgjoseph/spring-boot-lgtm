@@ -4,7 +4,7 @@
 To maintain a production-hardened observability sandbox using the Grafana LGTM stack (Loki, Grafana, Tempo, Mimir/Prometheus) with Grafana Alloy.
 
 ## Current Architecture
-- **Alloy:** Clustered Deployment (k8s-monitoring v4.4.0, 2+ replicas) with multi-role collectors (alloy-metrics, alloy-logs, alloy-receiver). Supports tail-based sampling and multi-exporter gateway. Uses WAL durability.
+- **Alloy:** Clustered Deployment (k8s-monitoring v4.6.1, 2+ replicas) with multi-role collectors (alloy-metrics, alloy-logs, alloy-receiver). Supports tail-based sampling and multi-exporter gateway. Uses WAL durability.
 - **Loki:** SimpleScalable mode, S3 persistence, Replication Factor 3, TSDB schema (v13), with 30-day compactor retention.
 - **Tempo:** Microservices mode (tempo-distributed, Redpanda Kafka streaming buffer, 2-3 replicas per component), S3 backend, Persistent 20Gi SSD WAL, and Metrics-Generator enabled.
 - **RustFS:** Standalone mode on SSD storage in dev, distributed mode in prod, serving as the high-performance S3-compatible backend.
