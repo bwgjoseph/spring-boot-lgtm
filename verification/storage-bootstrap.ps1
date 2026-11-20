@@ -1,3 +1,8 @@
+<#
+.SYNOPSIS
+    Legacy storage bootstrapping script for MinIO.
+    Note: RustFS auto-provisions configured buckets (loki, tempo, pyroscope, mimir) via its Helm values.
+#>
 param(
     [string]$minioUrl = "http://minio.monitoring.svc:9000"
 )

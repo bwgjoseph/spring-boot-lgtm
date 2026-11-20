@@ -43,7 +43,7 @@ graph TD
     end
 
     subgraph "Infrastructure Layer"
-        MINIO["MinIO<br/>(Port: 9000)"]
+        RUSTFS["RustFS<br/>(Port: 9000)"]
         MONGO["MongoDB<br/>(Port: 27017)"]
     end
 
@@ -63,9 +63,9 @@ graph TD
     ALLOY -- "OTLP (4317)" --> TEMPO
 
     %% Storage Relationships
-    PROM -- "Remote Write" --> MINIO
-    LOKI -- "S3 API" --> MINIO
-    TEMPO -- "S3 API" --> MINIO
+    PROM -- "Remote Write" --> RUSTFS
+    LOKI -- "S3 API" --> RUSTFS
+    TEMPO -- "S3 API" --> RUSTFS
     
     %% Internal Correlation & Alerting
     TEMPO -- "Remote Write (Service Graph)" --> PROM
@@ -76,7 +76,7 @@ graph TD
     GRAFANA -- "Queries" --> PROM
     GRAFANA -- "Queries" --> LOKI
     GRAFANA -- "Queries" --> TEMPO
-    GRAFANA -- "Persistence" --> MINIO
+    GRAFANA -- "Persistence" --> RUSTFS
 
     %% Styling
     style ALLOY fill:#f96,stroke:#333,stroke-width:2px
@@ -90,20 +90,20 @@ graph TD
 - **Correlation:** Data sources use standardized UIDs (`prometheus`, `loki`, `tempo`) to enable seamless cross-linking (Metric -> Trace -> Log).
 - **Alloy:** Acts as the entry point, processing traces (sampling, batching) and extracting structured metadata before forwarding to Tempo and Loki.
 - **Service Graph:** Generated natively by Tempo's internal `metricsGenerator` and pushed to Prometheus.
-- **Scalability:** Loki runs in **SimpleScalable** mode. Tempo runs in **Microservices Mode** (`tempo-distributed` 3.0.6) with **Redpanda** as the streaming ingestion log.
-- **Storage:** MinIO provides S3-compatible shared storage for **Loki**, **Tempo**, and **Mimir**. **MongoDB** is deployed as a 3-node ReplicaSet with CDC enabled.
+- **Scalability:** Loki runs in **SimpleScalable** mode. Tempo runs in **Microservices Mode** (`tempo-distributed`) with **Redpanda** as the streaming ingestion log.
+- **Storage:** RustFS provides S3-compatible shared storage for **Loki**, **Tempo**, **Pyroscope**, and **Mimir**. **MongoDB** is deployed as a 3-node ReplicaSet with CDC enabled.
 
 ## 🛠️ Tech Stack & Versions
 
 | Component           | Role              | Helm Chart                        | Version   |
 |---------------------|-------------------|-----------------------------------|-----------|
 | **Spring Boot 3.5** | Application       | -                                 | -         |
-| **Grafana Alloy**   | Collector/Gateway | `grafana/alloy`                   | `1.11.1`  |
-| **Grafana**         | Visualization     | `grafana-community/grafana`       | `12.11.1` |
-| **Loki**            | Log Storage       | `grafana-community/loki`          | `18.9.0`  |
-| **Tempo**           | Trace Storage     | `grafana-community/tempo-distributed` | `3.0.6` |
-| **Redpanda**        | Streaming Log     | `redpanda/redpanda`               | `26.2.1`  |
-| **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `29.27.0` |
+| **Grafana Alloy**   | Collector/Gateway | `grafana/alloy`                   | `1.15.0`  |
+| **Grafana**         | Visualization     | `grafana-community/grafana`       | `14.4.0`  |
+| **Loki**            | Log Storage       | `grafana-community/loki`          | `21.0.0`  |
+| **Tempo**           | Trace Storage     | `grafana-community/tempo-distributed` | `3.27.0` |
+| **Redpanda**        | Streaming Log     | `redpanda/redpanda`               | `26.2.5`  |
+| **Prometheus**      | Metrics Storage   | `prometheus-community/prometheus` | `29.45.1` |
 | **RustFS**          | Object Storage    | `rustfs/rustfs`                   | `1.0.3`   |
 | **MinIO**           | Object Storage (Legacy) | `minio/minio`               | `5.4.0`   |
 | **MongoDB**         | DB / CDC Source   | `bitnami/mongodb` (OCI)           | `18.6.31` |

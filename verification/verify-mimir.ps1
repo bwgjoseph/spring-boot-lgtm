@@ -1,4 +1,4 @@
-param (
+﻿param (
     [string]$Env = "dev",
     [string]$Mode = "full"
 )
@@ -27,12 +27,19 @@ if ($Mode -eq "full") {
 }
 
 # 3. Storage check
-$minioPod = (kubectl get pods -n monitoring -l release=minio -o name | Select-Object -First 1)
-$bucketExists = kubectl exec -n monitoring $minioPod -- mc ls local/mimir --quiet
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "  - [✓] S3 Backend healthy."
+$storagePod = (kubectl get pods -n monitoring -l app.kubernetes.io/name=rustfs -o name | Select-Object -First 1)
+if (-not $storagePod) {
+    $storagePod = (kubectl get pods -n monitoring -l release=minio -o name | Select-Object -First 1)
+}
+if ($storagePod) {
+    $bucketExists = kubectl exec -n monitoring $storagePod -- mc ls local/mimir --quiet
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  - [✓] S3 Backend healthy."
+    } else {
+        Write-Warning "  - S3 Backend check failed."
+    }
 } else {
-    Write-Warning "  - S3 Backend check failed."
+    Write-Warning "  - Storage pod not found for S3 check."
 }
 
 # 4. Metrics Ingestion Check (Query Mimir directly)

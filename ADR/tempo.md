@@ -35,7 +35,7 @@ flowchart TD
     end
 
     subgraph StorageTier ["Durable Object Storage"]
-        MINIO["MinIO S3 Backend (Port 9000)<br/><i>Bucket: 'tempo' (Parquet Blocks)</i>"]
+        RUSTFS["RustFS S3 Backend (Port 9000)<br/><i>Bucket: 'tempo' (Parquet Blocks)</i>"]
     end
 
     subgraph QueryTier ["Query & Analysis Tier"]
@@ -52,7 +52,7 @@ flowchart TD
     %% Streaming Ingestion to Storage & Live Store
     REDPANDA -->|"Consume (3 Partitions)"| BLOCK_BUILDER
     REDPANDA -->|"Consume (Recent Spans)"| LIVE_STORE
-    BLOCK_BUILDER -->|"3. Flush Parquet Blocks"| MINIO
+    BLOCK_BUILDER -->|"3. Flush Parquet Blocks"| RUSTFS
 
     %% Metrics Generation
     DISTRIBUTOR -.->|"Fan-out Spans"| METRICS_GEN
@@ -62,7 +62,7 @@ flowchart TD
     GRAFANA -->|"TraceQL Query"| QF
     QF --> QUERIER
     QUERIER -->|"Search In-Flight Traces"| LIVE_STORE
-    QUERIER -->|"Search Historical Parquet Blocks"| MINIO
+    QUERIER -->|"Search Historical Parquet Blocks"| RUSTFS
     GRAFANA -.->|"Query Service Graph Metrics"| PROM
 
     classDef ingress fill:#fff3e0,stroke:#e65100,stroke-width:2px;
@@ -74,7 +74,7 @@ flowchart TD
     class DISTRIBUTOR ingress;
     class REDPANDA buffer;
     class BLOCK_BUILDER,LIVE_STORE,METRICS_GEN proc;
-    class MINIO storage;
+    class RUSTFS storage;
     class QF,QUERIER,PROM,GRAFANA query;
 ```
 
@@ -83,19 +83,19 @@ flowchart TD
 ## Decision
 
 1. **Deployment Mode (Tempo 3.x Microservices):**
-   - Deploy via `grafana-community/tempo-distributed` (Chart 3.0.6) utilizing the **Tempo 3.x microservices model**.
+   - Deploy via `grafana-community/tempo-distributed` (Chart 3.27.0) utilizing the **Tempo 3.x microservices model**.
    - Decouple ingestion from block construction via **Redpanda** as a streaming log buffer.
 
 2. **Streaming Ingestion Tier (Redpanda + Block Builder):**
    - **Distributor (2 replicas):** Receives OTLP gRPC traffic on port `4317` and immediately streams spans to Redpanda.
    - **Kafka Topic:** Topic `tempo-traces` with **3 partitions** (`auto_create_topic_default_partitions: 3`).
-   - **Block Builder (3 replicas):** Matches the 3 Kafka partitions. Operates under consumer group `tempo-block-builder` to continuously aggregate spans and flush columnar **Parquet** blocks to MinIO S3.
+   - **Block Builder (3 replicas):** Matches the 3 Kafka partitions. Operates under consumer group `tempo-block-builder` to continuously aggregate spans and flush columnar **Parquet** blocks to RustFS S3.
    - **Live Store (3 replicas):** Consumes recent spans from Redpanda to serve in-memory queries for active in-flight traces with zero latency. *(In resource-constrained `dev`, live-store can be scaled down or disabled to conserve single-node memory).*
 
 3. **Storage Architecture & Columnar Parquet Format:**
-   - **Backend:** MinIO S3 (`bucket: tempo`) with path-style access enabled.
+   - **Backend:** RustFS S3 (`bucket: tempo`) with path-style access enabled.
    - **Columnar Format:** Exclusively build and store blocks in **Parquet** format, optimizing TraceQL search execution and compression.
-   - **Credential Management:** Injected globally via `globalExtraEnv` referencing secret `minio` (`rootPassword` as `S3_SECRET_KEY`) with `-config.expand-env=true` passed to all components.
+   - **Credential Management:** Injected globally via `globalExtraEnv` referencing secret `rustfs-secret` (`rootPassword` as `S3_SECRET_KEY`) with `-config.expand-env=true` passed to all components.
 
 4. **Metrics-from-Traces (Service Graphs & Span Metrics):**
    - Deploy **`metricsGenerator` (2 replicas)** with dedicated **5Gi SSD persistence** for its local Write-Ahead Log (`/var/tempo/generator/wal`).
@@ -132,14 +132,14 @@ This table maps the production implementation in `deployment/prod/values-tempo.y
 | `metricsGenerator.enabled` | `true` (`replicas: 2`, `WAL: 5Gi`) | Automatic Service Graph and Span Metric derivation. | Observability |
 | `metricsGenerator.remote_write`| Targets Prometheus with Exemplars | Pushes service dependency metrics to Prometheus. | Correlation |
 | `overrides.generate_native_histograms`| `both` | Produces Prometheus sparse native histograms. | Metrics Efficiency |
-| `globalExtraEnv` | `secretKeyRef: minio -> rootPassword` | Secure S3 credential expansion across all pods. | Security |
+| `globalExtraEnv` | `secretKeyRef: rustfs-secret -> rootPassword` | Secure S3 credential expansion across all pods. | Security |
 
 ---
 
 ## Consequences
 
 - **Positive:**
-  - Redpanda streaming buffer prevents trace ingestion loss during sudden traffic bursts or MinIO latency spikes.
+  - Redpanda streaming buffer prevents trace ingestion loss during sudden traffic bursts or RustFS latency spikes.
   - Automatic, real-time Service Graph generation in Grafana without manual instrumentation.
   - Parquet format delivers 5x–10x faster TraceQL query speeds compared to legacy formats.
   - Zero-lag queryability of hot spans via `liveStore`.

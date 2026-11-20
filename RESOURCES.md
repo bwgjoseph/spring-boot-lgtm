@@ -27,7 +27,6 @@ The following table lists the `requests` (guaranteed) and `limits` (maximum) for
 | **tempo-backend-scheduler** | 10m | 200m | 64Mi | 256Mi | `values-tempo.yaml` |
 | **tempo-backend-worker** | 10m | 200m | 64Mi | 256Mi | `values-tempo.yaml` |
 | **tempo-metrics-generator** | 10m | 200m | 64Mi | 256Mi | `values-tempo.yaml` |
-| **minio** | 100m | Unset | 256Mi | Unset | `values-minio.yaml` |
 | **rustfs** (dev standalone) | 50m | 500m | 128Mi | 512Mi | `values-rustfs.yaml` |
 | **rustfs** (prod distributed x4) | 250m | 1000m | 256Mi | 1Gi | `values-rustfs.yaml` |
 | **alloy** (DaemonSet) | Unset | Unset | Unset | Unset | `values-alloy.yaml` |

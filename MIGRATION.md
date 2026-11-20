@@ -3,7 +3,7 @@
 ## 1. Overview & Objectives
 This document details the strategy, architectural changes, and execution roadmap for migrating the telemetry collection layer from standalone **Grafana Alloy** (`grafana/alloy`) to the unified **`grafana/k8s-monitoring`** Helm chart (target version: **`4.4.0`**).
 
-The goal of this migration is to simplify and standardize the collection of logs, metrics, traces, and Kubernetes cluster telemetry into a single declarative chart while retaining the existing LGTM backends (**Loki**, **Tempo**, **Prometheus/Mimir**, and **MinIO**).
+The goal of this migration is to simplify and standardize the collection of logs, metrics, traces, and Kubernetes cluster telemetry into a single declarative chart while retaining the existing LGTM backends (**Loki**, **Tempo**, **Prometheus/Mimir**, and **RustFS**).
 
 ---
 
@@ -29,7 +29,7 @@ Under the hood, `grafana/k8s-monitoring` uses Grafana Alloy as its execution eng
 | **Cluster Events & Host Logs** | Required hand-written K8s Event watchers and `/var/log/journal` mount configs. | `clusterEvents.enabled: true` and `nodeLogs.enabled: true`. | **Out-of-the-box K8s warning events** and host system log ingestion into Loki. |
 
 > **What does NOT change:**
-> Backend storage engines (**Loki**, **Tempo**, **Prometheus/Mimir**, and **MinIO**) remain completely intact as destinations.
+> Backend storage engines (**Loki**, **Tempo**, **Prometheus/Mimir**, and **RustFS**) remain completely intact as destinations.
 
 ---
 
