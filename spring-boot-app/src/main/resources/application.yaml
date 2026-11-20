@@ -4,7 +4,7 @@ spring:
   data:
     mongodb:
       enabled: true
-      uri: mongodb://root:password@localhost:27017/kx?authSource=admin
+  mongodb.uri: mongodb://root:password@localhost:27017/kx?authSource=admin
 debezium:
   enabled: ${DEBEZIUM_ENABLED:true}
   properties:
@@ -46,7 +46,7 @@ management:
       produce: [w3c]
       consume: [w3c]
     # In newer Spring Boot, this explicitly enables MDC correlation
-    enabled: true
+    export.enabled: true
     baggage:
       # These travel across service boundaries
       remote-fields:

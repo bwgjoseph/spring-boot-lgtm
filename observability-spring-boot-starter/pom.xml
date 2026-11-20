@@ -47,7 +47,7 @@
 		<!-- Optional: AOP for @Observed -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-aop</artifactId>
+			<artifactId>spring-boot-starter-aspectj</artifactId>
 			<optional>true</optional>
 		</dependency>
 
@@ -61,7 +61,7 @@
 		<!-- Optional: Spring Web (for ServerRequestObservationContext) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
+			<artifactId>spring-boot-starter-webmvc</artifactId>
 			<optional>true</optional>
 		</dependency>
 
